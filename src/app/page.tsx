@@ -24,6 +24,7 @@ const SIMULATED_USERS = [
 export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [startupError, setStartupError] = useState("");
   const [seeding, setSeeding] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard"); // dashboard, expenses, workflow, logs, users
   
@@ -82,6 +83,9 @@ export default function Dashboard() {
   const fetchSession = async () => {
     try {
       const res = await fetch("/api/auth/me");
+      if (!res.ok) {
+        throw new Error(`Server returned error status: ${res.status}`);
+      }
       const data = await res.json();
       if (data.success) {
         setCurrentUser(data.user);
@@ -90,8 +94,9 @@ export default function Dashboard() {
         // Not logged in -> Login as initiator by default for preview
         await handleSwitchUser(SIMULATED_USERS[0]);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      setStartupError("Database connection failed. Please ensure MONGODB_URI is correctly configured in your Vercel Project Settings and whitelisted (0.0.0.0/0) in your MongoDB Atlas cluster.");
     } finally {
       setLoading(false);
     }
@@ -190,14 +195,22 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: userConfig.email, password: userConfig.pass }),
       });
+      if (!loginRes.ok) {
+        throw new Error(`Server returned error status: ${loginRes.status}`);
+      }
       const data = await loginRes.json();
       if (data.success) {
         setCurrentUser(data.user);
         setSelectedExpense(null);
         await loadDashboardData(data.user);
+      } else {
+        throw new Error(data.error || "Login simulation failed");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      if (!currentUser) {
+        setStartupError("Database connection failed. Please ensure MONGODB_URI is correctly configured in your Vercel Project Settings and whitelisted (0.0.0.0/0) in your MongoDB Atlas cluster.");
+      }
     } finally {
       setLoading(false);
     }
@@ -423,6 +436,29 @@ export default function Dashboard() {
     steps[index] = { ...steps[index], [field]: value };
     setWorkflowSteps(steps);
   };
+
+  if (startupError) {
+    return (
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#0F172A", color: "#F8FAFC", padding: "2rem", fontFamily: "var(--font-sans)" }}>
+        <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", padding: "2.5rem", textAlign: "center" }}>
+          <div style={{ display: "inline-flex", padding: "0.75rem", borderRadius: "50%", background: "rgba(239, 68, 68, 0.2)", color: "#EF4444", marginBottom: "1.5rem" }}>
+            <Icons.AlertTriangle size={32} />
+          </div>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: "bold", marginBottom: "1rem" }}>System Initialization Failed</h2>
+          <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.95rem", lineHeight: "1.6", marginBottom: "2rem" }}>
+            {startupError}
+          </p>
+          <button 
+            onClick={() => { setStartupError(""); setLoading(true); fetchSession(); }}
+            className="btn btn-primary"
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}
+          >
+            <Icons.RefreshCw size={16} /> Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
