@@ -11,6 +11,8 @@ const UserSchema = new Schema(
     passwordHash: { type: String, required: true },
     inviteToken: { type: String, required: false },
     inviteExpires: { type: Date, required: false },
+    resetCode: { type: String, required: false },
+    resetCodeExpires: { type: Date, required: false },
   },
   { timestamps: true }
 );

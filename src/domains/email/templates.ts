@@ -196,3 +196,37 @@ export function getInviteEmailHtml(inviteUrl: string, roleName: string, recipien
 
   return compileTemplate(content, { title: "Invitation to join EMS", origin });
 }
+
+/**
+ * Password Reset Code email template.
+ */
+export function getResetCodeEmailHtml(code: string, recipientName: string = "User", origin?: string): string {
+  const content = `
+    <h2 style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 24px; font-weight: 700; color: #0F172A; margin: 0 0 16px 0; text-align: left;">Reset your password</h2>
+    
+    <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px 0; text-align: left;">
+      Hello ${recipientName},
+    </p>
+    
+    <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px 0; text-align: left;">
+      We received a request to reset the password for your Expense Management System account. Please use the following 6-digit verification code to proceed:
+    </p>
+    
+    <!-- Code Box -->
+    <table border="0" cellspacing="0" cellpadding="0" align="center" style="margin: 30px auto 24px auto; width: 100%;">
+      <tr>
+        <td align="center">
+          <div style="display: inline-block; background-color: #F1F5F9; border: 1px solid #E2E8F0; padding: 14px 28px; border-radius: 8px; font-family: Courier, monospace; font-size: 28px; font-weight: 700; color: #0A52D6; letter-spacing: 4px; text-align: center;">
+            ${code}
+          </div>
+        </td>
+      </tr>
+    </table>
+    
+    <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #64748B; text-align: center; margin: 16px 0 0 0;">
+      This code is valid for 15 minutes and can only be used once. If you did not request this code, you can safely ignore this email.
+    </p>
+  `;
+
+  return compileTemplate(content, { title: "Reset your EMS password", origin });
+}
