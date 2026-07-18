@@ -54,9 +54,7 @@ body {
 
 /* Glassmorphism styling */
 .glass-panel {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgb(var(--color-surface));
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-glass);
@@ -275,7 +273,7 @@ html[data-theme="light"], :root[data-theme="light"] {
 }
 
 [data-theme="light"] .glass-panel {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgb(var(--color-surface));
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
 }
