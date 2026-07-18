@@ -16,6 +16,13 @@ export class AuthService {
   }
 
   /**
+   * Compares a plain password with a hashed password
+   */
+  public static async comparePassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
+
+  /**
    * Log in user and return user details and token
    */
   public static async login(email: string, password: string) {
