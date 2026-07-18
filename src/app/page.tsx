@@ -197,6 +197,10 @@ export default function Dashboard() {
   const fetchSession = async () => {
     try {
       const res = await fetch("/api/auth/me");
+      if (res.status === 401) {
+        router.push("/login");
+        return;
+      }
       if (!res.ok) {
         throw new Error(`Server returned error status: ${res.status}`);
       }
