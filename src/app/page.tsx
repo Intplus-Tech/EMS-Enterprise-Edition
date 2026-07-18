@@ -1341,7 +1341,7 @@ export default function Dashboard() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
               {/* My Drafts Column */}
               <div>
-                <h3 style={{ fontSize: "1.1rem", fontWeight: "bold", marginBottom: "1rem", color: "#fff" }}>My Drafts</h3>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: "bold", marginBottom: "1rem", color: "rgb(var(--color-text))" }}>My Drafts</h3>
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   {(() => {
                     const drafts = expenses.filter(e => {
@@ -1363,7 +1363,7 @@ export default function Dashboard() {
                             <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))", fontWeight: "bold" }}>{draft.requestNumber}</span>
                             <span className={`badge badge-${draft.status.toLowerCase()}`}>{draft.status}</span>
                           </div>
-                          <h4 style={{ fontSize: "0.95rem", fontWeight: "600", color: "#fff", marginBottom: "0.2rem" }}>{draft.description}</h4>
+                          <h4 style={{ fontSize: "0.95rem", fontWeight: "600", color: "rgb(var(--color-text))", marginBottom: "0.2rem" }}>{draft.description}</h4>
                           <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
                             <span>${draft.amount.toLocaleString()}</span>
                             <span>• Last edited {new Date(draft.updatedAt).toLocaleDateString()}</span>
@@ -1404,7 +1404,7 @@ export default function Dashboard() {
                               <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))", fontWeight: "bold" }}>EXP-0041</span>
                               <span className="badge badge-draft">DRAFT</span>
                             </div>
-                            <h4 style={{ fontSize: "0.95rem", fontWeight: "600", color: "#fff", marginBottom: "0.2rem" }}>Local Transport - Oct</h4>
+                            <h4 style={{ fontSize: "0.95rem", fontWeight: "600", color: "rgb(var(--color-text))", marginBottom: "0.2rem" }}>Local Transport - Oct</h4>
                             <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
                               <span>$84.20</span>
                               <span>• Last edited 2h ago</span>
@@ -1427,7 +1427,7 @@ export default function Dashboard() {
                               <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))", fontWeight: "bold" }}>EXP-0042</span>
                               <span className="badge badge-draft">DRAFT</span>
                             </div>
-                            <h4 style={{ fontSize: "0.95rem", fontWeight: "600", color: "#fff", marginBottom: "0.2rem" }}>Client Dinner (Alpha Corp)</h4>
+                            <h4 style={{ fontSize: "0.95rem", fontWeight: "600", color: "rgb(var(--color-text))", marginBottom: "0.2rem" }}>Client Dinner (Alpha Corp)</h4>
                             <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
                               <span>$312.00</span>
                               <span>• Last edited Yesterday</span>
@@ -1445,7 +1445,7 @@ export default function Dashboard() {
 
               {/* Active Requests Column */}
               <div>
-                <h3 style={{ fontSize: "1.1rem", fontWeight: "bold", marginBottom: "1rem", color: "#fff" }}>Active Requests</h3>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: "bold", marginBottom: "1rem", color: "rgb(var(--color-text))" }}>Active Requests</h3>
                 <div className="glass-panel" style={{ padding: "1.25rem" }}>
                   <div className="table-container">
                     <table className="data-table">
@@ -2144,8 +2144,8 @@ export default function Dashboard() {
                             width: "2rem",
                             height: "2rem",
                             borderRadius: "50%",
-                            background: isActive ? "rgba(99, 102, 241, 0.2)" : isCompleted ? "rgba(16, 185, 129, 0.2)" : "rgba(255, 255, 255, 0.05)",
-                            border: isActive ? "2px solid rgb(var(--color-primary))" : isCompleted ? "2px solid rgb(var(--color-secondary))" : "2px solid rgba(255, 255, 255, 0.1)",
+                            background: isActive ? "rgba(99, 102, 241, 0.2)" : isCompleted ? "rgba(16, 185, 129, 0.2)" : "rgba(var(--color-card-border), 0.15)",
+                            border: isActive ? "2px solid rgb(var(--color-primary))" : isCompleted ? "2px solid rgb(var(--color-secondary))" : "2px solid rgba(var(--color-card-border), 0.35)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -2153,7 +2153,7 @@ export default function Dashboard() {
                           }}>
                             {isCompleted ? <Icons.Check size={16} /> : (idx + 1)}
                           </div>
-                          <span style={{ fontSize: "0.7rem", marginTop: "0.25rem", color: step.active ? "#fff" : "rgb(var(--color-text-dim))", fontWeight: step.active ? "600" : "normal" }}>{step.name}</span>
+                          <span style={{ fontSize: "0.7rem", marginTop: "0.25rem", color: step.active ? "rgb(var(--color-text))" : "rgb(var(--color-text-dim))", fontWeight: step.active ? "600" : "normal" }}>{step.name}</span>
                         </div>
                       );
                     })}
@@ -2189,10 +2189,10 @@ export default function Dashboard() {
                     <h4 style={{ fontSize: "0.85rem", fontWeight: "bold", textTransform: "uppercase", color: "rgb(var(--color-text-dim))" }}>Attachments (1)</h4>
                     
                     {/* Attachment Item */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", background: "rgba(var(--color-card-border), 0.1)", borderRadius: "8px", border: "1px solid rgba(var(--color-card-border), 0.2)" }}>
                       <Icons.FileText size={28} style={{ color: "rgb(var(--color-primary))", flexShrink: 0 }} />
                       <div style={{ flexGrow: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: "0.85rem", color: "#fff", fontWeight: "600", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", margin: 0 }}>
+                        <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text))", fontWeight: "600", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", margin: 0 }}>
                           {selectedExpense.supportingDocument || "invoice_receipt.pdf"}
                         </p>
                         <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))" }}>1.2 MB • Oct 14, 2023</span>
@@ -2213,14 +2213,14 @@ export default function Dashboard() {
                       flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      border: "2px dashed rgba(255, 255, 255, 0.1)",
+                      border: "2px dashed rgba(var(--color-card-border), 0.35)",
                       borderRadius: "8px",
                       padding: "1.5rem",
                       textAlign: "center",
-                      background: "rgba(255,255,255,0.01)"
+                      background: "rgba(var(--color-card-border), 0.05)"
                     }}>
                       <Icons.Upload size={24} style={{ color: "rgb(var(--color-text-dim))", marginBottom: "0.5rem" }} />
-                      <span style={{ fontSize: "0.8rem", color: "#fff", fontWeight: "600" }}>Drop more files to attach</span>
+                      <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text))", fontWeight: "600" }}>Drop more files to attach</span>
                     </div>
                   </div>
                 </div>
@@ -2288,18 +2288,18 @@ export default function Dashboard() {
                             width: "1.5rem",
                             height: "1.5rem",
                             borderRadius: "50%",
-                            background: step.active ? "rgb(var(--color-secondary))" : "rgba(255,255,255,0.08)",
+                            background: step.active ? "rgb(var(--color-secondary))" : "rgba(var(--color-card-border), 0.15)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             fontSize: "0.75rem",
                             fontWeight: "bold",
-                            color: step.active ? "#0f172a" : "inherit"
+                            color: step.active ? "#0f172a" : "rgb(var(--color-text-dim))"
                           }}
                         >
                           {step.active ? "✓" : idx + 1}
                         </div>
-                        <span style={{ fontSize: "0.7rem", marginTop: "0.25rem", color: step.active ? "#fff" : "rgb(var(--color-text-dim))" }}>{step.name}</span>
+                        <span style={{ fontSize: "0.7rem", marginTop: "0.25rem", color: step.active ? "rgb(var(--color-text))" : "rgb(var(--color-text-dim))" }}>{step.name}</span>
                       </div>
                     ))}
                   </div>
@@ -2545,7 +2545,7 @@ export default function Dashboard() {
                     }}
                   >
                     <Icons.UploadCloud size={32} style={{ color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }} />
-                    <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: "600", color: "#fff" }}>
+                    <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: "600", color: "rgb(var(--color-text))" }}>
                       {resubmitForm.supportingDocument || "Click to upload merchant receipt file"}
                     </p>
                     <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>Supports PDF, PNG, JPG up to 10MB</span>
@@ -2601,12 +2601,12 @@ export default function Dashboard() {
           <div className="glass-panel" style={{ width: "100%", maxWidth: "450px", padding: "2rem", margin: "auto", display: "flex", flexDirection: "column", gap: "1.5rem", textAlign: "center" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontWeight: "700", fontSize: "0.95rem" }}>Transaction Invoice Receipt</span>
-              <button onClick={() => { setShowReceiptModal(false); setSelectedReceiptData(null); }} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer" }}>
+              <button onClick={() => { setShowReceiptModal(false); setSelectedReceiptData(null); }} style={{ background: "none", border: "none", color: "rgb(var(--color-text))", cursor: "pointer" }}>
                 <Icons.X size={20} />
               </button>
             </div>
 
-            <div style={{ padding: "1.5rem", background: "rgba(255,255,255,0.03)", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
+            <div style={{ padding: "1.5rem", background: "rgba(var(--color-card-border), 0.1)", borderRadius: "12px", border: "1px solid rgba(var(--color-card-border), 0.2)", display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
               <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(16,185,129,0.15)", color: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "0.5rem" }}>
                 <Icons.CheckCircle size={28} />
               </div>
@@ -2615,7 +2615,7 @@ export default function Dashboard() {
                 <p style={{ color: "#10B981", fontSize: "0.85rem", margin: "0.25rem 0 0" }}><span className="badge badge-paid">PAID</span></p>
               </div>
 
-              <div style={{ width: "100%", borderTop: "1px dashed rgba(255,255,255,0.12)", margin: "0.5rem 0" }} />
+              <div style={{ width: "100%", borderTop: "1px dashed rgba(var(--color-card-border), 0.4)", margin: "0.5rem 0" }} />
 
               <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.75rem", fontSize: "0.85rem", textAlign: "left" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -2650,7 +2650,7 @@ export default function Dashboard() {
           <div className="glass-panel" style={{ width: "100%", maxWidth: "550px", padding: "2rem", margin: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h3 style={{ fontWeight: "bold" }}>Per Diem Travel Policy Update</h3>
-              <button onClick={() => setShowPolicyModal(false)} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer" }}>
+              <button onClick={() => setShowPolicyModal(false)} style={{ background: "none", border: "none", color: "rgb(var(--color-text))", cursor: "pointer" }}>
                 <Icons.X size={24} />
               </button>
             </div>
