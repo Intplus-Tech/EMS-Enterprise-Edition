@@ -255,3 +255,84 @@ body {
 .data-table tr:hover td {
   background: rgba(255, 255, 255, 0.02);
 }
+
+/* Light Theme Variables and Overrides */
+html[data-theme="light"], :root[data-theme="light"] {
+  --color-background: 248 250 252;
+  --color-surface: 255 255 255;
+  --color-surface-secondary: 241 245 249;
+  --color-card: 255 255 255;
+  --color-card-border: 203 213 225;
+
+  --color-text: 15 23 42;
+  --color-text-muted: 71 85 105;
+  --color-text-dim: 100 116 139;
+}
+
+[data-theme="light"] body {
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-text));
+}
+
+[data-theme="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .glass-card {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .glass-card:hover {
+  border-color: rgba(var(--color-primary), 0.35);
+}
+
+[data-theme="light"] .sidebar {
+  background: rgba(255, 255, 255, 0.85);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .form-input,
+[data-theme="light"] .form-select,
+[data-theme="light"] .form-textarea {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  color: rgb(var(--color-text));
+}
+
+[data-theme="light"] .form-input:focus,
+[data-theme="light"] .form-select:focus,
+[data-theme="light"] .form-textarea:focus {
+  border-color: rgb(var(--color-primary));
+  box-shadow: 0 0 0 2px rgba(var(--color-primary), 0.1);
+}
+
+[data-theme="light"] .data-table th {
+  background: rgba(0, 0, 0, 0.02);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .data-table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .table-container {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .data-table tr:hover td {
+  background: rgba(0, 0, 0, 0.015);
+}
+
+[data-theme="light"] .btn-secondary {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgb(var(--color-text));
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="light"] .btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+

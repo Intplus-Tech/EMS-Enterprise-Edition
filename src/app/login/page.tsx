@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
@@ -16,6 +16,24 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Theme state
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "dark" | "light" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute("data-theme", savedTheme);
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,22 +63,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#F8FAFC", color: "#0F172A", fontFamily: "var(--font-sans)" }}>
+    <div style={{ 
+      display: "flex", 
+      flexDirection: "column", 
+      minHeight: "100vh", 
+      background: "rgb(var(--color-background))", 
+      color: "rgb(var(--color-text))", 
+      fontFamily: "var(--font-sans)",
+      transition: "background var(--transition-normal), color var(--transition-normal)"
+    }}>
       {/* Header */}
       <header style={{ 
         padding: "1.25rem 2.5rem", 
         display: "flex", 
         justifyContent: "space-between", 
         alignItems: "center", 
-        background: "#FFFFFF",
-        borderBottom: "1px solid #E2E8F0"
+        background: "rgb(var(--color-surface))",
+        borderBottom: "1px solid rgba(var(--color-card-border), 0.5)",
+        transition: "background var(--transition-normal), border var(--transition-normal)"
       }}>
         {/* Brand logo & text */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ 
             padding: "0.4rem", 
             borderRadius: "50%", 
-            background: "rgba(10, 82, 214, 0.1)",
+            background: "rgba(var(--color-primary), 0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
@@ -69,51 +96,83 @@ export default function LoginPage() {
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span style={{ fontWeight: "700", fontSize: "1rem", color: "#0F172A" }}>EMS</span>
+              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>EMS</span>
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 
-                background: "#E2E8F0", 
-                color: "#475569", 
+                background: "rgba(var(--color-card-border), 0.3)", 
+                color: "rgb(var(--color-text-muted))", 
                 padding: "0.15rem 0.35rem", 
                 borderRadius: "4px" 
               }}>
                 v1.0
               </span>
             </div>
-            <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block", marginTop: "1px" }}>Enterprise Edition</span>
+            <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))", display: "block", marginTop: "1px" }}>Enterprise Edition</span>
           </div>
         </div>
 
-        {/* Right navigation / Help button */}
-        <a 
-          href="https://spendflow.com/support" 
-          target="_blank"
-          style={{ 
-            display: "inline-flex", 
-            alignItems: "center", 
-            gap: "0.5rem", 
-            padding: "0.5rem 1rem", 
-            borderRadius: "8px", 
-            border: "1px solid #E2E8F0", 
-            background: "#FFFFFF",
-            color: "#475569",
-            fontSize: "0.85rem",
-            fontWeight: "500",
-            textDecoration: "none",
-            transition: "all 0.15s ease"
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.borderColor = "#CBD5E1";
-            e.currentTarget.style.background = "#F8FAFC";
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.borderColor = "#E2E8F0";
-            e.currentTarget.style.background = "#FFFFFF";
-          }}
-        >
-          <Icons.HelpCircle size={16} /> Help
-        </a>
+        {/* Right navigation / Help button + Theme switcher */}
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+          <button 
+            type="button"
+            onClick={toggleTheme}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "36px",
+              height: "36px",
+              borderRadius: "8px",
+              border: "1px solid rgba(var(--color-card-border), 0.6)",
+              background: "rgb(var(--color-card))",
+              color: "rgb(var(--color-text))",
+              cursor: "pointer",
+              transition: "all 0.15s ease"
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
+              e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+              e.currentTarget.style.background = "rgb(var(--color-card))";
+            }}
+          >
+            {theme === "light" ? <Icons.Moon size={16} /> : <Icons.Sun size={16} />}
+          </button>
+
+          <a 
+            href="https://spendflow.com/support" 
+            target="_blank"
+            style={{ 
+              display: "inline-flex", 
+              alignItems: "center", 
+              gap: "0.5rem", 
+              padding: "0.5rem 1rem", 
+              borderRadius: "8px", 
+              border: "1px solid rgba(var(--color-card-border), 0.6)", 
+              background: "rgb(var(--color-card))",
+              color: "rgb(var(--color-text-muted))",
+              fontSize: "0.85rem",
+              fontWeight: "500",
+              textDecoration: "none",
+              transition: "all 0.15s ease"
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
+              e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
+              e.currentTarget.style.color = "rgb(var(--color-text))";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+              e.currentTarget.style.background = "rgb(var(--color-card))";
+              e.currentTarget.style.color = "rgb(var(--color-text-muted))";
+            }}
+          >
+            <Icons.HelpCircle size={16} /> Help
+          </a>
+        </div>
       </header>
 
       {/* Main Form Area */}
@@ -121,14 +180,15 @@ export default function LoginPage() {
         <div style={{ 
           maxWidth: "480px", 
           width: "100%", 
-          background: "#FFFFFF", 
-          border: "1px solid #E2E8F0", 
+          background: "rgb(var(--color-surface))", 
+          border: "1px solid rgba(var(--color-card-border), 0.4)", 
           borderRadius: "16px", 
           padding: "2.5rem", 
-          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.05)" 
+          boxShadow: "var(--shadow-lg)",
+          transition: "background var(--transition-normal), border var(--transition-normal)"
         }}>
-          <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "#0F172A", marginBottom: "0.5rem" }}>Welcome back</h2>
-          <p style={{ color: "#64748B", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
+          <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "0.5rem" }}>Welcome back</h2>
+          <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
             Secure access to your expense workflow
           </p>
 
@@ -137,11 +197,11 @@ export default function LoginPage() {
               display: "flex", 
               alignItems: "center", 
               gap: "0.75rem", 
-              background: "#FFF1F2", 
-              border: "1px solid #FCA5A5", 
+              background: "rgba(239, 68, 68, 0.08)", 
+              border: "1px solid rgba(239, 68, 68, 0.3)", 
               borderRadius: "8px", 
               padding: "0.75rem 1rem", 
-              color: "#B91C1C", 
+              color: "#EF4444", 
               fontSize: "0.875rem", 
               marginBottom: "1.5rem" 
             }}>
@@ -153,7 +213,7 @@ export default function LoginPage() {
           <form onSubmit={handleLogin}>
             {/* Company Email / User ID */}
             <div style={{ marginBottom: "1.25rem" }}>
-              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", textTransform: "uppercase", color: "#64748B", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>
+              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", textTransform: "uppercase", color: "rgb(var(--color-text-muted))", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>
                 Company Email / User ID
               </label>
               <input 
@@ -165,10 +225,10 @@ export default function LoginPage() {
                 style={{ 
                   width: "100%", 
                   padding: "0.75rem 1rem", 
-                  background: "#FFFFFF", 
-                  border: "1px solid #D1D5DB", 
+                  background: "rgb(var(--color-background))", 
+                  border: "1px solid rgba(var(--color-card-border), 0.6)", 
                   borderRadius: "8px", 
-                  color: "#1F2937", 
+                  color: "rgb(var(--color-text))", 
                   fontSize: "0.95rem",
                   outline: "none"
                 }} 
@@ -177,7 +237,7 @@ export default function LoginPage() {
 
             {/* Password */}
             <div style={{ marginBottom: "1.25rem" }}>
-              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", textTransform: "uppercase", color: "#64748B", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>
+              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", textTransform: "uppercase", color: "rgb(var(--color-text-muted))", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>
                 Password
               </label>
               <div style={{ position: "relative" }}>
@@ -190,10 +250,10 @@ export default function LoginPage() {
                   style={{ 
                     width: "100%", 
                     padding: "0.75rem 2.75rem 0.75rem 1rem", 
-                    background: "#FFFFFF", 
-                    border: "1px solid #D1D5DB", 
+                    background: "rgb(var(--color-background))", 
+                    border: "1px solid rgba(var(--color-card-border), 0.6)", 
                     borderRadius: "8px", 
-                    color: "#1F2937", 
+                    color: "rgb(var(--color-text))", 
                     fontSize: "0.95rem",
                     outline: "none"
                   }} 
@@ -206,7 +266,7 @@ export default function LoginPage() {
                     right: "1rem", 
                     top: "50%", 
                     transform: "translateY(-50%)", 
-                    color: "#94A3B8", 
+                    color: "rgb(var(--color-text-dim))", 
                     background: "none", 
                     border: "none", 
                     cursor: "pointer", 
@@ -230,11 +290,12 @@ export default function LoginPage() {
                   width: "16px", 
                   height: "16px", 
                   borderRadius: "4px", 
-                  border: "1px solid #D1D5DB",
+                  border: "1px solid rgba(var(--color-card-border), 0.6)",
+                  background: "rgb(var(--color-background))",
                   cursor: "pointer"
                 }} 
               />
-              <label htmlFor="rememberDevice" style={{ fontSize: "0.85rem", color: "#475569", cursor: "pointer" }}>
+              <label htmlFor="rememberDevice" style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", cursor: "pointer" }}>
                 Remember this device — trusted for 7 days
               </label>
             </div>
@@ -245,7 +306,7 @@ export default function LoginPage() {
               disabled={loading}
               style={{ 
                 width: "100%", 
-                background: "#0A52D6", 
+                background: "rgb(var(--color-primary))", 
                 color: "#FFFFFF", 
                 border: "none", 
                 borderRadius: "8px", 
@@ -256,8 +317,8 @@ export default function LoginPage() {
                 opacity: loading ? 0.7 : 1,
                 transition: "background-color 0.2s"
               }}
-              onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = "#0848BE")}
-              onMouseOut={(e) => !loading && (e.currentTarget.style.backgroundColor = "#0A52D6")}
+              onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary-hover))")}
+              onMouseOut={(e) => !loading && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary))")}
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
@@ -268,14 +329,14 @@ export default function LoginPage() {
             <a 
               href="/forgot-password" 
               style={{ 
-                color: "#64748B", 
+                color: "rgb(var(--color-text-dim))", 
                 fontSize: "0.85rem", 
                 fontWeight: "500", 
                 textDecoration: "none",
                 transition: "color 0.15s" 
               }}
-              onMouseOver={(e) => e.currentTarget.style.color = "#0A52D6"}
-              onMouseOut={(e) => e.currentTarget.style.color = "#64748B"}
+              onMouseOver={(e) => e.currentTarget.style.color = "rgb(var(--color-primary))"}
+              onMouseOut={(e) => e.currentTarget.style.color = "rgb(var(--color-text-dim))"}
             >
               Forgot password?
             </a>

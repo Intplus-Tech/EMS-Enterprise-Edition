@@ -1,5 +1,13 @@
 import mongoose from "mongoose";
 
+// Ensure all models are registered on initial database connection
+import "../models/Department";
+import "../models/User";
+import "../models/BudgetPeriod";
+import "../models/ExpenseRequest";
+import "../models/Log";
+import "../models/WorkflowConfig";
+
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/expense_manager";
 
 if (!MONGODB_URI) {

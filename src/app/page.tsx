@@ -151,6 +151,26 @@ export default function Dashboard() {
   const [settingsMessage, setSettingsMessage] = useState("");
   const [settingsError, setSettingsError] = useState("");
 
+  // Theme switcher state
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme") as "dark" | "light" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute("data-theme", savedTheme);
+    } else {
+      document.documentElement.setAttribute("data-theme", "dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+    document.documentElement.setAttribute("data-theme", nextTheme);
+  };
+
   // Initialize and check me
   useEffect(() => {
     fetchSession();
@@ -812,11 +832,37 @@ export default function Dashboard() {
             </>
           )}
         </div>
-        <div style={{ marginTop: "auto", padding: "0.5rem", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div style={{ marginTop: "auto", padding: "0.5rem", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.25rem 0.5rem" }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgb(var(--color-secondary))" }} />
             <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>{currentUser?.name}</span>
           </div>
+
+          {/* Theme Toggle Button */}
+          <button
+            onClick={toggleTheme}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              background: "transparent",
+              border: "none",
+              color: "rgb(var(--color-text-muted))",
+              fontSize: "0.8rem",
+              fontWeight: "600",
+              cursor: "pointer",
+              padding: "0.25rem 0.5rem",
+              borderRadius: "4px",
+              textAlign: "left",
+              transition: "background 0.2s"
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"}
+            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+          >
+            {theme === "light" ? <Icons.Moon size={14} /> : <Icons.Sun size={14} />}
+            {theme === "light" ? "Dark Mode" : "Light Mode"}
+          </button>
+
           <button
             onClick={handleLogout}
             style={{

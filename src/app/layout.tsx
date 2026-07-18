@@ -39,6 +39,18 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <head>
         <style dangerouslySetInnerHTML={{ __html: cssVariables }} />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              var savedTheme = localStorage.getItem('theme');
+              if (savedTheme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+              } else {
+                document.documentElement.setAttribute('data-theme', 'dark');
+              }
+            } catch (e) {}
+          })();
+        ` }} />
       </head>
       <body className="min-h-full flex flex-col">
         {children}
