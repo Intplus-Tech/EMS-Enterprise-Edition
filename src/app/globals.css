@@ -334,3 +334,321 @@ html[data-theme="light"], :root[data-theme="light"] {
   background: rgba(0, 0, 0, 0.08);
 }
 
+/* Dashboard Chart & Custom Layouts */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-card {
+  padding: 1.5rem;
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.chart-toggle-group {
+  display: flex;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+[data-theme="light"] .chart-toggle-group {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.08);
+}
+
+.chart-toggle-btn {
+  padding: 0.4rem 1rem;
+  border-radius: calc(var(--radius-md) - 2px);
+  border: none;
+  background: transparent;
+  color: rgb(var(--color-text-muted));
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.chart-toggle-btn.active {
+  background: rgb(var(--color-primary));
+  color: #fff;
+}
+
+.chart-body {
+  display: flex;
+  height: 250px;
+  position: relative;
+  margin-top: 1rem;
+}
+
+.chart-y-axis {
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-right: 0.75rem;
+  font-size: 0.75rem;
+  color: rgb(var(--color-text-dim));
+  height: calc(100% - 24px);
+}
+
+.chart-area {
+  flex-grow: 1;
+  position: relative;
+  height: 100%;
+}
+
+.chart-gridlines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(100% - 24px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.chart-gridline {
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+  width: 100%;
+  height: 0;
+}
+
+[data-theme="light"] .chart-gridline {
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.06);
+}
+
+.chart-bars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 24px;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  padding: 0 1rem;
+  z-index: 2;
+}
+
+.chart-bar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 40px;
+  height: 100%;
+  justify-content: flex-end;
+  position: relative;
+}
+
+.chart-bar-fill {
+  width: 24px;
+  background: rgba(99, 102, 241, 0.25);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.5s ease-out, background var(--transition-fast);
+  cursor: pointer;
+}
+
+.chart-bar-fill:hover {
+  background: rgba(99, 102, 241, 0.45);
+}
+
+.chart-bar-fill.active {
+  background: rgb(var(--color-primary));
+}
+
+.chart-bar-tooltip {
+  position: absolute;
+  bottom: 105%;
+  background: rgba(15, 23, 42, 0.9);
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+  box-shadow: var(--shadow-md);
+}
+
+.chart-bar-container:hover .chart-bar-tooltip {
+  opacity: 1;
+}
+
+.chart-x-axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  font-size: 0.75rem;
+  color: rgb(var(--color-text-dim));
+  padding: 0 1rem;
+}
+
+/* Spend Breakdown List */
+.breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.breakdown-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.breakdown-progress-track {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+[data-theme="light"] .breakdown-progress-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.breakdown-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Top Expenditures Table Overrides */
+.expenditures-table-card {
+  padding: 1.5rem;
+}
+
+/* Approval Card Row */
+.approval-card-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 140px 160px;
+  gap: 1.5rem;
+  padding: 1.25rem 1.5rem;
+  background: rgba(30, 41, 59, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  align-items: center;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  margin-bottom: 0.75rem;
+}
+
+[data-theme="light"] .approval-card-row {
+  background: #fff;
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.approval-card-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(var(--color-primary), 0.25);
+  box-shadow: var(--shadow-md);
+}
+
+.approval-card-id {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: rgb(var(--color-text-dim));
+}
+
+.approval-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.approval-card-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: rgb(var(--color-text));
+}
+
+.approval-card-subline {
+  font-size: 0.8rem;
+  color: rgb(var(--color-text-dim));
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.approval-card-justification {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: rgb(var(--color-text-muted));
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+.approval-card-amount {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: rgb(var(--color-text));
+  text-align: right;
+}
+
+.approval-card-status {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+/* Status dots */
+.dot-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.dot-approved {
+  background-color: #10B981;
+}
+
+.dot-pending {
+  background-color: #F59E0B;
+}
+
+.dot-danger {
+  background-color: #EF4444;
+}
+
+

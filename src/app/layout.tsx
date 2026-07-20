@@ -36,7 +36,7 @@ export default function RootLayout({
   `;
 
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: cssVariables }} />
         <script dangerouslySetInnerHTML={{ __html: `
