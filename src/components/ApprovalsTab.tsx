@@ -39,6 +39,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [newComment, setNewComment] = useState("");
   const [submittingAction, setSubmittingAction] = useState(false);
 
+  // Escalation Modal state
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
+  const [escalateJustification, setEscalateJustification] = useState("");
+  const [officerAcknowledged, setOfficerAcknowledged] = useState(false);
+
   // Initialize mockup conversation timeline or load from history when selectedExpense changes
   useEffect(() => {
     if (selectedExpense) {
@@ -84,7 +89,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   }, [selectedExpense]);
 
   // Handler for custom actions (Approve, Insufficient Budget)
-  const handleWorkflowClick = async (actionType: "APPROVE" | "INSUFFICIENT" | "CLARIFY") => {
+  const handleWorkflowClick = async (actionType: "APPROVE" | "INSUFFICIENT" | "CLARIFY" | "ESCALATE") => {
     if (!selectedExpense || submittingAction) return;
     setSubmittingAction(true);
 
@@ -188,6 +193,25 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         } else {
           alert(data.error || "Action failed.");
         }
+      } else if (actionType === "ESCALATE") {
+        // Forward to Finance Head Exceptional Workflow Route
+        const comment = `[Officer Escalation] Justification: ${escalateJustification}`;
+        const res = await fetch(`/api/expenses/${selectedExpense._id}/workflow`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "APPROVE", comment }) // Moving forward to next role level
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert("Request forwarded to Finance Head review queue successfully.");
+          setShowEscalateModal(false);
+          setEscalateJustification("");
+          setOfficerAcknowledged(false);
+          setSelectedExpense(null);
+          if (loadDashboardData) await loadDashboardData(currentUser);
+        } else {
+          alert(data.error || "Escalation failed.");
+        }
       }
     } catch (err) {
       console.error(err);
@@ -265,20 +289,49 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     .filter(e => ["PAID", "CLOSED", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK"].includes(e.status))
     .reduce((sum, e) => sum + e.amount, 0) || 545000;
 
+  const isSelectedCompleted = selectedExpense ? ["PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(selectedExpense.status) : false;
+  const isSelectedOverBudget = selectedExpense ? (selectedExpense.amount > 30000 || selectedExpense.status === "INSUFFICIENT_BUDGET" || selectedExpense.status === "PENDING_EXCEPTIONAL") : false;
+
   // RENDER DETAILED REQUEST PROFILE PAGE
   if (selectedExpense) {
     return (
       <div style={{ padding: "0.25rem 0" }}>
+        
         {/* Back Link and Action Buttons */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
           <div>
-            <button 
-              onClick={() => { setSelectedExpense(null); setShowClarificationForm(false); }} 
-              style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: "1.25rem", fontWeight: "700", padding: 0 }}
-            >
-              <Icons.ArrowLeft size={20} />
-              Request Profile #{selectedExpense.requestNumber}
-            </button>
+            {isSelectedCompleted ? (
+              // Square Style Back Button (Image 3)
+              <button 
+                onClick={() => { setSelectedExpense(null); setShowClarificationForm(false); }} 
+                className="btn btn-secondary"
+                style={{ 
+                  border: "1.5px solid rgba(59, 130, 246, 0.3)", 
+                  background: "rgba(59, 130, 246, 0.05)", 
+                  padding: "0.5rem 1.25rem", 
+                  borderRadius: "6px", 
+                  cursor: "pointer", 
+                  fontSize: "0.85rem", 
+                  fontWeight: "700", 
+                  color: "#3B82F6", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: "0.35rem" 
+                }}
+              >
+                Back
+              </button>
+            ) : (
+              // Default Arrow Back Link
+              <button 
+                onClick={() => { setSelectedExpense(null); setShowClarificationForm(false); }} 
+                style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "none", border: "none", color: "inherit", cursor: "pointer", fontSize: "1.25rem", fontWeight: "700", padding: 0 }}
+              >
+                <Icons.ArrowLeft size={20} />
+                Request Profile #{selectedExpense.requestNumber}
+              </button>
+            )}
+            
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "0.5rem" }}>
               <span className={`badge badge-${selectedExpense.status?.toLowerCase().replace(/_/g, '-')}`} style={{ fontWeight: "700" }}>
                 {selectedExpense.status === "SENT_TO_FINANCE" ? "APPROVED BY DEPT HEAD" : selectedExpense.status?.replace(/_/g, ' ')}
@@ -289,32 +342,49 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button 
-              onClick={() => handleWorkflowClick("INSUFFICIENT")}
-              className="btn" 
-              style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent", borderWidth: "1.5px" }}
-              disabled={submittingAction}
-            >
-              Insufficient Budget
-            </button>
-            <button 
-              onClick={() => setShowClarificationForm(true)}
-              className="btn" 
-              style={{ borderColor: "#3B82F6", color: "#3B82F6", background: "transparent", borderWidth: "1.5px" }}
-              disabled={submittingAction}
-            >
-              Request Clarification
-            </button>
-            <button 
-              onClick={() => handleWorkflowClick("APPROVE")}
-              className="btn btn-primary"
-              style={{ background: "#2563EB", border: "none" }}
-              disabled={submittingAction}
-            >
-              {submittingAction ? "Processing..." : "Approve"}
-            </button>
-          </div>
+          {/* Hide Action Buttons for Completed requests (Image 3) */}
+          {!isSelectedCompleted && (
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button 
+                onClick={() => handleWorkflowClick("INSUFFICIENT")}
+                className="btn" 
+                style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent", borderWidth: "1.5px" }}
+                disabled={submittingAction}
+              >
+                Insufficient Budget
+              </button>
+              <button 
+                onClick={() => setShowClarificationForm(true)}
+                className="btn" 
+                style={{ borderColor: "#3B82F6", color: "#3B82F6", background: "transparent", borderWidth: "1.5px" }}
+                disabled={submittingAction}
+              >
+                Request Clarification
+              </button>
+              
+              {isSelectedOverBudget && currentUser?.role === "FINANCE_OFFICER" ? (
+                // Over Budget Forward to Fin Head button (Image 1)
+                <button 
+                  onClick={() => setShowEscalateModal(true)}
+                  className="btn btn-primary"
+                  style={{ background: "#2563EB", border: "none" }}
+                  disabled={submittingAction}
+                >
+                  Forward to Fin Head
+                </button>
+              ) : (
+                // Standard Approve button
+                <button 
+                  onClick={() => handleWorkflowClick("APPROVE")}
+                  className="btn btn-primary"
+                  style={{ background: "#2563EB", border: "none" }}
+                  disabled={submittingAction}
+                >
+                  {submittingAction ? "Processing..." : "Approve"}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 2-Column Details Layout */}
@@ -557,7 +627,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <div className="glass-panel" style={{ padding: "1.25rem" }}>
                   <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "700", color: "rgb(var(--color-text-muted))", display: "block", marginBottom: "0.25rem" }}>DEPT BUDGET (Q3)</span>
                   <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>Department Spend</span>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: "0.2" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: "0.2rem" }}>
                     <strong style={{ fontSize: "1.25rem" }}>₦{totalDeptSpend.toLocaleString()}</strong>
                     <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10B981", fontWeight: "700", fontSize: "0.75rem", padding: "0.15rem 0.5rem", borderRadius: "4px" }}>
                       ₦{(12545000).toLocaleString()}
@@ -594,13 +664,29 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       </div>
                     </div>
 
-                    <button 
-                      onClick={() => alert("File upload screen opened")}
-                      className="btn" 
-                      style={{ border: "1px dashed rgba(255,255,255,0.15)", background: "transparent", fontSize: "0.75rem", padding: "0.4rem", display: "flex", justifyContent: "center", gap: "0.25rem", color: "rgb(var(--color-text-muted))" }}
-                    >
-                      <Icons.Plus size={14} /> Upload Additional Files
-                    </button>
+                    {/* Show Paid gtbank_receipt.pdf document (Image 3) */}
+                    {isSelectedCompleted && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem", background: "rgba(255,255,255,0.02)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                        <Icons.FileText size={16} style={{ color: "#EF4444" }} />
+                        <div style={{ flexGrow: 1, minWidth: 0 }}>
+                          <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: "600", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
+                            gtbank_receipt.pdf
+                          </p>
+                          <span style={{ fontSize: "0.65rem", color: "rgb(var(--color-text-muted))" }}>845 KB • PDF Document</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hide upload button for Completed paid requests */}
+                    {!isSelectedCompleted && (
+                      <button 
+                        onClick={() => alert("File upload screen opened")}
+                        className="btn" 
+                        style={{ border: "1px dashed rgba(255,255,255,0.15)", background: "transparent", fontSize: "0.75rem", padding: "0.4rem", display: "flex", justifyContent: "center", gap: "0.25rem", color: "rgb(var(--color-text-muted))" }}
+                      >
+                        <Icons.Plus size={14} /> Upload Additional Files
+                      </button>
+                    )}
                   </div>
                 </div>
               </>
@@ -612,9 +698,20 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem", position: "relative" }}>
                 {[
                   { label: "Request Initiated", desc: `by ${selectedExpense.initiatorId?.name || "John Doe"}`, date: new Date(selectedExpense.createdAt).toLocaleDateString(), active: true },
-                  { label: "Department Approval", desc: "by Sarah Williams", date: new Date(selectedExpense.createdAt).toLocaleDateString(), active: ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
-                  { label: "Finance Verification", desc: selectedExpense.status === "SENT_TO_FINANCE" ? "Awaiting action..." : "Completed", date: ["UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) ? new Date(selectedExpense.updatedAt).toLocaleDateString() : "", active: ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: selectedExpense.status === "SENT_TO_FINANCE" },
-                  { label: "Final Disbursement", desc: selectedExpense.status === "PAID" ? "Completed" : "Pending approval...", date: selectedExpense.status === "PAID" ? new Date(selectedExpense.updatedAt).toLocaleDateString() : "", active: ["PAID", "CLOSED"].includes(selectedExpense.status) }
+                  { label: "Department Approval", desc: "by Sarah Williams", date: new Date(selectedExpense.createdAt).toLocaleDateString(), active: isSelectedCompleted || ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { 
+                    label: "Finance Verification", 
+                    desc: isSelectedCompleted ? `by ${currentUser.name || "Jane Doe"}` : (selectedExpense.status === "SENT_TO_FINANCE" ? "Awaiting action..." : "Completed"), 
+                    date: isSelectedCompleted ? new Date(selectedExpense.updatedAt).toLocaleDateString() : (["UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) ? new Date(selectedExpense.updatedAt).toLocaleDateString() : ""), 
+                    active: isSelectedCompleted || ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), 
+                    current: !isSelectedCompleted && selectedExpense.status === "SENT_TO_FINANCE" 
+                  },
+                  { 
+                    label: "Final Disbursement", 
+                    desc: isSelectedCompleted ? "by Jerry Doe" : (selectedExpense.status === "PAID" ? "Completed" : "Pending approval..."), 
+                    date: isSelectedCompleted ? new Date(selectedExpense.updatedAt).toLocaleDateString() : (selectedExpense.status === "PAID" ? new Date(selectedExpense.updatedAt).toLocaleDateString() : ""), 
+                    active: isSelectedCompleted || ["PAID", "CLOSED"].includes(selectedExpense.status) 
+                  }
                 ].map((step, idx) => (
                   <div key={idx} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", position: "relative" }}>
                     {/* Circle */}
@@ -643,6 +740,186 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
           </div>
         </div>
+
+        {/* FORWARD TO FINANCE HEAD ESCALATION MODAL (Image 1) */}
+        {showEscalateModal && (
+          <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            background: "rgba(15, 23, 42, 0.75)",
+            zIndex: 110,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backdropFilter: "blur(4px)"
+          }}>
+            <div className="glass-panel" style={{
+              width: "100%",
+              maxWidth: "520px",
+              maxHeight: "95vh",
+              overflowY: "auto",
+              padding: "1.75rem",
+              background: "rgb(15, 23, 42)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: "12px",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "1.25rem",
+              color: "#fff"
+            }}>
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <div style={{
+                    width: "2.5rem",
+                    height: "2.5rem",
+                    borderRadius: "8px",
+                    background: "rgba(239, 68, 68, 0.1)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#EF4444"
+                  }}>
+                    <Icons.Forward size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: "1.15rem", fontWeight: "700", margin: 0 }}>Forward to Fin Head</h3>
+                    <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>Escalation for Request {selectedExpense.requestNumber}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { setShowEscalateModal(false); setEscalateJustification(""); setOfficerAcknowledged(false); }}
+                  style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer", padding: 0 }}
+                >
+                  <Icons.X size={20} />
+                </button>
+              </div>
+
+              {/* Insufficient Budget Exception Alert Banner */}
+              <div style={{
+                background: "rgba(239, 68, 68, 0.05)",
+                border: "1px solid rgba(239, 68, 68, 0.15)",
+                padding: "0.75rem 1rem",
+                borderRadius: "8px",
+                display: "flex",
+                gap: "0.75rem",
+                alignItems: "flex-start"
+              }}>
+                <Icons.AlertTriangle size={18} style={{ color: "#EF4444", flexShrink: 0, marginTop: "0.1rem" }} />
+                <div>
+                  <h4 style={{ margin: 0, fontSize: "0.85rem", fontWeight: "700", color: "#EF4444" }}>Insufficient Budget Exception</h4>
+                  <p style={{ margin: "0.15rem 0 0 0", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+                    The requested amount for {selectedExpense.requestNumber} exceeds the quarterly departmental cap.
+                  </p>
+                </div>
+              </div>
+
+              {/* Request Info Cards */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                <span style={{ fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", color: "rgb(var(--color-text-muted))" }}>Request Information</span>
+                
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                    <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</span>
+                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.departmentId?.name || selectedExpense.departmentName || "Technology"}</strong>
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                    <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGET ITEM</span>
+                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.category || "Data Centre Operations"}</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                    <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGETED</span>
+                    <strong style={{ fontSize: "0.9rem" }}>₦1,220,000</strong>
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                    <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>AMOUNT SPEND</span>
+                    <strong style={{ fontSize: "0.9rem" }}>₦1,211,000</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Request (Over Cap) Card */}
+              <div style={{
+                background: "rgba(239, 68, 68, 0.03)",
+                border: "1px solid rgba(239, 68, 68, 0.15)",
+                borderRadius: "8px",
+                padding: "0.85rem 1rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center"
+              }}>
+                <strong style={{ fontSize: "0.9rem", color: "#EF4444" }}>Request (Over Cap)</strong>
+                <strong style={{ fontSize: "1.1rem", color: "#EF4444" }}>₦{selectedExpense.amount.toLocaleString()}</strong>
+              </div>
+
+              {/* Justification Textarea */}
+              <div className="form-group">
+                <label className="form-label" style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.35rem" }}>
+                  Justification for Escalation <span style={{ color: "#EF4444" }}>*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={escalateJustification}
+                  onChange={(e) => setEscalateJustification(e.target.value)}
+                  placeholder="Enter detailed reasoning for why this request should be approved despite the budget variance..."
+                  className="form-textarea"
+                  style={{ padding: "0.6rem", fontSize: "0.85rem", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}
+                />
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>
+                  <span>Min. 50 characters required for Finance Head review.</span>
+                  <span style={{ color: escalateJustification.length >= 50 ? "#10B981" : "#EF4444" }}>
+                    {escalateJustification.length} / 50 characters
+                  </span>
+                </div>
+              </div>
+
+              {/* Acknowledgment Checkbox */}
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
+                <input 
+                  type="checkbox" 
+                  id="acknowledge"
+                  checked={officerAcknowledged}
+                  onChange={(e) => setOfficerAcknowledged(e.target.checked)}
+                  style={{ width: "1.1rem", height: "1.1rem", marginTop: "0.1rem", cursor: "pointer" }}
+                />
+                <label htmlFor="acknowledge" style={{ fontSize: "0.75rem", lineHeight: "1.4", color: "rgb(var(--color-text-muted))", cursor: "pointer" }}>
+                  <strong>Officer Acknowledgment</strong>
+                  <span style={{ display: "block", marginTop: "0.1rem" }}>
+                    I have verified that this request is an urgent exception and requires Finance Head approval. I confirm all supporting documentation has been vetted.
+                  </span>
+                </label>
+              </div>
+
+              {/* Footer */}
+              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+                <button 
+                  onClick={() => { setShowEscalateModal(false); setEscalateJustification(""); setOfficerAcknowledged(false); }}
+                  className="btn btn-secondary" 
+                  style={{ padding: "0.55rem 1.25rem", fontSize: "0.85rem", background: "transparent", borderColor: "rgba(255,255,255,0.12)" }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => handleWorkflowClick("ESCALATE")}
+                  className="btn btn-primary"
+                  style={{ padding: "0.55rem 1.5rem", fontSize: "0.85rem", background: "#2563EB", border: "none" }}
+                  disabled={escalateJustification.length < 50 || !officerAcknowledged || submittingAction}
+                >
+                  Forward to Finance Head
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )}
+
       </div>
     );
   }
@@ -862,8 +1139,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       } else if (exp.status === "UPLOADED_TO_BANK") {
                         label = "Processing";
                         badgeColor = { background: "rgba(59, 130, 246, 0.12)", color: "#3B82F6" };
+                      } else if (exp.status === "REJECTED") {
+                        label = "Rejected";
+                        badgeColor = { background: "rgba(239, 68, 68, 0.12)", color: "#EF4444" };
                       } else if (["PAID", "CLOSED"].includes(exp.status)) {
-                        label = "Completed";
+                        label = "Paid";
                         badgeColor = { background: "rgba(16, 185, 129, 0.12)", color: "#10B981" };
                       }
 
@@ -903,7 +1183,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       </div>
 
       {filteredList.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", fontSize: "0.8", color: "rgb(var(--color-text-muted))" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
           <span>Showing {filteredList.length} of {currentList.length} requests</span>
           <button className="btn btn-secondary" style={{ padding: "0.45rem 1rem", fontSize: "0.75rem", fontWeight: "600" }}>
             Load more
