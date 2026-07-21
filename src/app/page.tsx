@@ -231,6 +231,10 @@ export default function Dashboard() {
       if (!initiatorTabs.includes(activeTab)) {
         setActiveTab("requests");
       }
+    } else if (["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser.role)) {
+      if (!["approvals", "settings"].includes(activeTab)) {
+        setActiveTab("approvals");
+      }
     } else {
       if (!approverTabs.includes(activeTab)) {
         setActiveTab("dashboard");
@@ -253,6 +257,8 @@ export default function Dashboard() {
         setCurrentUser(data.user);
         if (data.user.role === "INITIATOR") {
           setActiveTab("requests");
+        } else if (["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(data.user.role)) {
+          setActiveTab("approvals");
         } else {
           setActiveTab("dashboard");
         }
@@ -849,17 +855,19 @@ export default function Dashboard() {
             </>
           ) : (
             <>
-              <button
-                onClick={() => setActiveTab("dashboard")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: activeTab === "dashboard" ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: activeTab === "dashboard" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.LayoutDashboard size={18} /> Dashboard
-              </button>
+              {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
+                <button
+                  onClick={() => setActiveTab("dashboard")}
+                  className="btn"
+                  style={{
+                    justifyContent: "flex-start",
+                    background: activeTab === "dashboard" ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                    color: activeTab === "dashboard" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
+                  }}
+                >
+                  <Icons.LayoutDashboard size={18} /> Dashboard
+                </button>
+              )}
               
               <button
                 onClick={() => setActiveTab("approvals")}
@@ -870,7 +878,7 @@ export default function Dashboard() {
                   color: activeTab === "approvals" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
                 }}
               >
-                <Icons.CheckSquare size={18} /> Pending Approvals
+                <Icons.CheckSquare size={18} /> {["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) ? "Pipeline Overview" : "Pending Approvals"}
                 {(() => {
                   const pendingCount = expenses.filter(exp => {
                     if (currentUser?.role === "FINANCE_HEAD" && exp.status === "PENDING_EXCEPTIONAL") return true;
@@ -895,29 +903,33 @@ export default function Dashboard() {
                 })()}
               </button>
 
-              <button
-                onClick={() => setActiveTab("requests")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: activeTab === "requests" ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: activeTab === "requests" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.Receipt size={18} /> Requests
-              </button>
+              {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
+                <>
+                  <button
+                    onClick={() => setActiveTab("requests")}
+                    className="btn"
+                    style={{
+                      justifyContent: "flex-start",
+                      background: activeTab === "requests" ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                      color: activeTab === "requests" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
+                    }}
+                  >
+                    <Icons.Receipt size={18} /> Requests
+                  </button>
 
-              <button
-                onClick={() => setActiveTab("history")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: activeTab === "history" ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: activeTab === "history" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.History size={18} /> History
-              </button>
+                  <button
+                    onClick={() => setActiveTab("history")}
+                    className="btn"
+                    style={{
+                      justifyContent: "flex-start",
+                      background: activeTab === "history" ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                      color: activeTab === "history" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
+                    }}
+                  >
+                    <Icons.History size={18} /> History
+                  </button>
+                </>
+              )}
 
               <button
                 onClick={() => setActiveTab("settings")}
@@ -1053,6 +1065,8 @@ export default function Dashboard() {
             amountSearchQuery={amountSearchQuery}
             setAmountSearchQuery={setAmountSearchQuery}
             setSelectedExpense={setSelectedExpense}
+            selectedExpense={selectedExpense}
+            loadDashboardData={loadDashboardData}
           />
         )}
         
@@ -1313,7 +1327,7 @@ export default function Dashboard() {
       )}
 
       {/* DETAILS & ACTIONS MODAL */}
-      {selectedExpense && (
+      {selectedExpense && !["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
         <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="glass-panel" style={{ width: "100%", maxWidth: "750px", maxHeight: "90vh", overflowY: "auto", padding: "2rem", margin: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
