@@ -14,6 +14,8 @@ import { SettingsTab } from "../components/SettingsTab";
 import { WorkflowTab } from "../components/WorkflowTab";
 import { LogsTab } from "../components/LogsTab";
 import { UsersTab } from "../components/UsersTab";
+import { ExceptionHistoryTab } from "../components/ExceptionHistoryTab";
+import { DepartmentalSpendTab } from "../components/DepartmentalSpendTab";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -231,7 +233,11 @@ export default function Dashboard() {
       if (!initiatorTabs.includes(activeTab)) {
         setActiveTab("requests");
       }
-    } else if (["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser.role)) {
+    } else if (currentUser.role === "FINANCE_HEAD") {
+      if (!["pending-exceptions", "departmental-spend", "exception-history", "approvals", "history", "settings"].includes(activeTab)) {
+        setActiveTab("exception-history");
+      }
+    } else if (["FINANCE_OFFICER", "FINANCE_MANAGER"].includes(currentUser.role)) {
       if (!["approvals", "history", "settings"].includes(activeTab)) {
         setActiveTab("approvals");
       }
@@ -257,7 +263,9 @@ export default function Dashboard() {
         setCurrentUser(data.user);
         if (data.user.role === "INITIATOR") {
           setActiveTab("requests");
-        } else if (["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(data.user.role)) {
+        } else if (data.user.role === "FINANCE_HEAD") {
+          setActiveTab("exception-history");
+        } else if (["FINANCE_OFFICER", "FINANCE_MANAGER"].includes(data.user.role)) {
           setActiveTab("approvals");
         } else {
           setActiveTab("dashboard");
@@ -853,6 +861,75 @@ export default function Dashboard() {
                 <Icons.Settings size={18} /> Settings
               </button>
             </>
+          ) : currentUser?.role === "FINANCE_HEAD" ? (
+            <>
+              <div style={{ padding: "0.5rem 0.5rem 0.25rem", fontSize: "0.7rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                EXCEPTIONS
+              </div>
+
+              <button
+                onClick={() => setActiveTab("pending-exceptions")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: ["pending-exceptions", "approvals"].includes(activeTab) ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: ["pending-exceptions", "approvals"].includes(activeTab) ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: ["pending-exceptions", "approvals"].includes(activeTab) ? "700" : "500"
+                }}
+              >
+                <Icons.AlertTriangle size={18} /> Pending Exceptions
+                <span style={{
+                  marginLeft: "auto",
+                  background: "#2563EB",
+                  color: "#FFFFFF",
+                  fontSize: "0.75rem",
+                  fontWeight: "bold",
+                  padding: "0.15rem 0.55rem",
+                  borderRadius: "999px"
+                }}>
+                  12
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab("departmental-spend")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "departmental-spend" ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: activeTab === "departmental-spend" ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: activeTab === "departmental-spend" ? "700" : "500"
+                }}
+              >
+                <Icons.PieChart size={18} /> Departmental Spend
+              </button>
+
+              <button
+                onClick={() => setActiveTab("exception-history")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: ["exception-history", "history"].includes(activeTab) ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: ["exception-history", "history"].includes(activeTab) ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: ["exception-history", "history"].includes(activeTab) ? "700" : "500"
+                }}
+              >
+                <Icons.BarChart2 size={18} /> Exception History
+              </button>
+
+              <button
+                onClick={() => setActiveTab("settings")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "settings" ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: activeTab === "settings" ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: activeTab === "settings" ? "700" : "500"
+                }}
+              >
+                <Icons.Settings size={18} /> Settings
+              </button>
+            </>
           ) : (
             <>
               {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
@@ -983,10 +1060,57 @@ export default function Dashboard() {
             </>
           )}
         </div>
-        <div style={{ marginTop: "auto", padding: "0.5rem", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.25rem 0.5rem" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgb(var(--color-secondary))" }} />
-            <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>{currentUser?.name}</span>
+        
+        {/* User profile card at bottom of sidebar */}
+        <div style={{ marginTop: "auto", paddingTop: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div
+            style={{
+              padding: "0.6rem 0.75rem",
+              borderRadius: "10px",
+              background: "rgba(var(--color-surface), 0.5)",
+              border: "1px solid rgba(var(--color-card-border), 0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "0.5rem"
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", overflow: "hidden" }}>
+              <img
+                src={currentUser?.avatar || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop"}
+                alt="Profile"
+                style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+              />
+              <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+                <span style={{ fontSize: "0.825rem", fontWeight: "700", color: "rgb(var(--color-text))", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {currentUser?.name || "Jane Doe"}
+                </span>
+                <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))" }}>
+                  {currentUser?.role === "FINANCE_HEAD" ? "Finance Head" : currentUser?.role === "INITIATOR" ? "Initiator" : currentUser?.role?.replace(/_/g, " ") || "Initiator"}
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              title="Logout"
+              style={{
+                background: "none",
+                border: "none",
+                color: "rgb(var(--color-text-muted))",
+                cursor: "pointer",
+                padding: "0.3rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "6px",
+                flexShrink: 0
+              }}
+              onMouseOver={(e) => e.currentTarget.style.background = "rgba(239, 68, 68, 0.15)"}
+              onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
+            >
+              <Icons.LogOut size={16} style={{ color: "rgb(var(--color-text-dim))" }} />
+            </button>
           </div>
 
           {/* Theme Toggle Button */}
@@ -999,42 +1123,16 @@ export default function Dashboard() {
               background: "transparent",
               border: "none",
               color: "rgb(var(--color-text-muted))",
-              fontSize: "0.8rem",
+              fontSize: "0.75rem",
               fontWeight: "600",
               cursor: "pointer",
               padding: "0.25rem 0.5rem",
               borderRadius: "4px",
-              textAlign: "left",
-              transition: "background 0.2s"
+              textAlign: "left"
             }}
-            onMouseOver={(e) => e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)"}
-            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
           >
-            {theme === "light" ? <Icons.Moon size={14} /> : <Icons.Sun size={14} />}
+            {theme === "light" ? <Icons.Moon size={13} /> : <Icons.Sun size={13} />}
             {theme === "light" ? "Dark Mode" : "Light Mode"}
-          </button>
-
-          <button
-            onClick={handleLogout}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              background: "transparent",
-              border: "none",
-              color: "#EF4444",
-              fontSize: "0.8rem",
-              fontWeight: "600",
-              cursor: "pointer",
-              padding: "0.25rem 0.5rem",
-              borderRadius: "4px",
-              textAlign: "left",
-              transition: "background 0.2s"
-            }}
-            onMouseOver={(e) => e.currentTarget.style.background = "rgba(239, 68, 68, 0.1)"}
-            onMouseOut={(e) => e.currentTarget.style.background = "transparent"}
-          >
-            <Icons.LogOut size={14} /> Logout
           </button>
         </div>
       </div>
@@ -1042,6 +1140,54 @@ export default function Dashboard() {
       {/* Main dashboard content area */}
       <div className="main-content">
         
+        {/* Top Header Bar for Search & Actions */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.75rem", gap: "1rem", flexWrap: "wrap" }}>
+          <div style={{ position: "relative", minWidth: "280px", flexGrow: 1, maxWidth: "420px" }}>
+            <Icons.Search size={16} style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))" }} />
+            <input
+              type="text"
+              placeholder="Search requests..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="form-input"
+              style={{
+                paddingLeft: "2.4rem",
+                paddingTop: "0.55rem",
+                paddingBottom: "0.55rem",
+                fontSize: "0.85rem",
+                borderRadius: "8px",
+                background: "rgba(var(--color-surface), 0.5)",
+                border: "1px solid rgba(var(--color-card-border), 0.5)"
+              }}
+            />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
+            <div style={{ position: "relative", cursor: "pointer" }} onClick={() => setShowNotifications(!showNotifications)}>
+              <Icons.Bell size={20} style={{ color: "rgb(var(--color-text-muted))" }} />
+              <span style={{ position: "absolute", top: -2, right: -2, width: 8, height: 8, borderRadius: "50%", background: "#EF4444" }} />
+            </div>
+
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn btn-primary"
+              style={{
+                background: "#2563EB",
+                padding: "0.55rem 1.15rem",
+                borderRadius: "8px",
+                fontWeight: "600",
+                fontSize: "0.85rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.4rem",
+                boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)"
+              }}
+            >
+              <Icons.Plus size={16} /> New Request
+            </button>
+          </div>
+        </div>
+
         {/* VIEW: DASHBOARD PANEL */}
         {activeTab === "dashboard" && (
           <DashboardTab
@@ -1052,7 +1198,26 @@ export default function Dashboard() {
           />
         )}
 
-        {activeTab === "approvals" && (
+        {/* VIEW: EXCEPTION HISTORY (FINANCE HEAD) */}
+        {(activeTab === "exception-history" || (currentUser?.role === "FINANCE_HEAD" && activeTab === "history")) && (
+          <ExceptionHistoryTab
+            currentUser={currentUser}
+            expenses={expenses}
+            setSelectedExpense={setSelectedExpense}
+          />
+        )}
+
+        {/* VIEW: DEPARTMENTAL SPEND (FINANCE HEAD) */}
+        {activeTab === "departmental-spend" && (
+          <DepartmentalSpendTab
+            currentUser={currentUser}
+            expenses={expenses}
+            setSelectedExpense={setSelectedExpense}
+          />
+        )}
+
+        {/* VIEW: PENDING EXCEPTIONS & APPROVALS */}
+        {(activeTab === "pending-exceptions" || (activeTab === "approvals" && currentUser?.role !== "FINANCE_HEAD")) && (
           <ApprovalsTab
             currentUser={currentUser}
             expenses={expenses}
@@ -1098,8 +1263,8 @@ export default function Dashboard() {
           />
         )}
 
-        {/* VIEW: REQUEST HISTORY */}
-        {activeTab === "history" && (
+        {/* VIEW: REQUEST HISTORY (NON-FINANCE HEAD) */}
+        {activeTab === "history" && currentUser?.role !== "FINANCE_HEAD" && (
           <HistoryTab
             currentUser={currentUser}
             expenses={expenses}
