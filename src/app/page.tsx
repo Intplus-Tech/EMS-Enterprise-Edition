@@ -16,6 +16,8 @@ import { LogsTab } from "../components/LogsTab";
 import { UsersTab } from "../components/UsersTab";
 import { ExceptionHistoryTab } from "../components/ExceptionHistoryTab";
 import { DepartmentalSpendTab } from "../components/DepartmentalSpendTab";
+import { PendingExceptionsTab } from "../components/PendingExceptionsTab";
+import { PendingExceptionsOverviewTab } from "../components/PendingExceptionsOverviewTab";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -24,6 +26,7 @@ export default function Dashboard() {
   const [startupError, setStartupError] = useState("");
   const [seeding, setSeeding] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard"); // dashboard, expenses, workflow, logs, users, requests, history, settings
+  const [pendingExceptionSubView, setPendingExceptionSubView] = useState<"list" | "details">("list");
   
   // Users and departments (Admin)
   const [systemUsers, setSystemUsers] = useState<any[]>([]);
@@ -1216,8 +1219,30 @@ export default function Dashboard() {
           />
         )}
 
-        {/* VIEW: PENDING EXCEPTIONS & APPROVALS */}
-        {(activeTab === "pending-exceptions" || (activeTab === "approvals" && currentUser?.role !== "FINANCE_HEAD")) && (
+        {/* VIEW: PENDING EXCEPTIONS (FINANCE HEAD) */}
+        {activeTab === "pending-exceptions" && currentUser?.role === "FINANCE_HEAD" && (
+          pendingExceptionSubView === "list" ? (
+            <PendingExceptionsOverviewTab
+              currentUser={currentUser}
+              expenses={expenses}
+              onReviewRequest={(req) => {
+                setSelectedExpense(req);
+                setPendingExceptionSubView("details");
+              }}
+            />
+          ) : (
+            <PendingExceptionsTab
+              currentUser={currentUser}
+              expenses={expenses}
+              setSelectedExpense={setSelectedExpense}
+              loadDashboardData={loadDashboardData}
+              onBackToDashboard={() => setPendingExceptionSubView("list")}
+            />
+          )
+        )}
+
+        {/* VIEW: PENDING APPROVALS (OTHER ROLES) */}
+        {activeTab === "approvals" && currentUser?.role !== "FINANCE_HEAD" && (
           <ApprovalsTab
             currentUser={currentUser}
             expenses={expenses}

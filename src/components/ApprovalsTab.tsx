@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
+import { ApproveExpansionModal } from "./ApproveExpansionModal";
+import { RejectExpansionModal } from "./RejectExpansionModal";
 
 interface ApprovalsTabProps {
   currentUser: any;
@@ -48,6 +50,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [showAuthorizeReleaseModal, setShowAuthorizeReleaseModal] = useState(false);
   const [showCompletedReleaseModal, setShowCompletedReleaseModal] = useState(false);
   const [showThreadModal, setShowThreadModal] = useState(false);
+  const [showApproveExpansionModal, setShowApproveExpansionModal] = useState(false);
+  const [showRejectExpansionModal, setShowRejectExpansionModal] = useState(false);
+  const [expansionModalTarget, setExpansionModalTarget] = useState<any>(null);
   const [activeReleaseItem, setActiveReleaseItem] = useState<any>(null);
   const [bankRefNumber, setBankRefNumber] = useState("");
   const [receiptFileName, setReceiptFileName] = useState("");
@@ -396,46 +401,74 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             </div>
           </div>
 
-          {/* Hide Action Buttons for Completed requests (Image 3) */}
+          {/* Action Buttons */}
           {!isSelectedCompleted && (
             <div style={{ display: "flex", gap: "0.75rem" }}>
-              <button 
-                onClick={() => handleWorkflowClick("INSUFFICIENT")}
-                className="btn" 
-                style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent", borderWidth: "1.5px" }}
-                disabled={submittingAction}
-              >
-                Insufficient Budget
-              </button>
-              <button 
-                onClick={() => setShowClarificationForm(true)}
-                className="btn" 
-                style={{ borderColor: "#3B82F6", color: "#3B82F6", background: "transparent", borderWidth: "1.5px" }}
-                disabled={submittingAction}
-              >
-                Request Clarification
-              </button>
-              
-              {isSelectedOverBudget && currentUser?.role === "FINANCE_OFFICER" ? (
-                // Over Budget Forward to Fin Head button (Image 1)
-                <button 
-                  onClick={() => setShowEscalateModal(true)}
-                  className="btn btn-primary"
-                  style={{ background: "#2563EB", border: "none" }}
-                  disabled={submittingAction}
-                >
-                  Forward to Fin Head
-                </button>
+              {currentUser?.role === "FINANCE_HEAD" || selectedExpense.status === "PENDING_EXCEPTIONAL" ? (
+                <>
+                  <button 
+                    onClick={() => {
+                      setExpansionModalTarget(selectedExpense);
+                      setShowRejectExpansionModal(true);
+                    }}
+                    className="btn btn-danger" 
+                    style={{ background: "#B91C1C", color: "#FFFFFF", fontWeight: "700", border: "none" }}
+                    disabled={submittingAction}
+                  >
+                    Reject Expansion
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setExpansionModalTarget(selectedExpense);
+                      setShowApproveExpansionModal(true);
+                    }}
+                    className="btn btn-primary" 
+                    style={{ background: "#2563EB", color: "#FFFFFF", fontWeight: "700", border: "none" }}
+                    disabled={submittingAction}
+                  >
+                    Authorize One-Time Expansion
+                  </button>
+                </>
               ) : (
-                // Standard Approve button
-                <button 
-                  onClick={() => handleWorkflowClick("APPROVE")}
-                  className="btn btn-primary"
-                  style={{ background: "#2563EB", border: "none" }}
-                  disabled={submittingAction}
-                >
-                  {submittingAction ? "Processing..." : "Approve"}
-                </button>
+                <>
+                  <button 
+                    onClick={() => handleWorkflowClick("INSUFFICIENT")}
+                    className="btn" 
+                    style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent", borderWidth: "1.5px" }}
+                    disabled={submittingAction}
+                  >
+                    Insufficient Budget
+                  </button>
+                  <button 
+                    onClick={() => setShowClarificationForm(true)}
+                    className="btn" 
+                    style={{ borderColor: "#3B82F6", color: "#3B82F6", background: "transparent", borderWidth: "1.5px" }}
+                    disabled={submittingAction}
+                  >
+                    Request Clarification
+                  </button>
+                  
+                  {isSelectedOverBudget && currentUser?.role === "FINANCE_OFFICER" ? (
+                    <button 
+                      onClick={() => setShowEscalateModal(true)}
+                      className="btn btn-primary"
+                      style={{ background: "#2563EB", border: "none" }}
+                      disabled={submittingAction}
+                    >
+                      Forward to Fin Head
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleWorkflowClick("APPROVE")}
+                      className="btn btn-primary"
+                      style={{ background: "#2563EB", border: "none" }}
+                      disabled={submittingAction}
+                    >
+                      {submittingAction ? "Processing..." : "Approve"}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1833,6 +1866,70 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Finance Head Approve One-Time Budget Expansion Modal */}
+      <ApproveExpansionModal
+        isOpen={showApproveExpansionModal}
+        onClose={() => setShowApproveExpansionModal(false)}
+        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : "#0044"}
+        requestAmount={selectedExpense?.amount || 47200}
+        remainingBudget={26200}
+        deficitAmount={selectedExpense?.amount ? (selectedExpense.amount > 26200 ? selectedExpense.amount - 26200 : 21000) : 21000}
+        onConfirm={async (notes) => {
+          if (!selectedExpense) return;
+          try {
+            const res = await fetch(`/api/expenses/${selectedExpense._id}/exceptional`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "APPROVE", comment: notes })
+            });
+            const data = await res.json();
+            if (data.success) {
+              alert("One-Time Budget Expansion Authorized successfully!");
+              setShowApproveExpansionModal(false);
+              setSelectedExpense(null);
+              if (loadDashboardData) await loadDashboardData(currentUser);
+            } else {
+              alert(data.error || "Expansion authorization failed.");
+            }
+          } catch (err) {
+            console.error(err);
+            alert("An error occurred during budget expansion authorization.");
+          }
+        }}
+      />
+
+      {/* Finance Head Reject One-Time Budget Expansion Modal */}
+      <RejectExpansionModal
+        isOpen={showRejectExpansionModal}
+        onClose={() => setShowRejectExpansionModal(false)}
+        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : "#0044"}
+        requestAmount={selectedExpense?.amount || 47200}
+        remainingBudget={26200}
+        deficitAmount={selectedExpense?.amount ? (selectedExpense.amount > 26200 ? selectedExpense.amount - 26200 : 21000) : 21000}
+        onConfirm={async (reason) => {
+          if (!selectedExpense) return;
+          try {
+            const res = await fetch(`/api/expenses/${selectedExpense._id}/exceptional`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "REJECT", comment: reason })
+            });
+            const data = await res.json();
+            if (data.success) {
+              alert("Budget Expansion Request Rejected successfully.");
+              setShowRejectExpansionModal(false);
+              setSelectedExpense(null);
+              if (loadDashboardData) await loadDashboardData(currentUser);
+            } else {
+              alert(data.error || "Rejection failed.");
+            }
+          } catch (err) {
+            console.error(err);
+            alert("An error occurred during budget expansion rejection.");
+          }
+        }}
+      />
 
     </div>
   );

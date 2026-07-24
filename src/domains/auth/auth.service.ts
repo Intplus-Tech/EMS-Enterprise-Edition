@@ -39,7 +39,7 @@ export class AuthService {
       throw new Error("Account is inactive. Please contact your system administrator.");
     }
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    const isMatch = await AuthService.comparePassword(password, user.passwordHash);
     if (!isMatch) {
       await LoggerService.logApp("AUTH_LOGIN_FAILED", `Login attempt failed: wrong password for ${email}`);
       throw new Error("Invalid email or password");
