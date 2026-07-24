@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { RequestJustificationModal } from "./RequestJustificationModal";
 
 interface ExceptionHistoryTabProps {
   currentUser?: any;
@@ -16,6 +17,8 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
   const [deptFilter, setDeptFilter] = useState("All Departments");
   const [statusFilter, setStatusFilter] = useState("Approved");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showJustificationModal, setShowJustificationModal] = useState(false);
+  const [justificationTarget, setJustificationTarget] = useState<any>(null);
 
   // Default initial mock exception records matching the exact screenshot design
   const initialExceptionRecords = [
@@ -414,7 +417,11 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                       </td>
                       <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.875rem" }}>
                         <button
-                          onClick={() => setSelectedExpense && setSelectedExpense(rec.rawExpense)}
+                          onClick={() => {
+                            setJustificationTarget(rec);
+                            setShowJustificationModal(true);
+                            if (setSelectedExpense) setSelectedExpense(rec.rawExpense);
+                          }}
                           style={{
                             background: "none",
                             border: "none",
@@ -422,7 +429,8 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                             fontWeight: "700",
                             cursor: "pointer",
                             padding: 0,
-                            fontSize: "0.875rem"
+                            fontSize: "0.875rem",
+                            textDecoration: "underline"
                           }}
                         >
                           {rec.reqId}
@@ -592,6 +600,14 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Request Justification Modal */}
+      <RequestJustificationModal
+        isOpen={showJustificationModal}
+        onClose={() => setShowJustificationModal(false)}
+        requestNumber={justificationTarget?.reqId || "#0044"}
+        requestTitle={justificationTarget?.requestTitle || "Cooling Unit Replacement"}
+      />
     </div>
   );
 };
