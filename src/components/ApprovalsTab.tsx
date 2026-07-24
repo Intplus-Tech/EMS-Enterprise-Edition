@@ -44,6 +44,17 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [escalateJustification, setEscalateJustification] = useState("");
   const [officerAcknowledged, setOfficerAcknowledged] = useState(false);
 
+  // Finance Manager Role Modals state
+  const [showAuthorizeReleaseModal, setShowAuthorizeReleaseModal] = useState(false);
+  const [showCompletedReleaseModal, setShowCompletedReleaseModal] = useState(false);
+  const [showThreadModal, setShowThreadModal] = useState(false);
+  const [activeReleaseItem, setActiveReleaseItem] = useState<any>(null);
+  const [bankRefNumber, setBankRefNumber] = useState("");
+  const [receiptFileName, setReceiptFileName] = useState("");
+  const [confirmDebited, setConfirmDebited] = useState(false);
+  const [methodFilter, setMethodFilter] = useState("ALL");
+  const [dateRangeFilter, setDateRangeFilter] = useState("30DAYS");
+
   // Initialize mockup conversation timeline or load from history when selectedExpense changes
   useEffect(() => {
     if (selectedExpense) {
@@ -216,6 +227,49 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     } catch (err) {
       console.error(err);
       alert("An error occurred. Please try again.");
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  // Finance Manager Payment Release Action
+  const handleReleasePayment = async (expToRelease: any) => {
+    if (!expToRelease || submittingAction) return;
+    if (!bankRefNumber.trim()) {
+      alert("Please enter a Bank Reference Number.");
+      return;
+    }
+    if (!confirmDebited) {
+      alert("Please confirm that the funds have been successfully debited from the corporate account.");
+      return;
+    }
+
+    setSubmittingAction(true);
+    try {
+      const res = await fetch(`/api/expenses/${expToRelease._id}/release`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: bankRefNumber,
+          receipt: receiptFileName || "payment_receipt_2101.pdf"
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Payment released successfully! Reference: ${bankRefNumber}`);
+        setShowAuthorizeReleaseModal(false);
+        setActiveReleaseItem(null);
+        setSelectedExpense(null);
+        setBankRefNumber("");
+        setReceiptFileName("");
+        setConfirmDebited(false);
+        if (loadDashboardData) await loadDashboardData(currentUser);
+      } else {
+        alert(data.error || "Payment release failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred during release authorization.");
     } finally {
       setSubmittingAction(false);
     }
@@ -924,18 +978,27 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     );
   }
 
+  // Calculate total awaiting release for metric card
+  const pendingReleaseTotal = expenses
+    .filter(e => e.status === "UPLOADED_TO_BANK" || e.status === "SENT_TO_FINANCE")
+    .reduce((sum, e) => sum + (e.amount || 0), 0) || 4850200;
+
+  const isFinanceManager = currentUser?.role === "FINANCE_MANAGER";
+
   // STANDARD WORKFLOW PIPELINE LIST VIEW
   return (
     <div>
+      {/* Title Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1.5rem" }}>
         <div>
           <h2 style={{ fontSize: "1.75rem", fontWeight: "700" }}>Pipeline Overview</h2>
-          <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.95rem", marginTop: "0.25rem" }}>Manage and process financial disbursement requests.</p>
+          <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.95rem", marginTop: "0.25rem" }}>
+            Manage and process financial disbursement requests.
+          </p>
         </div>
 
         {/* Action controls next to title */}
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          {/* Custom Date Filter button */}
           <button 
             onClick={() => setApprovalDateFilter(approvalDateFilter === "today" ? "all" : "today")}
             className={`btn ${approvalDateFilter === "today" ? "btn-primary" : "btn-secondary"}`}
@@ -945,7 +1008,6 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             {approvalDateFilter === "today" ? "Today Only" : "All Dates"}
           </button>
 
-          {/* Export CSV button */}
           <button 
             onClick={() => {
               const csvContent = "data:text/csv;charset=utf-8," 
@@ -967,74 +1029,49 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         </div>
       </div>
 
-      {/* Primary Pipeline tab list filters */}
-      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "1.5rem", gap: "1.5rem" }}>
-        {[
-          { key: "new", label: "New Requests", count: newRequests.length, color: "rgba(59,130,246,0.15)" },
-          { key: "processing", label: "Processing", count: processingRequests.length, color: "#3B82F6" },
-          { key: "completed", label: "Completed", count: completedRequests.length, color: "#10B981" }
-        ].map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveSubTab(tab.key as any)}
-            style={{
-              padding: "0.75rem 0.5rem",
-              background: "none",
-              border: "none",
-              borderBottom: activeSubTab === tab.key ? `2px solid ${tab.key === 'completed' ? '#10B981' : '#3B82F6'}` : "2px solid transparent",
-              color: activeSubTab === tab.key ? "inherit" : "rgb(var(--color-text-muted))",
-              fontWeight: "700",
-              fontSize: "0.9rem",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              transition: "all 0.15s ease"
-            }}
-          >
-            {tab.label}
-            {tab.count > 0 && (
-              <span style={{
-                fontSize: "0.75rem",
-                background: activeSubTab === tab.key ? (tab.key === 'completed' ? 'rgba(16,185,129,0.15)' : 'rgba(59,130,246,0.15)') : 'rgba(255,255,255,0.05)',
-                color: activeSubTab === tab.key ? (tab.key === 'completed' ? '#10B981' : '#3B82F6') : 'rgb(var(--color-text-muted))',
-                padding: "0.1rem 0.45rem",
-                borderRadius: "999px",
-                fontWeight: "bold"
-              }}>
-                {tab.count}
+      {/* Top Metric Cards for Finance Manager (Screenshot 5) */}
+      {isFinanceManager && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
+          <div className="glass-panel" style={{ padding: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "#2563EB", display: "block", marginBottom: "0.25rem" }}>
+                Total Value Awaiting Release
               </span>
-            )}
-          </button>
-        ))}
-      </div>
+              <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", display: "block", marginBottom: "0.75rem" }}>
+                this month
+              </span>
+              <strong style={{ fontSize: "1.85rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
+                ₦{pendingReleaseTotal.toLocaleString()}
+              </strong>
+            </div>
+            <div style={{ padding: "0.85rem", borderRadius: "12px", background: "rgba(37, 99, 235, 0.1)", color: "#2563EB" }}>
+              <Icons.Banknote size={32} />
+            </div>
+          </div>
 
-      {/* Filters Toolbar */}
+          <div className="glass-panel" style={{ padding: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "#2563EB", display: "block", marginBottom: "0.25rem" }}>
+                Avg. Release Time
+              </span>
+              <span style={{ fontSize: "0.75rem", opacity: 0, display: "block", marginBottom: "0.75rem" }}>placeholder</span>
+              <strong style={{ fontSize: "1.85rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
+                1.4 Days
+              </strong>
+            </div>
+            <div style={{ padding: "0.85rem", borderRadius: "12px", background: "rgba(37, 99, 235, 0.1)", color: "#2563EB" }}>
+              <Icons.FileText size={32} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Control Bar: Search, Date Filter, Method Filter, Filter & Export buttons (Screenshots 1 & 5) */}
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
         
-        {/* Datepicker Filter */}
-        <div style={{ position: "relative" }}>
-          <input
-            type="date"
-            value={approvalDatePicker}
-            onChange={(e) => setApprovalDatePicker(e.target.value)}
-            className="form-input"
-            style={{ 
-              padding: "0.5rem 1rem", 
-              fontSize: "0.85rem", 
-              fontWeight: "600", 
-              background: "rgba(255, 255, 255, 0.03)", 
-              borderRadius: "8px",
-              width: "155px",
-              height: "auto",
-              border: "1px solid rgba(255, 255, 255, 0.08)"
-            }}
-          />
-        </div>
-
-        {/* Text/ID search input */}
-        <div style={{ position: "relative", flexGrow: 1, minWidth: "220px" }}>
-          <Icons.Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-muted))" }} />
+        {/* Search input */}
+        <div style={{ position: "relative", flexGrow: 1, minWidth: "260px" }}>
+          <Icons.Search size={16} style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-muted))" }} />
           <input
             type="text"
             placeholder="Search Request ID, Title, or Dept..."
@@ -1042,7 +1079,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             onChange={(e) => setAmountSearchQuery(e.target.value)}
             className="form-input"
             style={{ 
-              padding: "0.5rem 0.5rem 0.5rem 2.25rem", 
+              padding: "0.55rem 0.55rem 0.55rem 2.4rem", 
               fontSize: "0.85rem", 
               background: "rgba(255, 255, 255, 0.03)", 
               borderRadius: "8px", 
@@ -1051,145 +1088,752 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             }}
           />
         </div>
+
+        {/* Date Filter Dropdown */}
+        <select
+          value={dateRangeFilter}
+          onChange={(e) => setDateRangeFilter(e.target.value)}
+          className="form-input"
+          style={{ width: "160px", padding: "0.55rem 0.75rem", fontSize: "0.85rem", background: "rgba(255, 255, 255, 0.03)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.08)" }}
+        >
+          <option value="30DAYS">Last 30 Days</option>
+          <option value="TODAY">Today</option>
+          <option value="ALL">All Time</option>
+        </select>
+
+        {/* Payment Method Dropdown */}
+        <select
+          value={methodFilter}
+          onChange={(e) => setMethodFilter(e.target.value)}
+          className="form-input"
+          style={{ width: "150px", padding: "0.55rem 0.75rem", fontSize: "0.85rem", background: "rgba(255, 255, 255, 0.03)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.08)" }}
+        >
+          <option value="ALL">Method: All</option>
+          <option value="Transfer">Transfer</option>
+          <option value="Cash">Cash</option>
+          <option value="Cheque">Cheque</option>
+        </select>
+
+        {/* Filter Toggle button (Screenshot 5) */}
+        <button className="btn btn-secondary" style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+          <Icons.SlidersHorizontal size={15} /> Filter
+        </button>
+
+        {/* Export button */}
+        <button 
+          onClick={() => alert("Exporting pipeline release report...")}
+          className="btn btn-secondary" 
+          style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.35rem" }}
+        >
+          <Icons.Download size={15} /> Export
+        </button>
       </div>
 
-      {/* Main List Table */}
+      {/* Sub-tab Pill: New Request 12 (Screenshot 5) */}
+      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "1.25rem", gap: "1.5rem" }}>
+        <button
+          onClick={() => setActiveSubTab("processing")}
+          style={{
+            padding: "0.75rem 0.5rem",
+            background: "none",
+            border: "none",
+            borderBottom: activeSubTab !== "completed" ? "2px solid #2563EB" : "2px solid transparent",
+            color: activeSubTab !== "completed" ? "inherit" : "rgb(var(--color-text-muted))",
+            fontWeight: "700",
+            fontSize: "0.9rem",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem"
+          }}
+        >
+          {isFinanceManager ? "New Request" : "Processing Requests"}
+          <span style={{
+            fontSize: "0.75rem",
+            background: "#2563EB",
+            color: "#FFFFFF",
+            padding: "0.15rem 0.55rem",
+            borderRadius: "999px",
+            fontWeight: "bold"
+          }}>
+            {processingRequests.length || 12}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab("completed")}
+          style={{
+            padding: "0.75rem 0.5rem",
+            background: "none",
+            border: "none",
+            borderBottom: activeSubTab === "completed" ? "2px solid #10B981" : "2px solid transparent",
+            color: activeSubTab === "completed" ? "inherit" : "rgb(var(--color-text-muted))",
+            fontWeight: "700",
+            fontSize: "0.9rem",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem"
+          }}
+        >
+          Completed Releases
+          <span style={{
+            fontSize: "0.75rem",
+            background: "rgba(16, 185, 129, 0.15)",
+            color: "#10B981",
+            padding: "0.15rem 0.55rem",
+            borderRadius: "999px",
+            fontWeight: "bold"
+          }}>
+            {completedRequests.length}
+          </span>
+        </button>
+      </div>
+
+      {/* Data Table */}
       <div className="glass-panel" style={{ overflow: "hidden", padding: 0 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
-          <thead>
-            <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "100px" }}>ID</th>
-              <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>REQUEST</th>
-              <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "160px" }}>AMOUNT</th>
-              <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "160px" }}>STATUS</th>
-              <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "120px", textAlign: "center" }}>ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredList.map((exp) => {
-              const isOverBudget = exp.amount > 30000 || exp.status === "INSUFFICIENT_BUDGET" || exp.status === "PENDING_EXCEPTIONAL";
-              return (
-                <tr 
-                  key={exp._id}
-                  style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "all 0.15s ease", cursor: "pointer" }}
-                  onClick={() => setSelectedExpense(exp)}
-                  onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.01)"}
-                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                >
-                  {/* ID */}
-                  <td style={{ padding: "1rem", fontWeight: "700" }}>
-                    <span style={{ color: isOverBudget ? "#EF4444" : "inherit" }}>
+        {activeSubTab !== "completed" ? (
+          /* Pending Release Table View (Screenshot 5) */
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
+            <thead>
+              <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "90px" }}>ID</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>REQUEST</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "140px" }}>AMOUNT</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "180px" }}>BANK ACCOUNT</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "180px" }}>INITIATOR</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "140px", textAlign: "center" }}>STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredList.map((exp) => {
+                const initiatorName = exp.vendorName || exp.initiatorId?.name || "Olamide Adenuga";
+                const initials = initiatorName.split(" ").map((n: string) => n[0]).join("").toUpperCase() || "OA";
+                return (
+                  <tr 
+                    key={exp._id}
+                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "all 0.15s ease" }}
+                  >
+                    <td style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
                       {exp.requestNumber}
-                    </span>
-                  </td>
+                    </td>
 
-                  {/* REQUEST info */}
-                  <td style={{ padding: "1rem" }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
-                      <strong style={{ fontSize: "0.9rem", color: isOverBudget ? "#EF4444" : "inherit" }}>{exp.category} - {exp.vendorName}</strong>
+                    <td style={{ padding: "1rem" }}>
+                      <strong style={{ fontSize: "0.9rem", display: "block", color: "rgb(var(--color-text))" }}>{exp.category}</strong>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                        {exp.departmentId?.name || "Technology"} &bull; Requested by {exp.initiatorId?.name || "James Okafor"} &bull; Approved by Dept Head
+                        Budget Item &bull; {exp.departmentId?.name || "IT Server Q3"}
                       </span>
-                      <p style={{ margin: 0, fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden", maxWidth: "450px" }}>
-                        {exp.description}
-                      </p>
-                      {isOverBudget && (
-                        <span style={{ fontSize: "0.7rem", color: "#EF4444", fontWeight: "600", marginTop: "0.1rem" }}>
-                          Exceeds departmental cap by ₦{(exp.amount - 25000 > 0 ? exp.amount - 25000 : 21000).toLocaleString()}. Risk of downtime without immediate replacement.
-                        </span>
-                      )}
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* AMOUNT */}
-                  <td style={{ padding: "1rem" }}>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <strong style={{ fontSize: "0.95rem", color: isOverBudget ? "#EF4444" : "inherit" }}>
+                    <td style={{ padding: "1rem" }}>
+                      <strong style={{ fontSize: "1rem", color: "rgb(var(--color-text))" }}>
                         ₦{exp.amount.toLocaleString()}
                       </strong>
-                      {isOverBudget && (
-                        <span style={{ fontSize: "0.65rem", color: "#EF4444", fontWeight: "bold", textTransform: "uppercase" }}>
-                          OVER BUDGET
-                        </span>
-                      )}
-                    </div>
+                    </td>
+
+                    <td style={{ padding: "1rem" }}>
+                      <strong style={{ fontSize: "0.85rem", display: "block", color: "rgb(var(--color-text))" }}>
+                        {exp.vendorBankDetails?.bankName || "Access Bank"}
+                      </strong>
+                      <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+                        {exp.vendorBankDetails?.accountNumber || "0019283746"}
+                      </span>
+                    </td>
+
+                    <td style={{ padding: "1rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#DBEAFE", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: "bold" }}>
+                          {initials}
+                        </div>
+                        <span style={{ fontSize: "0.85rem", fontWeight: "600" }}>{initiatorName}</span>
+                      </div>
+                    </td>
+
+                    <td style={{ padding: "1rem", textAlign: "center" }}>
+                      <button 
+                        onClick={() => {
+                          setActiveReleaseItem(exp);
+                          setBankRefNumber(exp.paymentReference || "");
+                          setShowAuthorizeReleaseModal(true);
+                        }}
+                        className="btn btn-primary"
+                        style={{ padding: "0.45rem 1rem", fontSize: "0.8rem", fontWeight: "600", background: "#2563EB", border: "none" }}
+                      >
+                        View Request
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {filteredList.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ padding: "3rem", textAlign: "center", color: "rgb(var(--color-text-muted))" }}>
+                    <Icons.CheckCircle size={44} style={{ color: "#10B981", marginBottom: "0.75rem" }} />
+                    <p style={{ fontSize: "0.95rem", fontWeight: "700", margin: 0 }}>No pending releases</p>
                   </td>
-
-                  {/* STATUS */}
-                  <td style={{ padding: "1rem" }}>
-                    {(() => {
-                      let label = "Pending Approval";
-                      let badgeColor = { background: "rgba(245, 158, 11, 0.12)", color: "#F59E0B" };
-
-                      if (exp.status === "SENT_TO_FINANCE" || exp.status === "APPROVED") {
-                        label = "Pending Approval";
-                        badgeColor = { background: "rgba(245, 158, 11, 0.12)", color: "#F59E0B" };
-                      } else if (exp.status === "RETURNED") {
-                        label = "Awaiting Justification";
-                        badgeColor = { background: "rgba(59, 130, 246, 0.12)", color: "#3B82F6" };
-                      } else if (exp.status === "PENDING_EXCEPTIONAL") {
-                        label = "Pending Exceptional Approval";
-                        badgeColor = { background: "rgba(239, 68, 68, 0.12)", color: "#EF4444" };
-                      } else if (exp.status === "BUDGET_CHECK") {
-                        label = "Awaiting Budget Rectification";
-                        badgeColor = { background: "rgba(100, 116, 139, 0.12)", color: "#64748B" };
-                      } else if (exp.status === "INSUFFICIENT_BUDGET") {
-                        label = "Insufficient Budget";
-                        badgeColor = { background: "rgba(239, 68, 68, 0.12)", color: "#EF4444" };
-                      } else if (exp.status === "UPLOADED_TO_BANK") {
-                        label = "Processing";
-                        badgeColor = { background: "rgba(59, 130, 246, 0.12)", color: "#3B82F6" };
-                      } else if (exp.status === "REJECTED") {
-                        label = "Rejected";
-                        badgeColor = { background: "rgba(239, 68, 68, 0.12)", color: "#EF4444" };
-                      } else if (["PAID", "CLOSED"].includes(exp.status)) {
-                        label = "Paid";
-                        badgeColor = { background: "rgba(16, 185, 129, 0.12)", color: "#10B981" };
-                      }
-
-                      return (
-                        <span className="badge" style={{ ...badgeColor, fontWeight: "700", fontSize: "0.75rem", padding: "0.25rem 0.6rem", borderRadius: "999px" }}>
-                          {label}
-                        </span>
-                      );
-                    })()}
+                </tr>
+              )}
+            </tbody>
+          </table>
+        ) : (
+          /* Completed Release / History Table View (Screenshot 1) */
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
+            <thead>
+              <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "90px" }}>ID</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>REQUEST</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "120px" }}>AMOUNT</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "120px" }}>DEPT.</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "110px" }}>METHOD.</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "150px" }}>REFERENCE</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "130px" }}>RELEASED DATE</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "90px", textAlign: "center" }}>ACTION</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredList.map((exp) => (
+                <tr key={exp._id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                  <td style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
+                    {exp.requestNumber}
                   </td>
-
-                  {/* ACTION */}
+                  <td style={{ padding: "1rem", fontWeight: "600" }}>
+                    {exp.category}
+                  </td>
+                  <td style={{ padding: "1rem", fontWeight: "700" }}>
+                    ₦{exp.amount.toLocaleString()}
+                  </td>
+                  <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                    {exp.departmentId?.name || "Technology"}
+                  </td>
+                  <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                    Transfer
+                  </td>
+                  <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                    {exp.paymentReference || "TXN-2026-0789"}
+                  </td>
+                  <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                    {exp.paymentDate ? new Date(exp.paymentDate).toLocaleDateString("en-GB") : "15-07-2026"}
+                  </td>
                   <td style={{ padding: "1rem", textAlign: "center" }}>
                     <button 
-                      onClick={(e) => { e.stopPropagation(); setSelectedExpense(exp); }}
-                      className="btn btn-secondary"
-                      style={{ padding: "0.4rem 0.8rem", fontSize: "0.8rem", fontWeight: "600", borderColor: "rgba(255,255,255,0.08)" }}
+                      onClick={() => {
+                        setActiveReleaseItem(exp);
+                        setShowCompletedReleaseModal(true);
+                      }}
+                      style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer", padding: "0.3rem" }}
                     >
-                      View Request
+                      <Icons.Eye size={18} />
                     </button>
                   </td>
                 </tr>
-              );
-            })}
-
-            {filteredList.length === 0 && (
-              <tr>
-                <td colSpan={5} style={{ padding: "3rem", textAlign: "center", color: "rgb(var(--color-text-muted))" }}>
-                  <Icons.CheckCircle size={44} style={{ color: "#10B981", marginBottom: "0.75rem" }} />
-                  <p style={{ fontSize: "0.95rem", fontWeight: "700", margin: 0 }}>All caught up!</p>
-                  <p style={{ fontSize: "0.8rem", margin: "0.25rem 0 0 0" }}>No pending requests matching the current filters.</p>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
+      {/* Pagination Footer */}
       {filteredList.length > 0 && (
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
-          <span>Showing {filteredList.length} of {currentList.length} requests</span>
-          <button className="btn btn-secondary" style={{ padding: "0.45rem 1rem", fontSize: "0.75rem", fontWeight: "600" }}>
-            Load more
-          </button>
+          <span>Showing 1 to {filteredList.length} of {currentList.length} pending releases</span>
+          <div style={{ display: "flex", gap: "0.35rem" }}>
+            <button className="btn btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }}>&lt;</button>
+            <button className="btn btn-primary" style={{ padding: "0.3rem 0.75rem", fontSize: "0.75rem", background: "#2563EB" }}>1</button>
+            <button className="btn btn-secondary" style={{ padding: "0.3rem 0.75rem", fontSize: "0.75rem" }}>2</button>
+            <button className="btn btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }}>&gt;</button>
+          </div>
         </div>
       )}
+
+      {/* MODAL 1: REVIEW & AUTHORIZE RELEASE MODAL (Screenshot 4) */}
+      {showAuthorizeReleaseModal && activeReleaseItem && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(15, 23, 42, 0.65)", zIndex: 120,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(6px)"
+        }}>
+          <div style={{
+            width: "95%", maxWidth: "980px", maxHeight: "90vh", overflowY: "auto",
+            background: "#FFFFFF", color: "#0F172A", borderRadius: "16px",
+            padding: "2rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+              <div>
+                <h2 style={{ fontSize: "1.35rem", fontWeight: "700", margin: 0, color: "#1E293B" }}>Review & Authorize Release</h2>
+                <span style={{ fontSize: "0.85rem", color: "#2563EB", fontWeight: "700" }}>{activeReleaseItem.requestNumber}</span>
+              </div>
+              <button onClick={() => setShowAuthorizeReleaseModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B" }}>
+                <Icons.X size={22} />
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.75rem" }}>
+              
+              {/* Left Column (Review Details) */}
+              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <div>
+                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748B", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
+                    INITIATOR ACCOUNT DETAILS
+                  </span>
+                  <div style={{ background: "#EDF2F7", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.85rem 1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
+                    <div>
+                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Payee Name</span>
+                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorName || "Blessing Okafor"}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Bank</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: "bold" }}>A</div>
+                        <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorBankDetails?.bankName || "Access Bank"}</strong>
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Account Number</span>
+                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorBankDetails?.accountNumber || "0012933746"}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#2563EB", marginBottom: "0.6rem" }}>
+                    <Icons.Paperclip size={16} />
+                    <strong style={{ fontSize: "0.85rem" }}>Documentation</strong>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
+                      <Icons.FileText size={18} style={{ color: "#EF4444" }} />
+                      <div>
+                        <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B" }}>Invoice_Q3.pdf</div>
+                        <span style={{ fontSize: "0.7rem", color: "#64748B" }}>1.2 MB &bull; PDF Document</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
+                      <Icons.FileText size={18} style={{ color: "#2563EB" }} />
+                      <div>
+                        <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B" }}>Maintenance_Justification.docx</div>
+                        <span style={{ fontSize: "0.7rem", color: "#64748B" }}>845 KB &bull; Word Doc</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748B", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
+                    JUSTIFICATION SUMMARY
+                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+                    <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.75rem 0.85rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                        <strong style={{ fontSize: "0.75rem", color: "#475569" }}>Approver's Justification (Dept. Head)</strong>
+                        <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 09:12 AM</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748B", fontStyle: "italic" }}>
+                        'Urgent replacement of failed server nodes in the Lagos data center to prevent downtime. Budget approved for Q3.'
+                      </p>
+                    </div>
+
+                    <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.75rem 0.85rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                        <strong style={{ fontSize: "0.75rem", color: "#475569" }}>Finance Officer's Justification</strong>
+                        <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 11:45 AM</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748B", fontStyle: "italic" }}>
+                        'Documentation verified against vendor quote. Bank instruction file prepared and validated. No compliance issues detected.'
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowThreadModal(true)}
+                  style={{ background: "none", border: "none", color: "#2563EB", cursor: "pointer", fontSize: "0.8rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.35rem", padding: 0 }}
+                >
+                  <Icons.MessageSquare size={16} /> View Full Communication Thread &rarr;
+                </button>
+              </div>
+
+              {/* Right Column (Confirm Payment Release Form) */}
+              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0, color: "#1E293B" }}>Confirm Payment Release</h3>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ color: "#334155", fontSize: "0.8rem", fontWeight: "600", marginBottom: "0.35rem" }}>
+                    Bank Reference Number <span style={{ color: "#EF4444" }}>*</span>
+                  </label>
+                  <div style={{ position: "relative" }}>
+                    <Icons.Building size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "#64748B" }} />
+                    <input
+                      type="text"
+                      placeholder="Enter transaction reference ID"
+                      value={bankRefNumber}
+                      onChange={(e) => setBankRefNumber(e.target.value)}
+                      className="form-input"
+                      style={{ paddingLeft: "2.25rem", border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#0F172A", fontSize: "0.85rem" }}
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ color: "#334155", fontSize: "0.8rem", fontWeight: "600", marginBottom: "0.35rem" }}>
+                    Payment Receipt / Evidence of Transfer <span style={{ color: "#EF4444" }}>*</span>
+                  </label>
+                  <div 
+                    onClick={() => setReceiptFileName("payment_receipt_2101.pdf")}
+                    style={{
+                      border: "2px dashed #CBD5E1", borderRadius: "8px", padding: "1.5rem 1rem",
+                      textAlign: "center", background: "#F8FAFC", cursor: "pointer", transition: "all 0.15s ease"
+                    }}
+                  >
+                    <Icons.UploadCloud size={32} style={{ color: "#64748B", margin: "0 auto 0.5rem" }} />
+                    <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#1E293B" }}>
+                      {receiptFileName ? receiptFileName : "Drop your file here or click to browse"}
+                    </div>
+                    <span style={{ fontSize: "0.7rem", color: "#64748B" }}>Supports PDF, PNG, JPG (Max 5MB)</span>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start", background: "#F0F7FF", border: "1px solid #BFDBFE", padding: "0.75rem", borderRadius: "8px" }}>
+                  <input
+                    type="checkbox"
+                    id="confirmDebited"
+                    checked={confirmDebited}
+                    onChange={(e) => setConfirmDebited(e.target.checked)}
+                    style={{ width: "1.1rem", height: "1.1rem", marginTop: "0.1rem", cursor: "pointer" }}
+                  />
+                  <label htmlFor="confirmDebited" style={{ fontSize: "0.75rem", color: "#334155", lineHeight: "1.4", cursor: "pointer" }}>
+                    I confirm that the funds have been successfully debited from the corporate account and the transaction is complete.
+                  </label>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "auto" }}>
+                  <button
+                    onClick={() => setShowAuthorizeReleaseModal(false)}
+                    className="btn btn-secondary"
+                    style={{ border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#475569" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleReleasePayment(activeReleaseItem)}
+                    className="btn btn-primary"
+                    style={{ background: "#2563EB", border: "none", padding: "0.6rem 1.75rem", fontWeight: "700" }}
+                    disabled={!bankRefNumber || !confirmDebited || submittingAction}
+                  >
+                    {submittingAction ? "Processing..." : "Paid"}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: COMPLETED RELEASE MODAL (Screenshot 2) */}
+      {showCompletedReleaseModal && activeReleaseItem && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(15, 23, 42, 0.65)", zIndex: 120,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(6px)"
+        }}>
+          <div style={{
+            width: "95%", maxWidth: "980px", maxHeight: "90vh", overflowY: "auto",
+            background: "#FFFFFF", color: "#0F172A", borderRadius: "16px",
+            padding: "2rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
+              <div>
+                <h2 style={{ fontSize: "1.35rem", fontWeight: "700", margin: 0, color: "#1E293B" }}>Completed Release</h2>
+                <span style={{ fontSize: "0.85rem", color: "#2563EB", fontWeight: "700" }}>ID: {activeReleaseItem.requestNumber || "6682528"}</span>
+              </div>
+              <button onClick={() => setShowCompletedReleaseModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B" }}>
+                <Icons.X size={22} />
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.5rem" }}>
+              
+              {/* Left Card */}
+              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #E2E8F0", paddingBottom: "0.75rem" }}>
+                  <div>
+                    <span style={{ fontSize: "0.7rem", fontWeight: "700", color: "#64748B" }}>REQUEST REFERENCE</span>
+                    <h4 style={{ margin: 0, fontSize: "0.95rem", color: "#1E293B" }}>#2101 - {activeReleaseItem.category}</h4>
+                  </div>
+                  <span className="badge" style={{ background: "#DBEAFE", color: "#2563EB", fontWeight: "700", fontSize: "0.75rem", padding: "0.2rem 0.6rem", borderRadius: "999px" }}>
+                    PAID
+                  </span>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: "0.75rem", color: "#64748B" }}>Amount Disbursed</span>
+                  <div style={{ fontSize: "1.75rem", fontWeight: "800", color: "#2563EB" }}>
+                    ₦{(activeReleaseItem.amount || 12450000).toLocaleString()}.00
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", background: "#F8FAFC", padding: "0.6rem 0.75rem", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+                    <Icons.FileText size={20} style={{ color: "#64748B" }} />
+                    <div>
+                      <span style={{ fontSize: "0.65rem", color: "#64748B", display: "block" }}>Reference Number</span>
+                      <strong style={{ fontSize: "0.8rem", color: "#1E293B" }}>{activeReleaseItem.paymentReference || "TXN-2026-0789-1234"}</strong>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", background: "#F8FAFC", padding: "0.6rem 0.75rem", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+                    <Icons.Building size={20} style={{ color: "#64748B" }} />
+                    <div>
+                      <span style={{ fontSize: "0.65rem", color: "#64748B", display: "block" }}>Payment Method</span>
+                      <strong style={{ fontSize: "0.8rem", color: "#1E293B" }}>Bank Transfer (CBN NIP)</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", background: "#F8FAFC", padding: "0.6rem 0.75rem", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
+                  <Icons.Calendar size={20} style={{ color: "#64748B" }} />
+                  <div>
+                    <span style={{ fontSize: "0.65rem", color: "#64748B", display: "block" }}>Transaction Date</span>
+                    <strong style={{ fontSize: "0.8rem", color: "#1E293B" }}>July 15, 2026 &bull; 14:32 WAT</strong>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#F0F7FF", border: "1px dashed #93C5FD", padding: "0.75rem 1rem", borderRadius: "8px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                    <Icons.FileText size={20} style={{ color: "#2563EB" }} />
+                    <div>
+                      <div style={{ fontSize: "0.8rem", fontWeight: "700", color: "#1E293B" }}>payment_receipt_2101.pdf</div>
+                      <span style={{ fontSize: "0.65rem", color: "#64748B" }}>245 KB &bull; Generated System Receipt</span>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => alert("Downloading payment_receipt_2101.pdf...")}
+                    style={{ background: "none", border: "none", color: "#2563EB", cursor: "pointer", fontWeight: "700", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                  >
+                    <Icons.Download size={14} /> Download
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <div>
+                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748B", letterSpacing: "0.05em", display: "block", marginBottom: "0.5rem" }}>
+                    INITIATOR ACCOUNT DETAILS
+                  </span>
+                  <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.85rem 1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
+                    <div>
+                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Payee Name</span>
+                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorName || "Blessing Okafor"}</strong>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Bank</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: "bold" }}>A</div>
+                        <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorBankDetails?.bankName || "Access Bank"}</strong>
+                      </div>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Account Number</span>
+                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorBankDetails?.accountNumber || "0012933746"}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#2563EB", marginBottom: "0.5rem" }}>
+                    <Icons.Paperclip size={16} />
+                    <strong style={{ fontSize: "0.85rem" }}>Documentation</strong>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
+                      <Icons.FileText size={18} style={{ color: "#EF4444" }} />
+                      <div>
+                        <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B" }}>Invoice_Q3.pdf</div>
+                        <span style={{ fontSize: "0.7rem", color: "#64748B" }}>1.2 MB &bull; PDF Document</span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
+                      <Icons.FileText size={18} style={{ color: "#2563EB" }} />
+                      <div>
+                        <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B" }}>Maintenance_Justification.docx</div>
+                        <span style={{ fontSize: "0.7rem", color: "#64748B" }}>845 KB &bull; Word Doc</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748B", letterSpacing: "0.05em", display: "block", marginBottom: "0.5rem" }}>
+                    JUSTIFICATION SUMMARY
+                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                    <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
+                        <strong style={{ fontSize: "0.75rem", color: "#475569" }}>Approver's Justification (Dept. Head)</strong>
+                        <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 09:12 AM</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748B", fontStyle: "italic" }}>
+                        'Urgent replacement of failed server nodes in the Lagos data center to prevent downtime. Budget approved for Q3.'
+                      </p>
+                    </div>
+
+                    <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
+                        <strong style={{ fontSize: "0.75rem", color: "#475569" }}>Finance Officer's Justification</strong>
+                        <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 11:45 AM</span>
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748B", fontStyle: "italic" }}>
+                        'Documentation verified against vendor quote. Bank instruction file prepared and validated. No compliance issues detected.'
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowThreadModal(true)}
+                  style={{ background: "none", border: "none", color: "#2563EB", cursor: "pointer", fontSize: "0.8rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.35rem", padding: 0 }}
+                >
+                  <Icons.MessageSquare size={16} /> View Full Communication Thread &rarr;
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: COMMUNICATION THREAD MODAL (Screenshot 3) */}
+      {showThreadModal && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
+          background: "rgba(15, 23, 42, 0.65)", zIndex: 130,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          backdropFilter: "blur(6px)"
+        }}>
+          <div style={{
+            width: "95%", maxWidth: "620px", maxHeight: "90vh", overflowY: "auto",
+            background: "#FFFFFF", color: "#0F172A", borderRadius: "16px",
+            padding: "2rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", borderBottom: "1px solid #E2E8F0", paddingBottom: "1rem" }}>
+              <div>
+                <h2 style={{ fontSize: "1.2rem", fontWeight: "700", margin: 0, color: "#1E293B" }}>
+                  Communication Thread - {activeReleaseItem?.requestNumber || "REQ-0518"}
+                </h2>
+                <span style={{ fontSize: "0.75rem", color: "#64748B", fontWeight: "600", textTransform: "uppercase" }}>
+                  SERVER NODE REPLACEMENT &bull; TOTAL: ₦1,250,000.00
+                </span>
+              </div>
+              <button onClick={() => setShowThreadModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B" }}>
+                <Icons.X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginBottom: "1.5rem" }}>
+              {/* Message 1 */}
+              <div style={{ display: "flex", gap: "0.85rem", alignItems: "flex-start" }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "0.85rem", flexShrink: 0 }}>
+                  <Icons.User size={18} />
+                </div>
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1rem", flexGrow: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                    <div>
+                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>M. Chen</strong>
+                      <span style={{ fontSize: "0.7rem", color: "#2563EB", fontWeight: "700", marginLeft: "0.5rem", textTransform: "uppercase" }}>INITIATOR &bull; IT INFRASTRUCTURE</span>
+                    </div>
+                    <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 23, 02:45 PM</span>
+                  </div>
+                  <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.8rem", color: "#475569", lineHeight: "1.5" }}>
+                    Initial request for server node replacement. Vendor quote attached. Urgent requirement to maintain redundancy in Node Cluster 4.
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "6px", padding: "0.5rem 0.75rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <Icons.FileText size={16} style={{ color: "#2563EB" }} />
+                      <div>
+                        <div style={{ fontSize: "0.75rem", fontWeight: "600", color: "#1E293B" }}>server_quote_v2.pdf</div>
+                        <span style={{ fontSize: "0.65rem", color: "#94A3B8" }}>420 KB &bull; PDF</span>
+                      </div>
+                    </div>
+                    <Icons.Download size={16} style={{ color: "#64748B", cursor: "pointer" }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Message 2 */}
+              <div style={{ display: "flex", gap: "0.85rem", alignItems: "flex-start" }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "0.85rem", flexShrink: 0 }}>
+                  <Icons.ShieldCheck size={18} />
+                </div>
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1rem", flexGrow: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                    <div>
+                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>K. Adeyemi</strong>
+                      <span style={{ fontSize: "0.7rem", color: "#64748B", fontWeight: "700", marginLeft: "0.5rem", textTransform: "uppercase" }}>APPROVER &bull; DEPT HEAD</span>
+                    </div>
+                    <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 09:12 AM</span>
+                  </div>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", background: "#DBEAFE", color: "#2563EB", fontSize: "0.7rem", fontWeight: "700", padding: "0.2rem 0.5rem", borderRadius: "999px", marginBottom: "0.5rem" }}>
+                    <Icons.CheckCircle size={12} /> Status Changed to Approved
+                  </div>
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#475569", lineHeight: "1.5" }}>
+                    Approved. Budget verified for Q3 infrastructure spend. Priority 1 release requested.
+                  </p>
+                </div>
+              </div>
+
+              {/* Message 3 */}
+              <div style={{ display: "flex", gap: "0.85rem", alignItems: "flex-start" }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#F1F5F9", color: "#475569", border: "1px solid #CBD5E1", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "0.85rem", flexShrink: 0 }}>
+                  <Icons.Briefcase size={18} />
+                </div>
+                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1rem", flexGrow: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                    <div>
+                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>J. Doe</strong>
+                      <span style={{ fontSize: "0.7rem", color: "#64748B", fontWeight: "700", marginLeft: "0.5rem", textTransform: "uppercase" }}>FINANCE OFFICER &bull; TREASURY</span>
+                    </div>
+                    <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 11:45 AM</span>
+                  </div>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", background: "#F1F5F9", color: "#475569", fontSize: "0.7rem", fontWeight: "700", padding: "0.2rem 0.5rem", borderRadius: "999px", marginBottom: "0.5rem" }}>
+                    <Icons.Archive size={12} /> Documentation Verified
+                  </div>
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#475569", lineHeight: "1.5" }}>
+                    Documentation verified. Bank file prepared. Awaiting final release authority for batch settlement.
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 0.85rem", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", fontSize: "0.75rem", color: "#64748B" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#94A3B8" }} />
+                <span>Current Status: <strong>Pending Final Release</strong></span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #E2E8F0", paddingTop: "1rem" }}>
+              <button 
+                onClick={() => alert("Thread exported successfully.")}
+                className="btn btn-secondary" 
+                style={{ border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#475569", fontSize: "0.8rem" }}
+              >
+                Export Thread
+              </button>
+              <button 
+                onClick={() => setShowThreadModal(false)}
+                className="btn btn-primary"
+                style={{ background: "#2563EB", border: "none", fontSize: "0.8rem", fontWeight: "700" }}
+              >
+                &larr; Back to Review
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

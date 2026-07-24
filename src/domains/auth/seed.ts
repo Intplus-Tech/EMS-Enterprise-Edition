@@ -180,48 +180,65 @@ export async function runDatabaseSeed() {
       description: "Replacement of 12 aging servers ahead of Q4 peak load — vendor quote attached.",
       amount: 38500,
       supportingDocument: "Invoice_Q3.pdf",
-      vendorName: "James Okafor",
+      vendorName: "Olamide Adenuga",
       vendorBankDetails: {
         accountNumber: "0019283746",
-        bankName: "Access Bank PLC",
-        accountName: "James Okafor"
+        bankName: "Access Bank",
+        accountName: "Olamide Adenuga"
       },
       requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 5),
-      status: "SENT_TO_FINANCE"
+      status: "UPLOADED_TO_BANK"
     },
     {
       requestNumber: "REQ-0039",
       departmentId: mktDept._id,
       initiatorId: initiatorUser._id,
-      category: "Annual Marketing Conference Spend",
+      category: "Annual Marketing Conference",
       description: "Covers booth, travel, and collateral for the SaaS Connect conference in September.",
-      amount: 12800,
+      amount: 38500,
       supportingDocument: "Invoice_Q3.pdf",
-      vendorName: "Priya Nair",
+      vendorName: "Emeka Kalu",
       vendorBankDetails: {
-        accountNumber: "0019283746",
-        bankName: "Access Bank PLC",
-        accountName: "Priya Nair"
+        accountNumber: "1012938475",
+        bankName: "Zenith Bank",
+        accountName: "Emeka Kalu"
       },
       requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 3),
-      status: "RETURNED"
+      status: "UPLOADED_TO_BANK"
     },
     {
       requestNumber: "REQ-0037",
       departmentId: legalDept._id,
       initiatorId: initiatorUser._id,
-      category: "Legal Retainer Renewal",
-      description: "Renewal of existing retainer with Hartley & Co., no scope changes.",
+      category: "Annual Marketing Conference",
+      description: "Renewal of legal stationeries & compliance document filings.",
       amount: 9000,
       supportingDocument: "Invoice_Q3.pdf",
-      vendorName: "Tom Blaine",
+      vendorName: "Olamide Adenuga",
       vendorBankDetails: {
         accountNumber: "0019283746",
-        bankName: "Access Bank PLC",
-        accountName: "Tom Blaine"
+        bankName: "Access Bank",
+        accountName: "Olamide Adenuga"
       },
       requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 10),
-      status: "SENT_TO_FINANCE"
+      status: "UPLOADED_TO_BANK"
+    },
+    {
+      requestNumber: "REQ-0518",
+      departmentId: techDept._id,
+      initiatorId: initiatorUser._id,
+      category: "Server Node Replacement",
+      description: "Initial request for server node replacement. Vendor quote attached. Urgent requirement to maintain redundancy in Node Cluster 4.",
+      amount: 1250000,
+      supportingDocument: "Invoice_Q3.pdf",
+      vendorName: "Blessing Okafor",
+      vendorBankDetails: {
+        accountNumber: "0012933746",
+        bankName: "Access Bank",
+        accountName: "Blessing Okafor"
+      },
+      requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2),
+      status: "UPLOADED_TO_BANK"
     },
     {
       requestNumber: "REQ-0044",
@@ -234,47 +251,71 @@ export async function runDatabaseSeed() {
       vendorName: "James Okafor",
       vendorBankDetails: {
         accountNumber: "0019283746",
-        bankName: "Access Bank PLC",
+        bankName: "Access Bank",
         accountName: "James Okafor"
       },
       requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 4),
       status: "INSUFFICIENT_BUDGET"
     },
     {
-      requestNumber: "REQ-2024-0512", // Completed Request (Image 3)
+      requestNumber: "REQ-2101",
       departmentId: techDept._id,
       initiatorId: initiatorUser._id,
-      category: "Q3 Server Maintenance",
-      description: "The Q3 server maintenance fee reflects an increase of 15% due to the critical emergency replacement of industrial-grade cooling fans within our primary data center. During pre-scheduled inspections, the existing units showed signs of imminent mechanical failure, which would have compromised the uptime of core transaction processing systems. This replacement was not included in the original annual maintenance quote but is vital for operational continuity.",
-      amount: 35000,
+      category: "Q3 IT Infrastructure Upgrade",
+      description: "Urgent replacement of failed server nodes in the Lagos data center to prevent downtime. Budget approved for Q3.",
+      amount: 12450000,
       supportingDocument: "Invoice_Q3.pdf",
-      vendorName: "James Okafor",
+      vendorName: "Blessing Okafor",
       vendorBankDetails: {
-        accountNumber: "0019283746",
-        bankName: "Access Bank PLC",
-        accountName: "James Okafor"
+        accountNumber: "0012933746",
+        bankName: "Access Bank",
+        accountName: "Blessing Okafor"
       },
-      requiredPaymentDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2),
+      requiredPaymentDate: new Date("2026-07-15"),
       status: "PAID",
-      paymentReference: "TXN-10928374-RELEASE",
-      paymentDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1)
+      paymentReference: "TXN-2026-0789-1234",
+      paymentReceipt: "payment_receipt_2101.pdf",
+      paymentDate: new Date("2026-07-15T14:32:00")
     },
     {
-      requestNumber: "REQ-0044-REJ",
-      departmentId: techDept._id,
+      requestNumber: "REQ-0040",
+      departmentId: mktDept._id,
       initiatorId: initiatorUser._id,
-      category: "Legal Retainer Renewal",
-      description: "Exceeds departmental cap by ₦21,000. Risk of downtime without immediate replacement.",
-      amount: 61000,
+      category: "Annual Marketing Conference",
+      description: "SaaS Marketing conference registration and venue deposit.",
+      amount: 9500,
       supportingDocument: "Invoice_Q3.pdf",
-      vendorName: "James Okafor",
+      vendorName: "Emeka Kalu",
+      vendorBankDetails: {
+        accountNumber: "1012938475",
+        bankName: "Zenith Bank",
+        accountName: "Emeka Kalu"
+      },
+      requiredPaymentDate: new Date("2026-07-12"),
+      status: "PAID",
+      paymentReference: "CASH-2026-03",
+      paymentReceipt: "receipt_cash_0040.pdf",
+      paymentDate: new Date("2026-07-12T10:15:00")
+    },
+    {
+      requestNumber: "REQ-0039-PAID",
+      departmentId: legalDept._id,
+      initiatorId: initiatorUser._id,
+      category: "Legal Compliance Fee",
+      description: "Annual statutory corporate filings and legal compliance fees.",
+      amount: 7000,
+      supportingDocument: "Invoice_Q3.pdf",
+      vendorName: "Olamide Adenuga",
       vendorBankDetails: {
         accountNumber: "0019283746",
-        bankName: "Access Bank PLC",
-        accountName: "James Okafor"
+        bankName: "Access Bank",
+        accountName: "Olamide Adenuga"
       },
-      requiredPaymentDate: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5),
-      status: "REJECTED"
+      requiredPaymentDate: new Date("2026-07-10"),
+      status: "PAID",
+      paymentReference: "CHQ-2026-042",
+      paymentReceipt: "receipt_cheque_0039.pdf",
+      paymentDate: new Date("2026-07-10T11:00:00")
     }
   ];
 

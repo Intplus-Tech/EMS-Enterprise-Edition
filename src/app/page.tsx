@@ -232,7 +232,7 @@ export default function Dashboard() {
         setActiveTab("requests");
       }
     } else if (["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser.role)) {
-      if (!["approvals", "settings"].includes(activeTab)) {
+      if (!["approvals", "history", "settings"].includes(activeTab)) {
         setActiveTab("approvals");
       }
     } else {
@@ -903,32 +903,30 @@ export default function Dashboard() {
                 })()}
               </button>
 
-              {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
-                <>
-                  <button
-                    onClick={() => setActiveTab("requests")}
-                    className="btn"
-                    style={{
-                      justifyContent: "flex-start",
-                      background: activeTab === "requests" ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                      color: activeTab === "requests" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                    }}
-                  >
-                    <Icons.Receipt size={18} /> Requests
-                  </button>
+              <button
+                onClick={() => setActiveTab("history")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "history" ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                  color: activeTab === "history" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
+                }}
+              >
+                <Icons.History size={18} /> History
+              </button>
 
-                  <button
-                    onClick={() => setActiveTab("history")}
-                    className="btn"
-                    style={{
-                      justifyContent: "flex-start",
-                      background: activeTab === "history" ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                      color: activeTab === "history" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                    }}
-                  >
-                    <Icons.History size={18} /> History
-                  </button>
-                </>
+              {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
+                <button
+                  onClick={() => setActiveTab("requests")}
+                  className="btn"
+                  style={{
+                    justifyContent: "flex-start",
+                    background: activeTab === "requests" ? "rgba(255, 255, 255, 0.08)" : "transparent",
+                    color: activeTab === "requests" ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
+                  }}
+                >
+                  <Icons.Receipt size={18} /> Requests
+                </button>
               )}
 
               <button

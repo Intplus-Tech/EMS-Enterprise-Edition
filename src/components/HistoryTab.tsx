@@ -36,7 +36,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
     // Gated to user role or department if Approver
     const inDept = currentUser?.role === "INITIATOR"
       ? e.initiatorId?._id === currentUser?._id
-      : (currentUser?.role === "ADMIN" || e.departmentId === currentUser?.departmentId || e.initiatorId?.departmentId === currentUser?.departmentId || (e.departmentId as any)?.name === currentUser?.departmentName);
+      : (["ADMIN", "FINANCE_MANAGER", "FINANCE_OFFICER", "FINANCE_HEAD"].includes(currentUser?.role) || e.departmentId === currentUser?.departmentId || e.initiatorId?.departmentId === currentUser?.departmentId || (e.departmentId as any)?.name === currentUser?.departmentName);
     if (!inDept) return false;
 
     // Filter by category
