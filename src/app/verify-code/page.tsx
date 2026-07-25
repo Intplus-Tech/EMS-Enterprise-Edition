@@ -18,6 +18,16 @@ function VerifyCodeContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resendMessage, setResendMessage] = useState("");
+  const [resendTimer, setResendTimer] = useState(60);
+
+  // Dynamic countdown timer for OTP resend
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setResendTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendTimer]);
 
   // Mask the email address to display: j***@company.com
   const maskEmail = (emailStr: string) => {
@@ -121,6 +131,7 @@ function VerifyCodeContent() {
 
   // Resend code trigger
   const handleResend = async () => {
+    if (resendTimer > 0) return;
     setError("");
     setResendMessage("");
     try {
@@ -133,6 +144,7 @@ function VerifyCodeContent() {
       if (data.success) {
         setResendMessage(`New code generated: ${data.code}`);
         setDigits(Array(6).fill(""));
+        setResendTimer(60);
         if (inputRefs.current[0]) {
           inputRefs.current[0].focus();
         }
@@ -278,17 +290,18 @@ function VerifyCodeContent() {
           Didn't receive the code?{" "}
           <button 
             onClick={handleResend}
+            disabled={resendTimer > 0}
             style={{ 
               background: "none", 
               border: "none", 
-              color: "#0A52D6", 
+              color: resendTimer > 0 ? "#94A3B8" : "#0A52D6", 
               fontWeight: "700", 
-              cursor: "pointer", 
+              cursor: resendTimer > 0 ? "not-allowed" : "pointer", 
               padding: 0,
               fontFamily: "inherit"
             }}
           >
-            Resend
+            {resendTimer > 0 ? `Resend code in ${resendTimer}s` : "Resend code"}
           </button>
         </div>
       </div>

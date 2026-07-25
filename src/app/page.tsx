@@ -95,9 +95,11 @@ export default function Dashboard() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newRequest, setNewRequest] = useState({
     category: "Travel",
+    currency: "NGN",
     description: "",
     amount: "",
     supportingDocument: "invoice_receipt_1024.pdf",
+    supportingDocuments: ["invoice_receipt_1024.pdf"],
     vendorName: "",
     accountNumber: "",
     bankName: "",
@@ -464,9 +466,11 @@ export default function Dashboard() {
         setShowCreateModal(false);
         setNewRequest({
           category: "Travel",
+          currency: "NGN",
           description: "",
           amount: "",
           supportingDocument: "invoice_receipt_1024.pdf",
+          supportingDocuments: ["invoice_receipt_1024.pdf"],
           vendorName: "",
           accountNumber: "",
           bankName: "",
@@ -1568,7 +1572,7 @@ export default function Dashboard() {
             )}
 
             <form onSubmit={(e) => handleCreateRequest(e, true)} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr 0.8fr", gap: "0.75rem" }}>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">Expense Category</label>
                   <select
@@ -1583,17 +1587,31 @@ export default function Dashboard() {
                     <option value="Other">Other Expenses</option>
                   </select>
                 </div>
-                
+
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Requested Amount ({currentUser?.role === "INITIATOR" ? "₦" : "$"})</label>
+                  <label className="form-label">Requested Amount</label>
                   <input
                     type="number"
                     required
                     value={newRequest.amount}
                     onChange={(e) => setNewRequest({ ...newRequest, amount: e.target.value })}
-                    placeholder={currentUser?.role === "INITIATOR" ? "e.g. 3200" : "e.g. 2400"}
+                    placeholder="e.g. 3200"
                     className="form-input"
                   />
+                </div>
+
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label className="form-label">Currency</label>
+                  <select
+                    value={newRequest.currency}
+                    onChange={(e) => setNewRequest({ ...newRequest, currency: e.target.value })}
+                    className="form-select"
+                  >
+                    <option value="NGN">NGN (₦)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                  </select>
                 </div>
               </div>
 
@@ -1609,28 +1627,74 @@ export default function Dashboard() {
                 />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Supporting Invoice Document</label>
-                  <input
-                    type="text"
-                    required
-                    value={newRequest.supportingDocument}
-                    onChange={(e) => setNewRequest({ ...newRequest, supportingDocument: e.target.value })}
-                    className="form-input"
-                  />
+              {/* Supporting Attachments Manager */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                  <label className="form-label" style={{ margin: 0 }}>Supporting Documents ({newRequest.supportingDocuments.length})</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = prompt("Enter attachment file name (e.g. hotel_folio_992.pdf):", `receipt_${Date.now().toString().slice(-4)}.pdf`);
+                      if (name) {
+                        setNewRequest({
+                          ...newRequest,
+                          supportingDocuments: [...newRequest.supportingDocuments, name],
+                          supportingDocument: name
+                        });
+                      }
+                    }}
+                    style={{ background: "none", border: "none", color: "rgb(var(--color-primary))", fontSize: "0.75rem", fontWeight: "700", cursor: "pointer" }}
+                  >
+                    + Add File
+                  </button>
                 </div>
-                
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Required Payment Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={newRequest.requiredPaymentDate}
-                    onChange={(e) => setNewRequest({ ...newRequest, requiredPaymentDate: e.target.value })}
-                    className="form-input"
-                  />
+
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+                  {newRequest.supportingDocuments.map((docName, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "0.35rem",
+                        padding: "0.3rem 0.6rem",
+                        borderRadius: "6px",
+                        background: "rgba(99, 102, 241, 0.1)",
+                        border: "1px solid rgba(99, 102, 241, 0.25)",
+                        fontSize: "0.75rem",
+                        color: "rgb(var(--color-text))"
+                      }}
+                    >
+                      <Icons.Paperclip size={12} style={{ color: "rgb(var(--color-primary))" }} />
+                      <span>{docName}</span>
+                      {newRequest.supportingDocuments.length > 1 && (
+                        <Icons.X
+                          size={12}
+                          style={{ cursor: "pointer", color: "#EF4444", marginLeft: "0.2rem" }}
+                          onClick={() => {
+                            const updated = newRequest.supportingDocuments.filter((_, i) => i !== idx);
+                            setNewRequest({
+                              ...newRequest,
+                              supportingDocuments: updated,
+                              supportingDocument: updated[0] || ""
+                            });
+                          }}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Required Payment Date</label>
+                <input
+                  type="date"
+                  required
+                  value={newRequest.requiredPaymentDate}
+                  onChange={(e) => setNewRequest({ ...newRequest, requiredPaymentDate: e.target.value })}
+                  className="form-input"
+                />
               </div>
 
               <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)" }}>

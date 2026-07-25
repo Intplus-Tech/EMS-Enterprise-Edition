@@ -22,6 +22,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   const [showJustificationModal, setShowJustificationModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [glAccountCode, setGlAccountCode] = useState("GL-6120 Travel & Lodging");
 
   // Exceptional request details matching exact screenshot
   const requestDetails = {
@@ -218,6 +219,32 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   EMPLOYEE
                 </span>
                 <strong style={{ fontSize: "0.95rem", color: "rgb(var(--color-text))" }}>{requestDetails.employee}</strong>
+              </div>
+
+              <div>
+                <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#2563EB", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.25rem" }}>
+                  GL ACCOUNT CODE
+                </span>
+                <select
+                  value={glAccountCode}
+                  onChange={(e) => setGlAccountCode(e.target.value)}
+                  className="form-input"
+                  style={{
+                    padding: "0.4rem 0.6rem",
+                    fontSize: "0.85rem",
+                    fontWeight: "600",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(37, 99, 235, 0.4)",
+                    background: "rgba(37, 99, 235, 0.05)",
+                    color: "rgb(var(--color-text))"
+                  }}
+                >
+                  <option value="GL-6120 Travel & Lodging">GL-6120 Travel & Lodging</option>
+                  <option value="GL-6130 Software & Cloud">GL-6130 Software & Cloud</option>
+                  <option value="GL-6140 Office Supplies">GL-6140 Office Supplies</option>
+                  <option value="GL-6150 Marketing & Events">GL-6150 Marketing & Events</option>
+                  <option value="GL-6160 Professional Fees">GL-6160 Professional Fees</option>
+                </select>
               </div>
             </div>
 

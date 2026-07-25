@@ -30,7 +30,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   selectedExpense,
   loadDashboardData
 }) => {
-  // Finance sub-tabs: 'new', 'processing', 'completed'
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<"new" | "processing" | "completed">("processing");
   const [showClarificationForm, setShowClarificationForm] = useState(false);
   const [clarificationQuestion, setClarificationQuestion] = useState("");
@@ -1230,6 +1231,17 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
             <thead>
               <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+                <th style={{ padding: "0.85rem 0.5rem 0.85rem 1rem", width: "40px" }}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.length === filteredList.length && filteredList.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedIds(filteredList.map(item => item._id));
+                      else setSelectedIds([]);
+                    }}
+                    style={{ cursor: "pointer", width: "16px", height: "16px" }}
+                  />
+                </th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "90px" }}>ID</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>REQUEST</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "140px" }}>AMOUNT</th>
@@ -1247,6 +1259,17 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     key={exp._id}
                     style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "all 0.15s ease" }}
                   >
+                    <td style={{ padding: "1rem 0.5rem 1rem 1rem", width: "40px" }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(exp._id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedIds([...selectedIds, exp._id]);
+                          else setSelectedIds(selectedIds.filter(id => id !== exp._id));
+                        }}
+                        style={{ cursor: "pointer", width: "16px", height: "16px" }}
+                      />
+                    </td>
                     <td style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
                       {exp.requestNumber}
                     </td>
@@ -1930,6 +1953,64 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           }
         }}
       />
+
+      {/* Floating Sticky Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div style={{
+          position: "fixed",
+          bottom: "2rem",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#1E293B",
+          color: "#FFFFFF",
+          padding: "0.85rem 1.5rem",
+          borderRadius: "12px",
+          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+          display: "flex",
+          alignItems: "center",
+          gap: "1.25rem",
+          zIndex: 100,
+          border: "1px solid rgba(255, 255, 255, 0.15)"
+        }}>
+          <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>{selectedIds.length} items selected</span>
+          <button 
+            onClick={async () => {
+              if (!confirm(`Approve selected ${selectedIds.length} requests?`)) return;
+              for (const id of selectedIds) {
+                await fetch(`/api/expenses/${id}/workflow`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "APPROVE", comment: "Bulk approval" })
+                });
+              }
+              setSelectedIds([]);
+              if (loadDashboardData) await loadDashboardData(currentUser);
+            }}
+            className="btn btn-primary"
+            style={{ background: "#2563EB", border: "none", fontSize: "0.85rem", fontWeight: "700", padding: "0.5rem 1rem" }}
+          >
+            Approve Selected ({selectedIds.length})
+          </button>
+          <button 
+            onClick={async () => {
+              if (!confirm(`Reject selected ${selectedIds.length} requests?`)) return;
+              for (const id of selectedIds) {
+                await fetch(`/api/expenses/${id}/workflow`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ action: "REJECT", comment: "Bulk rejection" })
+                });
+              }
+              setSelectedIds([]);
+              if (loadDashboardData) await loadDashboardData(currentUser);
+            }}
+            className="btn btn-danger"
+            style={{ background: "#EF4444", border: "none", fontSize: "0.85rem", fontWeight: "700", color: "#FFFFFF", padding: "0.5rem 1rem" }}
+          >
+            Reject Selected ({selectedIds.length})
+          </button>
+        </div>
+      )}
 
     </div>
   );
