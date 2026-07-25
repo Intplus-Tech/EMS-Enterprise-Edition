@@ -74,8 +74,8 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
 
       {/* System Overview Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-        <h2 style={{ fontSize: "1.35rem", fontWeight: "700", color: "#f8fafc" }}>System Overview</h2>
-        <span style={{ fontSize: "0.85rem", color: "#94a3b8", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+        <h2 style={{ fontSize: "1.35rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>System Overview</h2>
+        <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", display: "flex", alignItems: "center", gap: "0.4rem" }}>
           <Icons.RefreshCw size={14} /> Live data as of 09:00 AM
         </span>
       </div>
@@ -88,7 +88,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
         marginBottom: "2.5rem"
       }}>
         {/* Card 1: TOTAL USERS */}
-        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "#1e293b", borderRadius: "0.85rem" }}>
+        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "rgb(var(--color-surface))", borderRadius: "0.85rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div style={{
               width: "48px",
@@ -104,10 +104,10 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               <Icons.Users size={22} />
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 TOTAL USERS
               </div>
-              <div style={{ fontSize: "1.65rem", fontWeight: "800", color: "#f8fafc", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "1.65rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>
                 {systemUsersCount}
               </div>
             </div>
@@ -115,7 +115,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
         </div>
 
         {/* Card 2: DEPARTMENTS */}
-        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "#1e293b", borderRadius: "0.85rem" }}>
+        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "rgb(var(--color-surface))", borderRadius: "0.85rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div style={{
               width: "48px",
@@ -131,10 +131,10 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               <Icons.Building2 size={22} />
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 DEPARTMENTS
               </div>
-              <div style={{ fontSize: "1.65rem", fontWeight: "800", color: "#f8fafc", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "1.65rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>
                 {departmentsCount}
               </div>
             </div>
@@ -142,7 +142,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
         </div>
 
         {/* Card 3: BUDGET PERIOD */}
-        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "#1e293b", borderRadius: "0.85rem" }}>
+        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "rgb(var(--color-surface))", borderRadius: "0.85rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div style={{
               width: "48px",
@@ -158,10 +158,10 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               <Icons.Calendar size={22} />
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 BUDGET PERIOD
               </div>
-              <div style={{ fontSize: "1.5rem", fontWeight: "800", color: "#f8fafc", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "1.5rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>
                 FY 2026
               </div>
             </div>
@@ -169,7 +169,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
         </div>
 
         {/* Card 4: TOTAL BUDGET */}
-        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "#1e293b", borderRadius: "0.85rem" }}>
+        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "rgb(var(--color-surface))", borderRadius: "0.85rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
             <div style={{
               width: "48px",
@@ -185,10 +185,10 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               <Icons.Lock size={22} />
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 TOTAL BUDGET
               </div>
-              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "#f8fafc", marginTop: "0.15rem" }}>
+              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>
                 ₦250,000,000
               </div>
             </div>
@@ -200,7 +200,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
       <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: "1.5rem" }}>
         {/* Left Column: Quick Actions */}
         <div>
-          <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "#f8fafc", marginBottom: "1rem" }}>
+          <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "1rem" }}>
             Quick Actions
           </h3>
 
@@ -211,14 +211,14 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               className="glass-panel"
               style={{
                 padding: "1.25rem",
-                backgroundColor: "#1e293b",
+                backgroundColor: "rgb(var(--color-surface))",
                 borderRadius: "0.75rem",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(var(--color-card-border), 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -235,7 +235,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               }}>
                 <Icons.UserPlus size={22} />
               </div>
-              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#f8fafc" }}>
+              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
                 Add New User
               </span>
             </div>
@@ -246,14 +246,14 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               className="glass-panel"
               style={{
                 padding: "1.25rem",
-                backgroundColor: "#1e293b",
+                backgroundColor: "rgb(var(--color-surface))",
                 borderRadius: "0.75rem",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(var(--color-card-border), 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -270,7 +270,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               }}>
                 <Icons.Building size={22} />
               </div>
-              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#f8fafc" }}>
+              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
                 Create Dept.
               </span>
             </div>
@@ -281,14 +281,14 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               className="glass-panel"
               style={{
                 padding: "1.25rem",
-                backgroundColor: "#1e293b",
+                backgroundColor: "rgb(var(--color-surface))",
                 borderRadius: "0.75rem",
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(var(--color-card-border), 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -305,7 +305,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               }}>
                 <Icons.Landmark size={22} />
               </div>
-              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#f8fafc" }}>
+              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
                 Set Budget
               </span>
             </div>
@@ -314,28 +314,28 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
 
         {/* Right Column: Recent System Activity Table */}
         <div>
-          <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "#f8fafc", marginBottom: "1rem" }}>
+          <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "1rem" }}>
             Recent System Activity
           </h3>
 
-          <div className="glass-panel" style={{ backgroundColor: "#1e293b", borderRadius: "0.75rem", overflow: "hidden" }}>
+          <div className="glass-panel" style={{ backgroundColor: "rgb(var(--color-surface))", borderRadius: "0.75rem", overflow: "hidden" }}>
             <table className="data-table" style={{ width: "100%" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)", backgroundColor: "rgba(15, 23, 42, 0.4)" }}>
-                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "#94a3b8" }}>TIMESTAMP</th>
-                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "#94a3b8" }}>ACTION DESCRIPTION</th>
-                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "#94a3b8" }}>INITIATOR / CONTEXT</th>
+                <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", backgroundColor: "rgba(var(--color-background), 0.5)" }}>
+                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>TIMESTAMP</th>
+                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>ACTION DESCRIPTION</th>
+                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>INITIATOR / CONTEXT</th>
                 </tr>
               </thead>
               <tbody>
                 {recentActivities.map((act) => (
-                  <tr key={act.id} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                    <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.85rem", color: "#f8fafc", fontWeight: "600" }}>
+                  <tr key={act.id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.2)" }}>
+                    <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.85rem", color: "rgb(var(--color-text))", fontWeight: "600" }}>
                       {act.timestamp}
                     </td>
                     <td style={{ padding: "1.1rem 1.25rem" }}>
-                      <div style={{ fontWeight: "700", color: "#f8fafc", fontSize: "0.9rem" }}>{act.action}</div>
-                      <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.15rem" }}>{act.subtext}</div>
+                      <div style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.9rem" }}>{act.action}</div>
+                      <div style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))", marginTop: "0.15rem" }}>{act.subtext}</div>
                     </td>
                     <td style={{ padding: "1.1rem 1.25rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
@@ -344,8 +344,8 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                             width: "28px",
                             height: "28px",
                             borderRadius: "50%",
-                            backgroundColor: "rgba(148, 163, 184, 0.2)",
-                            color: "#cbd5e1",
+                            backgroundColor: "rgba(var(--color-card-border), 0.3)",
+                            color: "rgb(var(--color-text))",
                             fontSize: "0.7rem",
                             fontWeight: "700",
                             display: "flex",
@@ -355,9 +355,9 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                             {act.badge}
                           </div>
                         ) : (
-                          <div style={{ color: "#94a3b8" }}>{act.icon}</div>
+                          <div style={{ color: "rgb(var(--color-text-muted))" }}>{act.icon}</div>
                         )}
-                        <span style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>{act.context}</span>
+                        <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>{act.context}</span>
                       </div>
                     </td>
                   </tr>

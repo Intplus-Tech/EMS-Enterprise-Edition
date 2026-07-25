@@ -93,7 +93,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
             <select
               value={selectedMatrixRole}
               onChange={(e) => setSelectedMatrixRole(e.target.value)}
-              style={{ padding: "0.45rem 0.85rem", backgroundColor: "#1e293b", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "0.375rem", color: "#f8fafc", fontSize: "0.85rem" }}
+              style={{ padding: "0.45rem 0.85rem", backgroundColor: "rgb(var(--color-surface))", border: "1px solid rgba(var(--color-card-border), 0.5)", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}
             >
               <option value="Finance Head">Finance Head</option>
               <option value="Finance Manager">Finance Manager</option>

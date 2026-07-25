@@ -1961,16 +1961,16 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           bottom: "2rem",
           left: "50%",
           transform: "translateX(-50%)",
-          background: "#1E293B",
-          color: "#FFFFFF",
+          background: "rgb(var(--color-surface))",
+          color: "rgb(var(--color-text))",
           padding: "0.85rem 1.5rem",
           borderRadius: "12px",
-          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
+          boxShadow: "var(--shadow-glass)",
           display: "flex",
           alignItems: "center",
           gap: "1.25rem",
           zIndex: 100,
-          border: "1px solid rgba(255, 255, 255, 0.15)"
+          border: "1px solid rgba(var(--color-card-border), 0.6)"
         }}>
           <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>{selectedIds.length} items selected</span>
           <button 

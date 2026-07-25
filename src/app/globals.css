@@ -334,6 +334,24 @@ html[data-theme="light"], :root[data-theme="light"] {
   background: rgba(0, 0, 0, 0.08);
 }
 
+/* Light Theme High-Contrast Badge Overrides */
+[data-theme="light"] .badge-draft { background: #E2E8F0; color: #475569; }
+[data-theme="light"] .badge-submitted { background: #DBEAFE; color: #1D4ED8; }
+[data-theme="light"] .badge-budget-check { background: #FEF3C7; color: #B45309; }
+[data-theme="light"] .badge-pending { background: #FEF3C7; color: #B45309; }
+[data-theme="light"] .badge-approved { background: #D1FAE5; color: #047857; }
+[data-theme="light"] .badge-finance { background: #EDE9FE; color: #6D28D9; }
+[data-theme="light"] .badge-bank { background: #CFFAFE; color: #0E7490; }
+[data-theme="light"] .badge-paid { background: #D1FAE5; color: #047857; }
+[data-theme="light"] .badge-closed { background: #E2E8F0; color: #334155; }
+[data-theme="light"] .badge-rejected { background: #FEE2E2; color: #B91C1C; }
+
+/* Select Options Theme Fix */
+option {
+  background: rgb(var(--color-surface));
+  color: rgb(var(--color-text));
+}
+
 /* Dashboard Chart & Custom Layouts */
 .dashboard-grid {
   display: grid;

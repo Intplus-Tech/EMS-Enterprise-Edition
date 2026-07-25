@@ -158,14 +158,14 @@ function VerifyCodeContent() {
 
   return (
     <div style={{ display: "flex", flexGrow: 1, alignItems: "center", justifyContent: "center", padding: "2rem", position: "relative" }}>
-      <div style={{ 
+      <div className="glass-panel" style={{ 
         maxWidth: "480px", 
         width: "100%", 
-        background: "#FFFFFF", 
-        border: "1px solid #E2E8F0", 
+        background: "rgb(var(--color-surface))", 
+        border: "1px solid rgba(var(--color-card-border), 0.5)", 
         borderRadius: "16px", 
         padding: "2.5rem", 
-        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.05)",
+        boxShadow: "var(--shadow-glass)",
         textAlign: "center"
       }}>
         {/* Envelope icon header badge */}
@@ -183,8 +183,8 @@ function VerifyCodeContent() {
           <Icons.Mail size={32} />
         </div>
 
-        <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "#0F172A", marginBottom: "0.5rem" }}>Check your email</h2>
-        <p style={{ color: "#64748B", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
+        <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "0.5rem" }}>Check your email</h2>
+        <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
           We have sent a 6-digit verification code to<br />
           <strong>{maskEmail(email)}</strong>.
         </p>
