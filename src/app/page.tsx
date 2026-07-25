@@ -19,6 +19,23 @@ import { DepartmentalSpendTab } from "../components/DepartmentalSpendTab";
 import { PendingExceptionsTab } from "../components/PendingExceptionsTab";
 import { PendingExceptionsOverviewTab } from "../components/PendingExceptionsOverviewTab";
 
+// System Admin Components & Modals
+import { AdminSystemOverviewTab } from "../components/admin/AdminSystemOverviewTab";
+import { AdminDepartmentalSpendTab } from "../components/admin/AdminDepartmentalSpendTab";
+import { AdminEnterpriseReportingTab } from "../components/admin/AdminEnterpriseReportingTab";
+import { AdminUsersAndRolesTab } from "../components/admin/AdminUsersAndRolesTab";
+import { AdminAuditTrailViewerTab } from "../components/admin/AdminAuditTrailViewerTab";
+
+import { AdminAddUserModal } from "../components/admin/modals/AdminAddUserModal";
+import { AdminEditUserProfileModal } from "../components/admin/modals/AdminEditUserProfileModal";
+import { AdminCreateDepartmentModal } from "../components/admin/modals/AdminCreateDepartmentModal";
+import { AdminEditDepartmentModal } from "../components/admin/modals/AdminEditDepartmentModal";
+import { AdminDeleteDepartmentModal } from "../components/admin/modals/AdminDeleteDepartmentModal";
+import { AdminDeleteUserModal } from "../components/admin/modals/AdminDeleteUserModal";
+import { AdminSuspendUserModal } from "../components/admin/modals/AdminSuspendUserModal";
+import { AdminEditRoleModal } from "../components/admin/modals/AdminEditRoleModal";
+import { AdminSetBudgetModal } from "../components/admin/modals/AdminSetBudgetModal";
+
 export default function Dashboard() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -41,6 +58,20 @@ export default function Dashboard() {
   });
   const [inviteError, setInviteError] = useState("");
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+
+  // System Admin Modal States
+  const [showAdminAddUserModal, setShowAdminAddUserModal] = useState(false);
+  const [showAdminEditUserProfileModal, setShowAdminEditUserProfileModal] = useState(false);
+  const [selectedAdminUser, setSelectedAdminUser] = useState<any>(null);
+  const [showAdminCreateDeptModal, setShowAdminCreateDeptModal] = useState(false);
+  const [showAdminEditDeptModal, setShowAdminEditDeptModal] = useState(false);
+  const [selectedAdminDept, setSelectedAdminDept] = useState<any>(null);
+  const [showAdminDeleteDeptModal, setShowAdminDeleteDeptModal] = useState(false);
+  const [showAdminDeleteUserModal, setShowAdminDeleteUserModal] = useState(false);
+  const [showAdminSuspendUserModal, setShowAdminSuspendUserModal] = useState(false);
+  const [showAdminEditRoleModal, setShowAdminEditRoleModal] = useState(false);
+  const [selectedAdminRole, setSelectedAdminRole] = useState<any>(null);
+  const [showAdminSetBudgetModal, setShowAdminSetBudgetModal] = useState(false);
   
   // Expenses data
   const [expenses, setExpenses] = useState<any[]>([]);
@@ -243,6 +274,11 @@ export default function Dashboard() {
     } else if (["FINANCE_OFFICER", "FINANCE_MANAGER"].includes(currentUser.role)) {
       if (!["approvals", "history", "settings"].includes(activeTab)) {
         setActiveTab("approvals");
+      }
+    } else if (currentUser.role === "ADMIN") {
+      const adminTabs = ["dashboard", "departmental_spend", "reports", "users_roles", "audit_trail", "settings", "workflow", "logs", "users"];
+      if (!adminTabs.includes(activeTab)) {
+        setActiveTab("dashboard");
       }
     } else {
       if (!approverTabs.includes(activeTab)) {
@@ -933,6 +969,86 @@ export default function Dashboard() {
                 <Icons.Settings size={18} /> Settings
               </button>
             </>
+          ) : currentUser?.role === "ADMIN" ? (
+            <>
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "dashboard" ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: activeTab === "dashboard" ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: activeTab === "dashboard" ? "700" : "500"
+                }}
+              >
+                <Icons.LayoutDashboard size={18} /> Dashboard
+              </button>
+
+              <button
+                onClick={() => setActiveTab("departmental_spend")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "departmental_spend" ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: activeTab === "departmental_spend" ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: activeTab === "departmental_spend" ? "700" : "500"
+                }}
+              >
+                <Icons.PieChart size={18} /> Departmental Spend
+              </button>
+
+              <button
+                onClick={() => setActiveTab("reports")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "reports" ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: activeTab === "reports" ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: activeTab === "reports" ? "700" : "500"
+                }}
+              >
+                <Icons.BarChart2 size={18} /> Report
+              </button>
+
+              <button
+                onClick={() => setActiveTab("users_roles")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "users_roles" ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: activeTab === "users_roles" ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: activeTab === "users_roles" ? "700" : "500"
+                }}
+              >
+                <Icons.Users size={18} /> Users & Roles
+              </button>
+
+              <button
+                onClick={() => setActiveTab("audit_trail")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "audit_trail" ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: activeTab === "audit_trail" ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: activeTab === "audit_trail" ? "700" : "500"
+                }}
+              >
+                <Icons.FileText size={18} /> Audit Trail
+              </button>
+
+              <button
+                onClick={() => setActiveTab("settings")}
+                className="btn"
+                style={{
+                  justifyContent: "flex-start",
+                  background: activeTab === "settings" ? "rgba(37, 99, 235, 0.12)" : "transparent",
+                  color: activeTab === "settings" ? "#2563EB" : "rgb(var(--color-text-muted))",
+                  fontWeight: activeTab === "settings" ? "700" : "500"
+                }}
+              >
+                <Icons.Settings size={18} /> Settings
+              </button>
+            </>
           ) : (
             <>
               {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
@@ -1193,11 +1309,74 @@ export default function Dashboard() {
 
         {/* VIEW: DASHBOARD PANEL */}
         {activeTab === "dashboard" && (
-          <DashboardTab
-            currentUser={currentUser}
-            expenses={expenses}
-            chartViewMode={chartViewMode}
-            setChartViewMode={setChartViewMode}
+          currentUser?.role === "ADMIN" ? (
+            <AdminSystemOverviewTab
+              currentUser={currentUser}
+              systemUsersCount={systemUsers.length > 0 ? systemUsers.length : 124}
+              departmentsCount={departments.length > 0 ? departments.length : 12}
+              onOpenAddUser={() => setShowAdminAddUserModal(true)}
+              onOpenCreateDept={() => setShowAdminCreateDeptModal(true)}
+              onOpenSetBudget={() => setShowAdminSetBudgetModal(true)}
+            />
+          ) : (
+            <DashboardTab
+              currentUser={currentUser}
+              expenses={expenses}
+              chartViewMode={chartViewMode}
+              setChartViewMode={setChartViewMode}
+            />
+          )
+        )}
+
+        {/* SYSTEM ADMIN VIEWS */}
+        {activeTab === "departmental_spend" && currentUser?.role === "ADMIN" && (
+          <AdminDepartmentalSpendTab
+            departments={departments}
+            onOpenCreateDept={() => setShowAdminCreateDeptModal(true)}
+            onOpenEditDept={(dept) => {
+              setSelectedAdminDept(dept);
+              setShowAdminEditDeptModal(true);
+            }}
+            onOpenDeleteDept={(dept) => {
+              setSelectedAdminDept(dept);
+              setShowAdminDeleteDeptModal(true);
+            }}
+          />
+        )}
+
+        {activeTab === "reports" && currentUser?.role === "ADMIN" && (
+          <AdminEnterpriseReportingTab
+            departments={departments}
+          />
+        )}
+
+        {activeTab === "users_roles" && currentUser?.role === "ADMIN" && (
+          <AdminUsersAndRolesTab
+            systemUsers={systemUsers}
+            departments={departments}
+            onOpenAddUser={() => setShowAdminAddUserModal(true)}
+            onOpenEditUserProfile={(user) => {
+              setSelectedAdminUser(user);
+              setShowAdminEditUserProfileModal(true);
+            }}
+            onOpenEditRole={(roleData) => {
+              setSelectedAdminRole(roleData);
+              setShowAdminEditRoleModal(true);
+            }}
+            onOpenSuspendUser={(user) => {
+              setSelectedAdminUser(user);
+              setShowAdminSuspendUserModal(true);
+            }}
+            onOpenDeleteUser={(user) => {
+              setSelectedAdminUser(user);
+              setShowAdminDeleteUserModal(true);
+            }}
+          />
+        )}
+
+        {activeTab === "audit_trail" && currentUser?.role === "ADMIN" && (
+          <AdminAuditTrailViewerTab
+            logs={systemLogs}
           />
         )}
 
@@ -2624,6 +2803,94 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* SYSTEM ADMIN MODALS */}
+      <AdminAddUserModal
+        isOpen={showAdminAddUserModal}
+        onClose={() => setShowAdminAddUserModal(false)}
+        departments={departments}
+        onSaveUser={(userData) => {
+          setSystemUsers([...systemUsers, { id: Date.now().toString(), ...userData, isActive: true }]);
+          alert("User successfully invited!");
+        }}
+      />
+
+      <AdminEditUserProfileModal
+        isOpen={showAdminEditUserProfileModal}
+        onClose={() => setShowAdminEditUserProfileModal(false)}
+        user={selectedAdminUser}
+        departments={departments}
+        onUpdateUser={(updatedUser) => {
+          setSystemUsers(systemUsers.map(u => ((u.id || u._id) === (updatedUser.id || updatedUser._id) ? updatedUser : u)));
+          alert("User profile updated!");
+        }}
+        onForceLogOut={() => alert("Session forced closed.")}
+      />
+
+      <AdminCreateDepartmentModal
+        isOpen={showAdminCreateDeptModal}
+        onClose={() => setShowAdminCreateDeptModal(false)}
+        onCreateDepartment={(deptData) => {
+          setDepartments([...departments, { id: Date.now().toString(), ...deptData, utilized: 0, pctUsed: 0, usersCount: 1, isActive: true }]);
+          alert("Department created successfully!");
+        }}
+      />
+
+      <AdminEditDepartmentModal
+        isOpen={showAdminEditDeptModal}
+        onClose={() => setShowAdminEditDeptModal(false)}
+        department={selectedAdminDept}
+        onUpdateDepartment={(updatedDept) => {
+          setDepartments(departments.map(d => ((d.id || d._id) === (updatedDept.id || updatedDept._id) ? updatedDept : d)));
+          alert("Department updated!");
+        }}
+      />
+
+      <AdminDeleteDepartmentModal
+        isOpen={showAdminDeleteDeptModal}
+        onClose={() => setShowAdminDeleteDeptModal(false)}
+        department={selectedAdminDept}
+        onConfirmDelete={(deptId) => {
+          setDepartments(departments.filter(d => (d.id || d._id) !== deptId));
+          alert("Department deleted!");
+        }}
+      />
+
+      <AdminDeleteUserModal
+        isOpen={showAdminDeleteUserModal}
+        onClose={() => setShowAdminDeleteUserModal(false)}
+        user={selectedAdminUser}
+        onConfirmDelete={(userId) => {
+          setSystemUsers(systemUsers.filter(u => (u.id || u._id) !== userId));
+          alert("User deleted!");
+        }}
+      />
+
+      <AdminSuspendUserModal
+        isOpen={showAdminSuspendUserModal}
+        onClose={() => setShowAdminSuspendUserModal(false)}
+        user={selectedAdminUser}
+        onConfirmSuspend={(userId) => {
+          setSystemUsers(systemUsers.map(u => ((u.id || u._id) === userId ? { ...u, isActive: false } : u)));
+          alert("User access suspended!");
+        }}
+      />
+
+      <AdminEditRoleModal
+        isOpen={showAdminEditRoleModal}
+        onClose={() => setShowAdminEditRoleModal(false)}
+        roleData={selectedAdminRole}
+        onSaveRole={() => alert("Role configuration updated!")}
+        onDeleteRole={() => alert("Role deleted!")}
+        onOpenMatrix={() => setActiveTab("users_roles")}
+      />
+
+      <AdminSetBudgetModal
+        isOpen={showAdminSetBudgetModal}
+        onClose={() => setShowAdminSetBudgetModal(false)}
+        departments={departments}
+        onSetBudget={() => alert("Department budget updated successfully!")}
+      />
 
       {/* Global intercepted alert modal dialog */}
       {alertDialog.isOpen && (

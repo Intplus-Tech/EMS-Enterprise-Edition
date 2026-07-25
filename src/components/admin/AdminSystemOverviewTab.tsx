@@ -1,0 +1,372 @@
+import React from "react";
+import * as Icons from "lucide-react";
+
+interface AdminSystemOverviewTabProps {
+  currentUser: any;
+  systemUsersCount?: number;
+  departmentsCount?: number;
+  onOpenAddUser: () => void;
+  onOpenCreateDept: () => void;
+  onOpenSetBudget: () => void;
+}
+
+export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
+  currentUser,
+  systemUsersCount = 124,
+  departmentsCount = 12,
+  onOpenAddUser,
+  onOpenCreateDept,
+  onOpenSetBudget
+}) => {
+  const userName = currentUser?.name || "Anita Adebayo";
+
+  const recentActivities = [
+    {
+      id: "act-1",
+      timestamp: "08:45 AM",
+      action: "User Created",
+      subtext: "Profile: T. Blaine",
+      badge: "TB",
+      context: "Legal Dept."
+    },
+    {
+      id: "act-2",
+      timestamp: "08:30 AM",
+      action: "Budget Updated",
+      subtext: "Quarterly Adjustment",
+      icon: <Icons.CreditCard size={14} />,
+      context: "IT Dept to ₦250,000"
+    },
+    {
+      id: "act-3",
+      timestamp: "07:50 AM",
+      action: "New Request Created",
+      subtext: "Sales Department",
+      icon: <Icons.Banknote size={14} />,
+      context: "Blessing Okafor (₦250,000)"
+    }
+  ];
+
+  return (
+    <div>
+      {/* Welcome Blue Banner */}
+      <div style={{
+        backgroundColor: "#2563eb",
+        borderRadius: "1rem",
+        padding: "2rem 2.5rem",
+        color: "#ffffff",
+        marginBottom: "2rem",
+        boxShadow: "0 10px 25px -5px rgba(37, 99, 235, 0.4)"
+      }}>
+        <h1 style={{ fontSize: "2rem", fontWeight: "700", marginBottom: "0.5rem" }}>
+          Welcome back, {userName}
+        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", fontSize: "0.9rem", color: "#bfdbfe" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <Icons.Calendar size={16} /> Monday, May 12, 2025
+          </span>
+          <span>•</span>
+          <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <Icons.Clock size={16} /> Last login: Today, 07:15 AM
+          </span>
+        </div>
+      </div>
+
+      {/* System Overview Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+        <h2 style={{ fontSize: "1.35rem", fontWeight: "700", color: "#f8fafc" }}>System Overview</h2>
+        <span style={{ fontSize: "0.85rem", color: "#94a3b8", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <Icons.RefreshCw size={14} /> Live data as of 09:00 AM
+        </span>
+      </div>
+
+      {/* 4 Overview Stat Cards */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+        gap: "1.25rem",
+        marginBottom: "2.5rem"
+      }}>
+        {/* Card 1: TOTAL USERS */}
+        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "#1e293b", borderRadius: "0.85rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              backgroundColor: "rgba(59, 130, 246, 0.15)",
+              color: "#3b82f6",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0
+            }}>
+              <Icons.Users size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                TOTAL USERS
+              </div>
+              <div style={{ fontSize: "1.65rem", fontWeight: "800", color: "#f8fafc", marginTop: "0.15rem" }}>
+                {systemUsersCount}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: DEPARTMENTS */}
+        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "#1e293b", borderRadius: "0.85rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              backgroundColor: "rgba(139, 92, 246, 0.15)",
+              color: "#a78bfa",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0
+            }}>
+              <Icons.Building2 size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                DEPARTMENTS
+              </div>
+              <div style={{ fontSize: "1.65rem", fontWeight: "800", color: "#f8fafc", marginTop: "0.15rem" }}>
+                {departmentsCount}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: BUDGET PERIOD */}
+        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "#1e293b", borderRadius: "0.85rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              backgroundColor: "rgba(16, 185, 129, 0.15)",
+              color: "#10b981",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0
+            }}>
+              <Icons.Calendar size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                BUDGET PERIOD
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: "800", color: "#f8fafc", marginTop: "0.15rem" }}>
+                FY 2026
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: TOTAL BUDGET */}
+        <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "#1e293b", borderRadius: "0.85rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{
+              width: "48px",
+              height: "48px",
+              borderRadius: "50%",
+              backgroundColor: "rgba(239, 68, 68, 0.15)",
+              color: "#f87171",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0
+            }}>
+              <Icons.Lock size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                TOTAL BUDGET
+              </div>
+              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "#f8fafc", marginTop: "0.15rem" }}>
+                ₦250,000,000
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Grid: Quick Actions & Recent System Activity */}
+      <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: "1.5rem" }}>
+        {/* Left Column: Quick Actions */}
+        <div>
+          <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "#f8fafc", marginBottom: "1rem" }}>
+            Quick Actions
+          </h3>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* Add New User button card */}
+            <div 
+              onClick={onOpenAddUser}
+              className="glass-panel"
+              style={{
+                padding: "1.25rem",
+                backgroundColor: "#1e293b",
+                borderRadius: "0.75rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                transition: "all 0.2s ease"
+              }}
+            >
+              <div style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                color: "#2563eb",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "0.75rem"
+              }}>
+                <Icons.UserPlus size={22} />
+              </div>
+              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#f8fafc" }}>
+                Add New User
+              </span>
+            </div>
+
+            {/* Create Dept card */}
+            <div 
+              onClick={onOpenCreateDept}
+              className="glass-panel"
+              style={{
+                padding: "1.25rem",
+                backgroundColor: "#1e293b",
+                borderRadius: "0.75rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                transition: "all 0.2s ease"
+              }}
+            >
+              <div style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(16, 185, 129, 0.15)",
+                color: "#10b981",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "0.75rem"
+              }}>
+                <Icons.Building size={22} />
+              </div>
+              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#f8fafc" }}>
+                Create Dept.
+              </span>
+            </div>
+
+            {/* Set Budget card */}
+            <div 
+              onClick={onOpenSetBudget}
+              className="glass-panel"
+              style={{
+                padding: "1.25rem",
+                backgroundColor: "#1e293b",
+                borderRadius: "0.75rem",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                border: "1px solid rgba(255, 255, 255, 0.08)",
+                transition: "all 0.2s ease"
+              }}
+            >
+              <div style={{
+                width: "48px",
+                height: "48px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(245, 158, 11, 0.15)",
+                color: "#f59e0b",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: "0.75rem"
+              }}>
+                <Icons.Landmark size={22} />
+              </div>
+              <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#f8fafc" }}>
+                Set Budget
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Recent System Activity Table */}
+        <div>
+          <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "#f8fafc", marginBottom: "1rem" }}>
+            Recent System Activity
+          </h3>
+
+          <div className="glass-panel" style={{ backgroundColor: "#1e293b", borderRadius: "0.75rem", overflow: "hidden" }}>
+            <table className="data-table" style={{ width: "100%" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)", backgroundColor: "rgba(15, 23, 42, 0.4)" }}>
+                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "#94a3b8" }}>TIMESTAMP</th>
+                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "#94a3b8" }}>ACTION DESCRIPTION</th>
+                  <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "#94a3b8" }}>INITIATOR / CONTEXT</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentActivities.map((act) => (
+                  <tr key={act.id} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                    <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.85rem", color: "#f8fafc", fontWeight: "600" }}>
+                      {act.timestamp}
+                    </td>
+                    <td style={{ padding: "1.1rem 1.25rem" }}>
+                      <div style={{ fontWeight: "700", color: "#f8fafc", fontSize: "0.9rem" }}>{act.action}</div>
+                      <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.15rem" }}>{act.subtext}</div>
+                    </td>
+                    <td style={{ padding: "1.1rem 1.25rem" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+                        {act.badge ? (
+                          <div style={{
+                            width: "28px",
+                            height: "28px",
+                            borderRadius: "50%",
+                            backgroundColor: "rgba(148, 163, 184, 0.2)",
+                            color: "#cbd5e1",
+                            fontSize: "0.7rem",
+                            fontWeight: "700",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center"
+                          }}>
+                            {act.badge}
+                          </div>
+                        ) : (
+                          <div style={{ color: "#94a3b8" }}>{act.icon}</div>
+                        )}
+                        <span style={{ fontSize: "0.85rem", color: "#cbd5e1" }}>{act.context}</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
