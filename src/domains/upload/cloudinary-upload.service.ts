@@ -20,7 +20,7 @@ export class CloudinaryUploadServiceClass implements IFileUploadService {
     fileBuffer: Buffer,
     fileName: string,
     mimeType: string,
-    folder: string = "expense-manager"
+    folder: string = ENV.CLOUDINARY_UPLOAD_FOLDER
   ): Promise<{ url: string; publicId: string }> {
     if (!isConfigured) {
       console.warn(
