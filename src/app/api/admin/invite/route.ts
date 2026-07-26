@@ -6,7 +6,7 @@ import { Department } from "../../../../models/Department";
 import { authenticate } from "../../../../middlewares/auth";
 import { SystemRole } from "../../../../enums/roles";
 import { withErrorHandling } from "../../../../middlewares/errors";
-import { getInviteEmailHtml } from "../../../../domains/email/templates";
+import { EmailService } from "../../../../domains/email/email.service";
 import { LoggerService } from "../../../../domains/logs/logger.service";
 import { AuthService } from "../../../../domains/auth/auth.service";
 
@@ -45,7 +45,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       await existingUser.save();
 
       const inviteUrl = `${req.nextUrl.origin}/setup?token=${inviteToken}`;
-      const emailHtml = getInviteEmailHtml(inviteUrl, role, name, req.nextUrl.origin);
+      await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
 
       await LoggerService.logAudit(
         "USER_RE_INVITED",
@@ -58,7 +58,6 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
         success: true,
         message: "Invitation re-sent successfully.",
         inviteUrl,
-        emailHtml,
         user: {
           id: existingUser._id.toString(),
           email: existingUser.email,
@@ -90,9 +89,9 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   await newUser.save();
 
-  // 6. Generate the invitation link and compile the email
+  // 6. Generate the invitation link and compile/send the email
   const inviteUrl = `${req.nextUrl.origin}/setup?token=${inviteToken}`;
-  const emailHtml = getInviteEmailHtml(inviteUrl, role, name, req.nextUrl.origin);
+  await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
 
   // 7. Log audit entry
   await LoggerService.logAudit(
@@ -106,7 +105,6 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     success: true,
     message: "Invitation created successfully.",
     inviteUrl,
-    emailHtml,
     user: {
       id: newUser._id.toString(),
       email: newUser.email,

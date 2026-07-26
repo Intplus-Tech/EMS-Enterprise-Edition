@@ -1,8 +1,10 @@
 import { connectToDatabase } from "../../config/db";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
+import { User } from "../../models/User";
 import { BudgetService } from "../budget/budget.service";
 import { WorkflowService } from "../workflow/workflow.service";
 import { LoggerService } from "../logs/logger.service";
+import { EmailService } from "../email/email.service";
 import { RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
 import { IUser } from "../../types";
