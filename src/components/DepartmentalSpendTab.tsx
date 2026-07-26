@@ -17,70 +17,6 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [isReloading, setIsReloading] = useState(false);
 
-  // Departmental spend initial mock data matching screenshot exactly
-  const initialDeptSpend = [
-    {
-      id: "dept-it",
-      dept: "IT",
-      dotColor: "#2563EB",
-      totalBudget: 250000,
-      utilized: 210000,
-      remaining: 40000,
-      percentUsed: 84,
-      barColor: "#2563EB",
-      topRequester: "Adeyemi T.",
-      overBudgetCount: 3
-    },
-    {
-      id: "dept-mkt",
-      dept: "Marketing",
-      dotColor: "#475569",
-      totalBudget: 180000,
-      utilized: 90000,
-      remaining: 90000,
-      percentUsed: 50,
-      barColor: "#64748B",
-      topRequester: "Chioma O.",
-      overBudgetCount: 0
-    },
-    {
-      id: "dept-ops",
-      dept: "Ops",
-      dotColor: "#DC2626",
-      totalBudget: 320000,
-      utilized: 295000,
-      remaining: 25000,
-      percentUsed: 92,
-      barColor: "#DC2626",
-      topRequester: "Babatunde F.",
-      overBudgetCount: 2
-    },
-    {
-      id: "dept-legal",
-      dept: "Legal",
-      dotColor: "#334155",
-      totalBudget: 120000,
-      utilized: 115000,
-      remaining: 5000,
-      percentUsed: 96,
-      barColor: "#475569",
-      topRequester: "Ibrahim S.",
-      overBudgetCount: 1
-    },
-    {
-      id: "dept-hr",
-      dept: "HR",
-      dotColor: "#94A3B8",
-      totalBudget: 150000,
-      utilized: 45000,
-      remaining: 105000,
-      percentUsed: 30,
-      barColor: "#94A3B8",
-      topRequester: "Fatima Z.",
-      overBudgetCount: 0
-    }
-  ];
-
   // Dynamic departmental spend calculation from DB expenses
   const liveDeptMap: Record<string, { totalBudget: number; utilized: number; topRequester: string; overBudgetCount: number; requesters: Record<string, number> }> = {};
   
@@ -106,29 +42,27 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
     });
   }
 
-  const liveDeptSpendList = Object.keys(liveDeptMap).length > 0
-    ? Object.keys(liveDeptMap).map((dName, idx) => {
-        const item = liveDeptMap[dName];
-        const remaining = Math.max(0, item.totalBudget - item.utilized);
-        const percentUsed = Math.min(100, Math.round((item.utilized / item.totalBudget) * 100));
-        const colors = ["#2563EB", "#475569", "#DC2626", "#334155", "#94A3B8"];
-        const color = colors[idx % colors.length];
-        return {
-          id: `dept-${idx}`,
-          dept: dName,
-          dotColor: color,
-          totalBudget: item.totalBudget,
-          utilized: item.utilized,
-          remaining,
-          percentUsed,
-          barColor: color,
-          topRequester: item.topRequester,
-          overBudgetCount: item.overBudgetCount
-        };
-      })
-    : null;
+  const liveDeptSpendList = Object.keys(liveDeptMap).map((dName, idx) => {
+    const item = liveDeptMap[dName];
+    const remaining = Math.max(0, item.totalBudget - item.utilized);
+    const percentUsed = Math.min(100, Math.round((item.utilized / item.totalBudget) * 100));
+    const colors = ["#2563EB", "#475569", "#DC2626", "#334155", "#94A3B8"];
+    const color = colors[idx % colors.length];
+    return {
+      id: `dept-${idx}`,
+      dept: dName,
+      dotColor: color,
+      totalBudget: item.totalBudget,
+      utilized: item.utilized,
+      remaining,
+      percentUsed,
+      barColor: color,
+      topRequester: item.topRequester,
+      overBudgetCount: item.overBudgetCount
+    };
+  });
 
-  const currentDeptSpendData = liveDeptSpendList || initialDeptSpend;
+  const currentDeptSpendData = liveDeptSpendList;
 
   // Filtering logic
   const filteredDeptSpend = currentDeptSpendData.filter(row => {
@@ -171,55 +105,66 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
     }, 600);
   };
 
-  // Monthly trend data
-  const monthsData = [
-    { month: "JAN", isProjection: false, height: "35%", color: "#BFDBFE" },
-    { month: "FEB", isProjection: false, height: "48%", color: "#93C5FD" },
-    { month: "MAR", isProjection: false, height: "62%", color: "#60A5FA" },
-    { month: "APR", isProjection: false, height: "75%", color: "#2563EB" },
-    { month: "MAY", isProjection: false, height: "90%", color: "#1D4ED8" },
-    { month: "JUN", isProjection: true, height: "78%" },
-    { month: "JUL", isProjection: true, height: "70%" },
-    { month: "AUG", isProjection: true, height: "74%" },
-    { month: "SEP", isProjection: true, height: "66%" },
-    { month: "OCT", isProjection: true, height: "72%" },
-    { month: "NOV", isProjection: true, height: "64%" },
-    { month: "DEC", isProjection: true, height: "75%" }
-  ];
+  // Dynamic Monthly Trend Chart calculated from DB expenses
+  const monthTotals: number[] = new Array(12).fill(0);
+  const currentMonthIdx = new Date().getMonth();
+  if (expenses && expenses.length > 0) {
+    expenses.forEach(e => {
+      if (e.createdAt && ["PAID", "CLOSED", "APPROVED"].includes(e.status)) {
+        const m = new Date(e.createdAt).getMonth();
+        monthTotals[m] += e.amount || 0;
+      }
+    });
+  }
+  const maxMonthSpend = Math.max(...monthTotals, 1);
+  const monthNames = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+  const monthsData = monthNames.map((name, idx) => {
+    const val = monthTotals[idx];
+    const heightPct = val > 0 ? Math.max(15, Math.round((val / maxMonthSpend) * 100)) : (idx <= currentMonthIdx ? 12 : 10);
+    const isProjection = idx > currentMonthIdx;
+    return {
+      month: name,
+      isProjection,
+      height: `${heightPct}%`,
+      color: idx === currentMonthIdx ? "#2563EB" : "#93C5FD",
+      amount: val
+    };
+  });
 
-  // Key approvers data
-  const keyApprovers = [
-    {
-      id: "app-1",
-      initials: "EB",
-      avatarBg: "#2563EB",
+  // Dynamic Key Approvers list calculated from DB expenses history
+  const approverMap: Record<string, { name: string; dept: string; totalApproved: number }> = {};
+  if (expenses && expenses.length > 0) {
+    expenses.forEach(e => {
+      if (e.history) {
+        e.history.forEach((h: any) => {
+          if (h.action === "APPROVE" || h.action === "APPROVED" || h.action?.includes("APPROV")) {
+            const name = h.actorName || "Approver";
+            const dept = (e.departmentId as any)?.name || e.departmentName || "Management";
+            if (!approverMap[name]) approverMap[name] = { name, dept, totalApproved: 0 };
+            approverMap[name].totalApproved += e.amount || 0;
+          }
+        });
+      }
+    });
+  }
+  const keyApproversList = Object.values(approverMap).map((app, idx) => {
+    const initials = app.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
+    const colors = ["#2563EB", "#94A3B8", "#475569", "#3b82f6"];
+    return {
+      id: `app-${idx}`,
+      initials,
+      avatarBg: colors[idx % colors.length],
       avatarColor: "#FFFFFF",
-      name: "Emeka B.",
-      subtitle: "CTO • IT Dept",
-      amount: "₦150k",
+      name: app.name,
+      subtitle: app.dept,
+      amount: `₦${app.totalApproved >= 1000 ? Math.round(app.totalApproved / 1000) + "k" : app.totalApproved}`,
       status: "Approved"
-    },
-    {
-      id: "app-2",
-      initials: "SA",
-      avatarBg: "#94A3B8",
-      avatarColor: "#FFFFFF",
-      name: "Sarah A.",
-      subtitle: "CFO • Operations",
-      amount: "₦210k",
-      status: "Approved"
-    },
-    {
-      id: "app-3",
-      initials: "MK",
-      avatarBg: "#94A3B8",
-      avatarColor: "#FFFFFF",
-      name: "Musa K.",
-      subtitle: "Head of Legal",
-      amount: "₦95k",
-      status: "Approved"
-    }
-  ];
+    };
+  });
+  const keyApprovers = keyApproversList;
+
+  const totalEnterpriseBudget = currentDeptSpendData.reduce((sum, d) => sum + d.totalBudget, 0);
+  const totalUtilized = currentDeptSpendData.reduce((sum, d) => sum + d.utilized, 0);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.75rem", width: "100%" }}>
@@ -258,19 +203,19 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
                 width: "36px",
                 height: "36px",
                 borderRadius: "50%",
-                background: "rgba(239, 68, 68, 0.12)",
-                color: "#EF4444",
+                background: "rgba(37, 99, 235, 0.12)",
+                color: "#2563EB",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center"
               }}
             >
-              <Icons.TrendingDown size={20} />
+              <Icons.PieChart size={20} />
             </div>
           </div>
           <div style={{ marginTop: "1.25rem" }}>
             <h2 style={{ fontSize: "2.35rem", fontWeight: "800", color: "rgb(var(--color-text))", letterSpacing: "-0.03em", margin: 0 }}>
-              ₦4,850,200
+              ₦{totalEnterpriseBudget.toLocaleString()}
             </h2>
           </div>
         </div>
@@ -310,7 +255,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
           </div>
           <div style={{ marginTop: "1.25rem" }}>
             <h2 style={{ fontSize: "2.35rem", fontWeight: "800", color: "rgb(var(--color-text))", letterSpacing: "-0.03em", margin: 0 }}>
-              ₦850,200
+              ₦{totalUtilized.toLocaleString()}
             </h2>
           </div>
         </div>
@@ -562,7 +507,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
             color: "rgb(var(--color-text-muted))"
           }}
         >
-          <span>Showing {filteredDeptSpend.length} of {initialDeptSpend.length} pending exceptions</span>
+          <span>Showing {filteredDeptSpend.length} of {currentDeptSpendData.length} department records</span>
 
           <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
             <button

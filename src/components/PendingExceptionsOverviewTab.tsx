@@ -17,93 +17,29 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
   const [searchQuery, setSearchQuery] = useState("");
   const [isReloading, setIsReloading] = useState(false);
 
-  // Initial mockup records matching exact screenshot
-  const initialPendingExceptions = [
-    {
-      id: "exc-0044",
-      deficit: -21000,
-      reqId: "#0044",
-      title: "Emergency Data Centre Cooling Unit",
-      subtitle: "Urgent Hardware Maintenance",
-      dept: "IT",
-      amount: 47200,
-      budget: 26200,
-      waitDays: 3,
-      isHighWait: true
-    },
-    {
-      id: "exc-0051",
-      deficit: -12500,
-      reqId: "#0051",
-      title: "Cloud Infrastructure Expansion",
-      subtitle: "Q3 Growth Scaling",
-      dept: "Ops",
-      amount: 32500,
-      budget: 20000,
-      waitDays: 1,
-      isHighWait: false
-    },
-    {
-      id: "exc-0048",
-      deficit: -8200,
-      reqId: "#0048",
-      title: "Legal Retainer Renewal (Special Counsel)",
-      subtitle: "Arbitration Services",
-      dept: "Legal",
-      amount: 17200,
-      budget: 9000,
-      waitDays: 5,
-      isHighWait: true
-    },
-    {
-      id: "exc-0055",
-      deficit: -5400,
-      reqId: "#0055",
-      title: "Regional Office Logistics Subsidy",
-      subtitle: "Transportation Adjustment",
-      dept: "Ops",
-      amount: 12400,
-      budget: 7000,
-      waitDays: 2,
-      isHighWait: false
-    },
-    {
-      id: "exc-0059",
-      deficit: -2800,
-      reqId: "#0059",
-      title: "Premium Software License Renewal",
-      subtitle: "Annual Compliance Tools",
-      dept: "IT",
-      amount: 15800,
-      budget: 13000,
-      waitDays: 1,
-      isHighWait: false
-    }
-  ];
-
   // Map live pending exceptional expenses from API
-  const liveExceptionalRecords = expenses && expenses.filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET").length > 0
-    ? expenses.filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET").map(e => {
-        const createdDate = new Date(e.createdAt || Date.now());
-        const diffDays = Math.max(1, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
-        const deptName = (e.departmentId as any)?.name || e.departmentName || "IT";
-        return {
-          id: e._id || e.id,
-          deficit: -(e.amount * 0.4),
-          reqId: e.requestNumber ? `#${e.requestNumber.slice(-4)}` : `#${e._id?.slice(-4)}`,
-          title: e.description || e.category,
-          subtitle: e.category,
-          dept: deptName,
-          amount: e.amount,
-          budget: Math.round(e.amount * 0.6),
-          waitDays: diffDays,
-          isHighWait: diffDays >= 3,
-          rawExpense: e
-        };
-      })
-    : null;
+  const liveExceptionalRecords = expenses
+    .filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET")
+    .map(e => {
+      const createdDate = new Date(e.createdAt || Date.now());
+      const diffDays = Math.max(1, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const deptName = (e.departmentId as any)?.name || e.departmentName || "IT";
+      return {
+        id: e._id || e.id,
+        deficit: -(e.amount * 0.4),
+        reqId: e.requestNumber ? `#${e.requestNumber.slice(-4)}` : `#${e._id?.slice(-4)}`,
+        title: e.description || e.category,
+        subtitle: e.category,
+        dept: deptName,
+        amount: e.amount,
+        budget: Math.round(e.amount * 0.6),
+        waitDays: diffDays,
+        isHighWait: diffDays >= 3,
+        rawExpense: e
+      };
+    });
 
-  const [records, setRecords] = useState(liveExceptionalRecords || initialPendingExceptions);
+  const [records, setRecords] = useState(liveExceptionalRecords);
 
   // Calculate dynamic KPIs
   const totalDeficitExposed = records.reduce((sum, r) => sum + Math.abs(r.deficit), 0);

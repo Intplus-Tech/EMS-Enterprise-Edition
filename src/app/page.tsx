@@ -1318,8 +1318,9 @@ export default function Dashboard() {
           currentUser?.role === "ADMIN" ? (
             <AdminSystemOverviewTab
               currentUser={currentUser}
-              systemUsersCount={systemUsers.length > 0 ? systemUsers.length : 124}
-              departmentsCount={departments.length > 0 ? departments.length : 12}
+              systemUsersCount={systemUsers.length}
+              departmentsCount={departments.length}
+              systemLogs={systemLogs}
               onOpenAddUser={() => setShowAdminAddUserModal(true)}
               onOpenCreateDept={() => setShowAdminCreateDeptModal(true)}
               onOpenSetBudget={() => setShowAdminSetBudgetModal(true)}
@@ -1353,6 +1354,8 @@ export default function Dashboard() {
         {activeTab === "reports" && currentUser?.role === "ADMIN" && (
           <AdminEnterpriseReportingTab
             departments={departments}
+            expenses={expenses}
+            metrics={metrics}
           />
         )}
 

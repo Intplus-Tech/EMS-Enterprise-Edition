@@ -16,14 +16,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
 }) => {
   const [selectedAnalyticsDept, setSelectedAnalyticsDept] = useState<any | null>(null);
 
-  // Fallback departments matching design if list empty
-  const deptList = departments && departments.length > 0 ? departments : [
-    { id: "dept-1", name: "IT", totalBudget: 250000, utilized: 223750, remaining: 26250, pctUsed: 89.5, usersCount: 42, isActive: true },
-    { id: "dept-2", name: "Operations", totalBudget: 300000, utilized: 278400, remaining: 21600, pctUsed: 92.8, usersCount: 68, isActive: true },
-    { id: "dept-3", name: "Marketing", totalBudget: 180000, utilized: 72000, remaining: 108000, pctUsed: 40.0, usersCount: 15, isActive: true },
-    { id: "dept-4", name: "HR", totalBudget: 150000, utilized: 45000, remaining: 105000, pctUsed: 30.0, usersCount: 8, isActive: true },
-    { id: "dept-5", name: "Legal", totalBudget: 120000, utilized: 18000, remaining: 102000, pctUsed: 15.0, usersCount: 5, isActive: false }
-  ];
+  const deptList = departments;
 
   // If Analytics Detail view is selected
   if (selectedAnalyticsDept) {

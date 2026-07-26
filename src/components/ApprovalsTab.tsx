@@ -68,37 +68,18 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       if (dbHistory.length > 0) {
         const mapped = dbHistory.map((h: any) => ({
           sender: h.actorRole === "INITIATOR" ? "Initiator" : "Dept Head",
-          senderName: h.actorName,
-          time: new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          senderName: h.actorName || "Staff Member",
+          time: h.timestamp ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A",
           message: h.comment || h.action
         }));
         setTimelineMessages(mapped);
       } else {
-        // Fallback placeholder conversation matching mockup
         setTimelineMessages([
           {
             sender: "Initiator",
-            senderName: selectedExpense.initiatorId?.name || "James Okafor",
-            time: "09:12 AM",
-            message: "Please find the invoice for the Q3 Server maintenance attached."
-          },
-          {
-            sender: "Dept Head",
-            senderName: "Sarah Williams",
-            time: "11:45 AM",
-            message: "The amount is slightly above the usual maintenance fee. Please provide further justification for the 15% increase."
-          },
-          {
-            sender: "Initiator",
-            senderName: selectedExpense.initiatorId?.name || "James Okafor",
-            time: "02:30 PM",
-            message: "The increase is due to the emergency replacement of the cooling fans which were not in the initial quote. Justification document uploaded."
-          },
-          {
-            sender: "Dept Head",
-            senderName: "Sarah Williams",
-            time: "04:15 PM",
-            message: "“Justification accepted. Urgent maintenance confirmed. Approved for Finance processing.” — Dept Head"
+            senderName: (selectedExpense.initiatorId as any)?.name || selectedExpense.initiatorName || "Initiator",
+            time: selectedExpense.createdAt ? new Date(selectedExpense.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "09:00 AM",
+            message: selectedExpense.description || "Request submitted for approval."
           }
         ]);
       }

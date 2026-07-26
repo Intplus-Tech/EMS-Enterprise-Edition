@@ -5,6 +5,7 @@ interface AdminSystemOverviewTabProps {
   currentUser: any;
   systemUsersCount?: number;
   departmentsCount?: number;
+  systemLogs?: any[];
   onOpenAddUser: () => void;
   onOpenCreateDept: () => void;
   onOpenSetBudget: () => void;
@@ -12,40 +13,24 @@ interface AdminSystemOverviewTabProps {
 
 export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
   currentUser,
-  systemUsersCount = 124,
-  departmentsCount = 12,
+  systemUsersCount = 0,
+  departmentsCount = 0,
+  systemLogs = [],
   onOpenAddUser,
   onOpenCreateDept,
   onOpenSetBudget
 }) => {
-  const userName = currentUser?.name || "Anita Adebayo";
+  const userName = currentUser?.name || "System Admin";
 
-  const recentActivities = [
-    {
-      id: "act-1",
-      timestamp: "08:45 AM",
-      action: "User Created",
-      subtext: "Profile: T. Blaine",
-      badge: "TB",
-      context: "Legal Dept."
-    },
-    {
-      id: "act-2",
-      timestamp: "08:30 AM",
-      action: "Budget Updated",
-      subtext: "Quarterly Adjustment",
-      icon: <Icons.CreditCard size={14} />,
-      context: "IT Dept to ₦250,000"
-    },
-    {
-      id: "act-3",
-      timestamp: "07:50 AM",
-      action: "New Request Created",
-      subtext: "Sales Department",
-      icon: <Icons.Banknote size={14} />,
-      context: "Blessing Okafor (₦250,000)"
-    }
-  ];
+  const recentActivities: any[] = systemLogs.slice(0, 5).map((l: any, idx: number) => ({
+    id: l._id || `act-${idx}`,
+    timestamp: l.timestamp ? new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A",
+    action: l.action || "System Event",
+    subtext: l.message || "Action recorded in audit log",
+    badge: l.actorName ? l.actorName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "SYS",
+    context: l.actorRole || "System",
+    icon: <Icons.Activity size={14} />
+  }));
 
   return (
     <div>

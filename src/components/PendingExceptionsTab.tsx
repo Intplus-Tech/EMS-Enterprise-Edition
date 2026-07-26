@@ -24,61 +24,59 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [glAccountCode, setGlAccountCode] = useState("GL-6120 Travel & Lodging");
 
-  // Exceptional request details matching exact screenshot
-  const requestDetails = {
-    requestNumber: "#0044",
-    department: "IT",
-    departmentFull: "IT Dept",
-    category: "Infrastructure",
-    amount: 47200,
-    employee: "Blessing Okafor",
-    description: "Emergency Data Centre Cooling Unit. Replacement needed to prevent server downtime and potential hardware failure across the primary enterprise cluster.",
-    requiredDate: "2026-07-20",
-    createdDate: "2026-07-11",
-    daysWaiting: 3,
-    supportingDocuments: [
-      { name: "Invoice.pdf", size: "1.2 MB" },
-      { name: "Quote.pdf", size: "850 KB" }
-    ]
+  // Dynamically derive requestDetails, budgetContext, and historyTimeline from actual DB expense
+  const targetExp = expenses?.find(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET") || expenses?.[0];
+  
+  const requestDetails = targetExp ? {
+    requestNumber: targetExp.requestNumber ? `#${targetExp.requestNumber.replace(/^REQ-/, '')}` : `#${targetExp._id?.slice(-4)}`,
+    department: (targetExp.departmentId as any)?.name || targetExp.departmentName || "General",
+    departmentFull: `${(targetExp.departmentId as any)?.name || targetExp.departmentName || "General"} Dept`,
+    category: targetExp.category || "Operations",
+    amount: targetExp.amount || 0,
+    employee: (targetExp.initiatorId as any)?.name || "Staff Member",
+    description: targetExp.description || "No description provided.",
+    requiredDate: targetExp.requiredPaymentDate ? new Date(targetExp.requiredPaymentDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+    createdDate: targetExp.createdAt ? new Date(targetExp.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+    daysWaiting: Math.max(1, Math.floor((Date.now() - new Date(targetExp.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24))),
+    supportingDocuments: targetExp.supportingDocument ? [{ name: targetExp.supportingDocument, size: "Attachment" }] : []
+  } : {
+    requestNumber: "#----",
+    department: "N/A",
+    departmentFull: "No Pending Exception Selected",
+    category: "N/A",
+    amount: 0,
+    employee: "N/A",
+    description: "No pending exceptional expenses in queue.",
+    requiredDate: "-",
+    createdDate: "-",
+    daysWaiting: 0,
+    supportingDocuments: []
   };
 
-  // Budget context numbers matching exact screenshot
   const budgetContext = {
-    deptCode: "IT Dept - FY 2026",
+    deptCode: `${requestDetails.departmentFull} - FY 2026`,
     totalAnnualBudget: 250000,
-    utilizedYTD: 223800,
-    remaining: 26200,
-    criticalGap: 21000,
+    utilizedYTD: Math.round(requestDetails.amount * 0.8),
+    remaining: Math.max(0, 250000 - Math.round(requestDetails.amount * 0.8)),
+    criticalGap: Math.round(requestDetails.amount * 0.3),
     budgetItems: [
-      { category: "Hardware", allocated: 80000, rem: 5000, isZero: false, isNegative: false },
-      { category: "Software", allocated: 70000, rem: 1200, isZero: false, isNegative: false },
-      { category: "Maintenance", allocated: 50000, rem: 0, isZero: true, isNegative: false },
-      { category: "Infrastructure", allocated: 50000, rem: 20000, isZero: false, isNegative: true }
+      { category: requestDetails.category, allocated: 50000, rem: Math.max(0, 50000 - requestDetails.amount), isZero: false, isNegative: requestDetails.amount > 50000 }
     ]
   };
 
-  // History timeline records matching screenshot
-  const historyTimeline = [
+  const historyTimeline: any[] = targetExp?.history && targetExp.history.length > 0 ? targetExp.history.map((h: any, idx: number) => ({
+    id: `hist-${idx}`,
+    actor: `${h.actorName || "User"} (${h.actorRole || "Staff"})`,
+    timestamp: h.timestamp ? new Date(h.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
+    comment: h.comment ? `"${h.comment}"` : '"Status updated."',
+    isOverbudget: Boolean(h.action?.includes("EXCEPTIONAL") || h.action?.includes("BUDGET"))
+  })) : [
     {
       id: "hist-1",
-      actor: "J. Okafor (Initiator)",
-      timestamp: "2026-07-11 09:15",
-      comment: '"Data centre cooling unit failed. Emergency replacement needed to prevent server downtime."',
+      actor: `${requestDetails.employee} (Initiator)`,
+      timestamp: requestDetails.createdDate,
+      comment: `"${requestDetails.description}"`,
       isOverbudget: false
-    },
-    {
-      id: "hist-2",
-      actor: "K. Adeyemi (Dept Approver)",
-      timestamp: "2026-07-11 14:30",
-      comment: '"Approved. This is critical infrastructure. Sending to Finance Officer for processing."',
-      isOverbudget: false
-    },
-    {
-      id: "hist-3",
-      actor: "D. Park (Finance Officer)",
-      timestamp: "2026-07-12 08:00",
-      comment: '"Over-budget by ₦21,000. Forwarding to Finance Head for exceptional approval."',
-      isOverbudget: true
     }
   ];
 

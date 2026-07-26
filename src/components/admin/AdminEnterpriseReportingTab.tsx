@@ -3,14 +3,32 @@ import * as Icons from "lucide-react";
 
 interface AdminEnterpriseReportingTabProps {
   departments: any[];
+  expenses?: any[];
+  metrics?: any;
 }
 
 export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabProps> = ({
-  departments
+  departments,
+  expenses = [],
+  metrics
 }) => {
   const [period, setPeriod] = useState("Last 30 Days");
   const [selectedDept, setSelectedDept] = useState("ALL");
   const [selectedBudgetItem, setSelectedBudgetItem] = useState("ALL");
+
+  const pendingCount = metrics?.pendingRequestsCount ?? expenses.filter(e => e.status?.includes("PENDING")).length;
+  const approvedCount = metrics?.approvedCount ?? expenses.filter(e => e.status === "APPROVED").length;
+  const rejectedCount = metrics?.rejectedCount ?? expenses.filter(e => e.status === "REJECTED").length;
+  const paidCount = metrics?.paidCount ?? expenses.filter(e => e.status === "PAID" || e.status === "CLOSED").length;
+  const uploadedCount = metrics?.uploadedCount ?? expenses.filter(e => Boolean(e.supportingDocument)).length;
+
+  const deptUtilization = departments.map((d: any) => {
+    const deptExpenses = expenses.filter(e => (e.departmentId?._id || e.departmentId) === (d._id || d.id));
+    const spent = deptExpenses.filter(e => ["PAID", "CLOSED", "APPROVED"].includes(e.status)).reduce((sum, e) => sum + (e.amount || 0), 0);
+    const budget = d.totalBudget || 250000;
+    const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+    return { name: d.name, spent, budget, pct };
+  });
 
   return (
     <div>
@@ -95,7 +113,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
           </div>
           <div>
             <div style={{ fontSize: "0.7rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase" }}>PENDING</div>
-            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>12</div>
+            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>{pendingCount}</div>
           </div>
         </div>
 
@@ -106,7 +124,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
           </div>
           <div>
             <div style={{ fontSize: "0.7rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase" }}>APPROVED</div>
-            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>34</div>
+            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>{approvedCount}</div>
           </div>
         </div>
 
@@ -117,7 +135,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
           </div>
           <div>
             <div style={{ fontSize: "0.7rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase" }}>REJECTED</div>
-            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>34</div>
+            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>{rejectedCount}</div>
           </div>
         </div>
 
@@ -128,7 +146,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
           </div>
           <div>
             <div style={{ fontSize: "0.7rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase" }}>PAID</div>
-            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>34</div>
+            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>{paidCount}</div>
           </div>
         </div>
 
@@ -139,7 +157,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
           </div>
           <div>
             <div style={{ fontSize: "0.7rem", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase" }}>UPLOADED</div>
-            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>34</div>
+            <div style={{ fontSize: "1.4rem", fontWeight: "800", color: "#f8fafc" }}>{uploadedCount}</div>
           </div>
         </div>
       </div>
@@ -154,45 +172,20 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
-                <span style={{ fontWeight: "600", color: "#f8fafc" }}>Engineering</span>
-                <span style={{ color: "#94a3b8" }}>₦ 4,200,000 / ₦ 5M (84%)</span>
+            {deptUtilization.map((d: any, idx: number) => (
+              <div key={idx}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
+                  <span style={{ fontWeight: "600", color: "#f8fafc" }}>{d.name}</span>
+                  <span style={{ color: "#94a3b8" }}>₦ {d.spent.toLocaleString()} / ₦ {(d.budget / 1000000).toFixed(1)}M ({d.pct}%)</span>
+                </div>
+                <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px" }}>
+                  <div style={{ width: `${d.pct}%`, height: "100%", backgroundColor: d.pct > 90 ? "#ef4444" : "#2563eb", borderRadius: "3px" }} />
+                </div>
               </div>
-              <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px" }}>
-                <div style={{ width: "84%", height: "100%", backgroundColor: "#2563eb", borderRadius: "3px" }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
-                <span style={{ fontWeight: "600", color: "#f8fafc" }}>Marketing</span>
-                <span style={{ color: "#94a3b8" }}>₦ 1,800,000 / ₦ 3M (60%)</span>
-              </div>
-              <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px" }}>
-                <div style={{ width: "60%", height: "100%", backgroundColor: "#2563eb", borderRadius: "3px" }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
-                <span style={{ fontWeight: "600", color: "#f8fafc" }}>Operations</span>
-                <span style={{ color: "#94a3b8" }}>₦ 3,900,000 / ₦ 4M (97%)</span>
-              </div>
-              <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px" }}>
-                <div style={{ width: "97%", height: "100%", backgroundColor: "#ef4444", borderRadius: "3px" }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: "0.25rem" }}>
-                <span style={{ fontWeight: "600", color: "#f8fafc" }}>Sales</span>
-                <span style={{ color: "#94a3b8" }}>₦ 1,200,000 / ₦ 2.5M (48%)</span>
-              </div>
-              <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px" }}>
-                <div style={{ width: "48%", height: "100%", backgroundColor: "#2563eb", borderRadius: "3px" }} />
-              </div>
-            </div>
+            ))}
+            {deptUtilization.length === 0 && (
+              <p style={{ color: "#94a3b8", fontSize: "0.85rem", margin: 0 }}>No department budget utilization recorded.</p>
+            )}
           </div>
         </div>
 

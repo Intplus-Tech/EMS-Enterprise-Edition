@@ -14,49 +14,7 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
   const [actionTypeFilter, setActionTypeFilter] = useState("All Actions");
   const [expandedLogId, setExpandedLogId] = useState<string | null>("log-1");
 
-  const mockLogs = [
-    {
-      id: "log-1",
-      timestamp: "Jul 15, 2026 10:45 AM",
-      userBadge: "DM",
-      userName: "David Marsh",
-      userRole: "Finance Head",
-      action: "Exceptional Approval",
-      statusFrom: "Pending Exceptional Approval",
-      statusTo: "Sent to Finance",
-      ipAddress: "192.168.1.45",
-      verbatimFeedback: '"Budget expansion approved per executive request. Documentation verified and attached for quarterly audit compliance."',
-      attachmentsCount: 2
-    },
-    {
-      id: "log-2",
-      timestamp: "Jul 14, 2026 02:15 PM",
-      userBadge: "SV",
-      userName: "Sarah Voss",
-      userRole: "Finance Officer",
-      action: "Generate Payment Instruction",
-      statusFrom: "Sent to Finance",
-      statusTo: "Awaiting Bank Release",
-      ipAddress: "192.168.1.22",
-      verbatimFeedback: '"Uploaded generated payment instruction manifest to banking portal."',
-      attachmentsCount: 1
-    },
-    {
-      id: "log-3",
-      timestamp: "Jul 13, 2026 11:30 AM",
-      userBadge: "MS",
-      userName: "Michael Scott",
-      userRole: "Dept Manager",
-      action: "Approve",
-      statusFrom: "Pending Approval",
-      statusTo: "Pending Exceptional Approval",
-      ipAddress: "10.0.0.84",
-      verbatimFeedback: '"Departmental budget cap exceeded by ₦400k. Route to Finance Head for exceptional override."',
-      attachmentsCount: 0
-    }
-  ];
-
-  const formattedLiveLogs = logs && logs.length > 0 ? logs.map((l: any) => ({
+  const formattedLiveLogs = logs.map((l: any) => ({
     id: l._id || l.id,
     timestamp: l.timestamp ? new Date(l.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
     userBadge: l.actorName ? l.actorName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "SYS",
@@ -68,9 +26,9 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
     ipAddress: l.ipAddress || "192.168.1.1",
     verbatimFeedback: l.message ? `"${l.message}"` : '"No comment recorded."',
     attachmentsCount: l.details?.attachmentsCount || 0
-  })) : null;
+  }));
 
-  const displayLogs = formattedLiveLogs || mockLogs;
+  const displayLogs = formattedLiveLogs;
 
   return (
     <div>

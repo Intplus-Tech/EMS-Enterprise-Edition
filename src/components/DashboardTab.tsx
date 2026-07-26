@@ -41,22 +41,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     }
   });
 
-  // Use actual totals from database when expenses exist
-  const hasExpenses = expenses && expenses.length > 0;
-  if (!hasExpenses) {
-    if (deptSpentThisMonth === 0) deptSpentThisMonth = 44850200;
-    if (totalDeptRequests === 0) totalDeptRequests = 49;
-    if (myDraftCount === 0) myDraftCount = 3;
-    if (awaitingUpdateCount === 0) awaitingUpdateCount = 3;
-  }
+
 
   const baseMonthly = {
-    3: 5200000, // April
-    4: 5800000, // May
-    5: 7500000, // June
-    6: 6400000, // July
-    7: 9200000, // August
-    8: 8000000  // September
+    3: 0, // April
+    4: 0, // May
+    5: 0, // June
+    6: 0, // July
+    7: 0, // August
+    8: 0  // September
   };
 
   expenses.forEach((e) => {
@@ -80,21 +73,37 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     { label: "SEP", value: baseMonthly[8] }
   ];
 
+  const dailyBuckets = [0, 0, 0, 0, 0, 0];
+  expenses.forEach((e) => {
+    if (e.status === "PAID" || e.status === "CLOSED" || e.status === "APPROVED") {
+      const d = new Date(e.createdAt);
+      if (d.getMonth() === currentMonth && d.getFullYear() === currentYear) {
+        const dateNum = d.getDate();
+        if (dateNum <= 5) dailyBuckets[0] += e.amount;
+        else if (dateNum <= 10) dailyBuckets[1] += e.amount;
+        else if (dateNum <= 15) dailyBuckets[2] += e.amount;
+        else if (dateNum <= 20) dailyBuckets[3] += e.amount;
+        else if (dateNum <= 25) dailyBuckets[4] += e.amount;
+        else dailyBuckets[5] += e.amount;
+      }
+    }
+  });
+
   const dailyData = [
-    { label: "1-5", value: 12000000 },
-    { label: "6-10", value: 8500000 },
-    { label: "11-15", value: 14500000 },
-    { label: "16-20", value: 6200000 },
-    { label: "21-25", value: 9200000, active: true },
-    { label: "26-30", value: 4800000 }
+    { label: "1-5", value: dailyBuckets[0] },
+    { label: "6-10", value: dailyBuckets[1] },
+    { label: "11-15", value: dailyBuckets[2] },
+    { label: "16-20", value: dailyBuckets[3] },
+    { label: "21-25", value: dailyBuckets[4], active: true },
+    { label: "26-30", value: dailyBuckets[5] }
   ];
 
   const baseBreakdown: Record<string, number> = {
-    "IT Infrastructure": 12400000,
-    "Marketing": 8200000,
-    "Travel & Logistics": 4500000,
-    "Office Supplies": 2100000,
-    "Training": 900000
+    "IT Infrastructure": 0,
+    "Marketing": 0,
+    "Travel & Logistics": 0,
+    "Office Supplies": 0,
+    "Training": 0
   };
 
   expenses.forEach((e) => {
@@ -115,56 +124,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   });
 
   const breakdownItems = [
-    { name: "IT Infrastructure", value: baseBreakdown["IT Infrastructure"], color: "rgb(var(--color-primary))", pct: 85 },
-    { name: "Marketing", value: baseBreakdown["Marketing"], color: "rgba(99, 102, 241, 0.5)", pct: 60 },
-    { name: "Travel & Logistics", value: baseBreakdown["Travel & Logistics"], color: "#475569", pct: 40 },
-    { name: "Office Supplies", value: baseBreakdown["Office Supplies"], color: "rgb(var(--color-secondary))", pct: 20 },
-    { name: "Training", value: baseBreakdown["Training"], color: "rgba(16, 185, 129, 0.4)", pct: 10 }
+    { name: "IT Infrastructure", value: baseBreakdown["IT Infrastructure"], color: "rgb(var(--color-primary))", pct: 0 },
+    { name: "Marketing", value: baseBreakdown["Marketing"], color: "rgba(99, 102, 241, 0.5)", pct: 0 },
+    { name: "Travel & Logistics", value: baseBreakdown["Travel & Logistics"], color: "#475569", pct: 0 },
+    { name: "Office Supplies", value: baseBreakdown["Office Supplies"], color: "rgb(var(--color-secondary))", pct: 0 },
+    { name: "Training", value: baseBreakdown["Training"], color: "rgba(16, 185, 129, 0.4)", pct: 0 }
   ];
 
   const maxVal = Math.max(...breakdownItems.map(i => i.value)) || 1;
   breakdownItems.forEach(i => {
     i.pct = Math.round((i.value / maxVal) * 100);
   });
-
-  const mockExpenditures = [
-    {
-      description: "Cloud Infrastructure Migration",
-      requestNumber: "PROJ-901-QX",
-      category: "IT Tech",
-      vendorName: "AWS Nigeria",
-      createdAt: new Date("2023-08-14T10:00:00Z").toISOString(),
-      amount: 8240000,
-      status: "APPROVED"
-    },
-    {
-      description: "Quarterly Executive Summit",
-      requestNumber: "EVNT-442-BA",
-      category: "Marketing",
-      vendorName: "Eko Hotels & Suites",
-      createdAt: new Date("2023-08-02T10:00:00Z").toISOString(),
-      amount: 4500000,
-      status: "APPROVED"
-    },
-    {
-      description: "Security Software Licensing",
-      requestNumber: "SOFT-110-LZ",
-      category: "IT Tech",
-      vendorName: "Microsoft Corp",
-      createdAt: new Date("2023-07-28T10:00:00Z").toISOString(),
-      amount: 3120000,
-      status: "APPROVED"
-    },
-    {
-      description: "National PR Campaign",
-      requestNumber: "AD-772-VY",
-      category: "Marketing",
-      vendorName: "Blue Media Agency",
-      createdAt: new Date("2023-07-15T10:00:00Z").toISOString(),
-      amount: 2800000,
-      status: "PENDING_APPROVAL"
-    }
-  ];
 
   const actualPaidExpenses = expenses
     .filter(e => ["PAID", "CLOSED", "APPROVED"].includes(e.status))
@@ -178,8 +148,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       status: e.status
     }));
 
-  const allExpenditures = [...actualPaidExpenses, ...mockExpenditures]
-    .sort((a, b) => b.amount - a.amount);
+  const allExpenditures = actualPaidExpenses.sort((a, b) => b.amount - a.amount);
   
   const displayedExpenditures = allExpenditures.slice(0, 4);
 

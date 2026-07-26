@@ -20,103 +20,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
   const [showJustificationModal, setShowJustificationModal] = useState(false);
   const [justificationTarget, setJustificationTarget] = useState<any>(null);
 
-  // Default initial mock exception records matching the exact screenshot design
-  const initialExceptionRecords = [
-    {
-      id: "exc-0044",
-      date: "2026-07-12",
-      reqId: "#0044",
-      dept: "IT",
-      requestTitle: "Data Centre Cooling Upgrade",
-      expansionAmt: 21000,
-      financeHead: "Michael Chen",
-      totalExpansionsDept: 35500,
-      period: "FY 2026",
-      status: "Approved",
-      rawExpense: {
-        _id: "exc-0044-raw",
-        requestNumber: "REQ-0044",
-        category: "IT Equipment",
-        description: "Data Centre Cooling Upgrade - Emergency expansion authorized",
-        amount: 21000,
-        status: "APPROVED",
-        vendorName: "Michael Chen IT Solutions",
-        vendorBankDetails: { bankName: "Zenith Bank", accountNumber: "1092837465", accountName: "Michael Chen" },
-        createdAt: "2026-07-12T10:00:00.000Z"
-      }
-    },
-    {
-      id: "exc-0032",
-      date: "2026-06-28",
-      reqId: "#0032",
-      dept: "Ops",
-      requestTitle: "Supply Chain Emergency Logistics",
-      expansionAmt: 18500,
-      financeHead: "Aisha Bello",
-      totalExpansionsDept: 18500,
-      period: "FY 2026",
-      status: "Approved",
-      rawExpense: {
-        _id: "exc-0032-raw",
-        requestNumber: "REQ-0032",
-        category: "Operations",
-        description: "Supply Chain Emergency Logistics - Unplanned freight surcharge",
-        amount: 18500,
-        status: "APPROVED",
-        vendorName: "Aisha Logistics Ltd",
-        vendorBankDetails: { bankName: "Access Bank", accountNumber: "0019283746", accountName: "Aisha Logistics" },
-        createdAt: "2026-06-28T14:20:00.000Z"
-      }
-    },
-    {
-      id: "exc-0021",
-      date: "2026-05-15",
-      reqId: "#0021",
-      dept: "IT",
-      requestTitle: "Cybersecurity License True-up",
-      expansionAmt: 14500,
-      financeHead: "Michael Chen",
-      totalExpansionsDept: 35500,
-      period: "FY 2026",
-      status: "Approved",
-      rawExpense: {
-        _id: "exc-0021-raw",
-        requestNumber: "REQ-0021",
-        category: "Software",
-        description: "Cybersecurity License True-up - Additional enterprise seat licenses",
-        amount: 14500,
-        status: "APPROVED",
-        vendorName: "CyberSec Global",
-        vendorBankDetails: { bankName: "First Bank", accountNumber: "3029182736", accountName: "CyberSec Global" },
-        createdAt: "2026-05-15T09:15:00.000Z"
-      }
-    },
-    {
-      id: "exc-0018",
-      date: "2026-04-03",
-      reqId: "#0018",
-      dept: "HR",
-      requestTitle: "Annual Leadership Offsite Surplus",
-      expansionAmt: 13000,
-      financeHead: "Robert Sterling",
-      totalExpansionsDept: 13000,
-      period: "FY 2026",
-      status: "Approved",
-      rawExpense: {
-        _id: "exc-0018-raw",
-        requestNumber: "REQ-0018",
-        category: "Human Resources",
-        description: "Annual Leadership Offsite Surplus - Accommodation buffer override",
-        amount: 13000,
-        status: "APPROVED",
-        vendorName: "Sterling Events Ltd",
-        vendorBankDetails: { bankName: "GTBank", accountNumber: "0129384756", accountName: "Sterling Events" },
-        createdAt: "2026-04-03T11:45:00.000Z"
-      }
-    }
-  ];
-
-  // Include dynamic exceptional budget expenses from database if available
+  // Include dynamic exceptional budget expenses from database
   const dbExceptions = expenses
     .filter(e => e.exceptionalBudgetApproved || e.status === "PENDING_EXCEPTIONAL" || (e.history && e.history.some((h: any) => h.action?.includes("EXCEPTIONAL") || h.action?.includes("EXPANSION"))))
     .map(e => ({
@@ -133,7 +37,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
       rawExpense: e
     }));
 
-  const allRecords = dbExceptions.length > 0 ? dbExceptions : initialExceptionRecords;
+  const allRecords = dbExceptions;
 
   // Filtering logic
   const filteredRecords = allRecords.filter(rec => {
