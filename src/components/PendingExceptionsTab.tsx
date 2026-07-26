@@ -595,6 +595,23 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         remainingBudget={budgetContext.remaining}
         deficitAmount={budgetContext.criticalGap}
         onConfirm={async (notes) => {
+          const targetExp = expenses?.find(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET") || expenses?.[0];
+          if (targetExp && targetExp._id && !targetExp._id.startsWith("exc-")) {
+            try {
+              const res = await fetch(`/api/expenses/${targetExp._id}/exceptional`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "APPROVE", comment: notes })
+              });
+              const data = await res.json();
+              if (!data.success) {
+                alert(data.error || "Failed to authorize budget expansion.");
+                return;
+              }
+            } catch (err) {
+              console.error(err);
+            }
+          }
           alert("One-Time Budget Expansion Authorized successfully!");
           setShowApproveModal(false);
           if (loadDashboardData && currentUser) await loadDashboardData(currentUser);
@@ -609,6 +626,23 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         remainingBudget={budgetContext.remaining}
         deficitAmount={budgetContext.criticalGap}
         onConfirm={async (reason) => {
+          const targetExp = expenses?.find(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET") || expenses?.[0];
+          if (targetExp && targetExp._id && !targetExp._id.startsWith("exc-")) {
+            try {
+              const res = await fetch(`/api/expenses/${targetExp._id}/exceptional`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "REJECT", comment: reason })
+              });
+              const data = await res.json();
+              if (!data.success) {
+                alert(data.error || "Failed to reject budget expansion.");
+                return;
+              }
+            } catch (err) {
+              console.error(err);
+            }
+          }
           alert("Budget Expansion Request Rejected successfully.");
           setShowRejectModal(false);
           if (loadDashboardData && currentUser) await loadDashboardData(currentUser);
