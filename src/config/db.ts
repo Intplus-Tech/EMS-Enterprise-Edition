@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { ENV } from "./env";
 
 // Ensure all models are registered on initial database connection
 import "../models/Department";
@@ -8,11 +9,7 @@ import "../models/ExpenseRequest";
 import "../models/Log";
 import "../models/WorkflowConfig";
 
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/expense_manager";
-
-if (!MONGODB_URI) {
-  throw new Error("Please define the MONGODB_URI environment variable inside .env.local");
-}
+const MONGODB_URI = ENV.MONGODB_URI;
 
 /**
  * Global is used here to maintain a cached connection across hot reloads

@@ -81,7 +81,29 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
     }
   ];
 
-  const [records, setRecords] = useState(initialPendingExceptions);
+  // Map live pending exceptional expenses from API
+  const liveExceptionalRecords = expenses && expenses.filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET").length > 0
+    ? expenses.filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET").map(e => {
+        const createdDate = new Date(e.createdAt || Date.now());
+        const diffDays = Math.max(1, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
+        const deptName = (e.departmentId as any)?.name || e.departmentName || "IT";
+        return {
+          id: e._id || e.id,
+          deficit: -(e.amount * 0.4),
+          reqId: e.requestNumber ? `#${e.requestNumber.slice(-4)}` : `#${e._id?.slice(-4)}`,
+          title: e.description || e.category,
+          subtitle: e.category,
+          dept: deptName,
+          amount: e.amount,
+          budget: Math.round(e.amount * 0.6),
+          waitDays: diffDays,
+          isHighWait: diffDays >= 3,
+          rawExpense: e
+        };
+      })
+    : null;
+
+  const [records, setRecords] = useState(liveExceptionalRecords || initialPendingExceptions);
 
   // Calculate dynamic KPIs
   const totalDeficitExposed = records.reduce((sum, r) => sum + Math.abs(r.deficit), 0);

@@ -341,16 +341,18 @@ export default function Dashboard() {
         }
       }
 
-      // Load workflow config if Admin
+      // Load workflow config and system logs
+      if (["ADMIN", "FINANCE_HEAD", "FINANCE_OFFICER", "FINANCE_MANAGER", "APPROVER"].includes(user.role)) {
+        loadLogs("ALL");
+        loadUsers();
+      }
+
       if (user.role === "ADMIN") {
         const wfRes = await fetch("/api/admin/workflow");
         const wfData = await wfRes.json();
         if (wfData.success) {
           setWorkflowSteps(wfData.steps);
         }
-        
-        loadLogs("ALL");
-        loadUsers();
       }
     } catch (e) {
       console.error("Error loading dashboard data:", e);

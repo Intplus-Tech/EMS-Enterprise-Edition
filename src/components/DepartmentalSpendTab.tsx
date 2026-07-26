@@ -81,8 +81,57 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
     }
   ];
 
+  // Dynamic departmental spend calculation from DB expenses
+  const liveDeptMap: Record<string, { totalBudget: number; utilized: number; topRequester: string; overBudgetCount: number; requesters: Record<string, number> }> = {};
+  
+  if (expenses && expenses.length > 0) {
+    expenses.forEach(e => {
+      const deptName = (e.departmentId as any)?.name || e.departmentName || "IT";
+      if (!liveDeptMap[deptName]) {
+        liveDeptMap[deptName] = { totalBudget: 250000, utilized: 0, topRequester: "N/A", overBudgetCount: 0, requesters: {} };
+      }
+      if (e.status === "PAID" || e.status === "CLOSED" || e.status === "APPROVED") {
+        liveDeptMap[deptName].utilized += e.amount;
+      }
+      if (e.status === "INSUFFICIENT_BUDGET" || e.status === "PENDING_EXCEPTIONAL" || e.exceptionalBudgetApproved) {
+        liveDeptMap[deptName].overBudgetCount++;
+      }
+      const reqName = (e.initiatorId as any)?.name || "Team Member";
+      liveDeptMap[deptName].requesters[reqName] = (liveDeptMap[deptName].requesters[reqName] || 0) + e.amount;
+    });
+
+    Object.keys(liveDeptMap).forEach(d => {
+      const sorted = Object.entries(liveDeptMap[d].requesters).sort((a, b) => b[1] - a[1]);
+      if (sorted[0]) liveDeptMap[d].topRequester = sorted[0][0];
+    });
+  }
+
+  const liveDeptSpendList = Object.keys(liveDeptMap).length > 0
+    ? Object.keys(liveDeptMap).map((dName, idx) => {
+        const item = liveDeptMap[dName];
+        const remaining = Math.max(0, item.totalBudget - item.utilized);
+        const percentUsed = Math.min(100, Math.round((item.utilized / item.totalBudget) * 100));
+        const colors = ["#2563EB", "#475569", "#DC2626", "#334155", "#94A3B8"];
+        const color = colors[idx % colors.length];
+        return {
+          id: `dept-${idx}`,
+          dept: dName,
+          dotColor: color,
+          totalBudget: item.totalBudget,
+          utilized: item.utilized,
+          remaining,
+          percentUsed,
+          barColor: color,
+          topRequester: item.topRequester,
+          overBudgetCount: item.overBudgetCount
+        };
+      })
+    : null;
+
+  const currentDeptSpendData = liveDeptSpendList || initialDeptSpend;
+
   // Filtering logic
-  const filteredDeptSpend = initialDeptSpend.filter(row => {
+  const filteredDeptSpend = currentDeptSpendData.filter(row => {
     if (deptFilter !== "All Departments" && row.dept !== deptFilter) return false;
     if (searchQuery.trim() !== "") {
       const q = searchQuery.toLowerCase();

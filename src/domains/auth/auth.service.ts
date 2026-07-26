@@ -1,11 +1,12 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { connectToDatabase } from "../../config/db";
+import { ENV } from "../../config/env";
 import { User } from "../../models/User";
 import { LoggerService } from "../logs/logger.service";
 import { EmailService } from "../email/email.service";
 
-const JWT_SECRET = process.env.JWT_SECRET || "spendflow-secure-jwt-secret-key-12345";
+const JWT_SECRET = ENV.JWT_SECRET;
 
 export class AuthService {
   /**

@@ -3,10 +3,12 @@
  * Changing this file updates the App Name, Logo Icon, and Theme colors globally.
  */
 
+import { ENV } from "./env";
+
 export const BRANDING = {
   appName: "SpendFlow",
   logoIcon: "Wallet", // This corresponds to the Lucide icon name we will render dynamically
-  logoUrl: process.env.NEXT_PUBLIC_APP_LOGO_URL || "", // Configurable from .env
+  logoUrl: ENV.NEXT_PUBLIC_APP_LOGO_URL, // Configurable from ENV source of truth
   tagline: "Dynamic Expense & Budget Management",
   theme: {
     // Standard Dark Mode palette with Indigo/Purple highlights

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { AuthService } from "../../../../domains/auth/auth.service";
 import { LoginSchema } from "../../../../validators/validation";
 import { withErrorHandling } from "../../../../middlewares/errors";
+import { ENV } from "../../../../config/env";
 
 export const POST = withErrorHandling(async (req: NextRequest) => {
   const body = await req.json();
@@ -14,7 +15,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   // Set secure HTTP-only cookie for sessions
   response.cookies.set("session", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: ENV.isProduction,
     sameSite: "strict",
     maxAge: 60 * 60 * 8, // 8 hours
     path: "/"

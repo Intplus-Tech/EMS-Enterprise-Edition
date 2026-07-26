@@ -1,17 +1,14 @@
 import { v2 as cloudinary } from "cloudinary";
 import { IFileUploadService } from "./file-upload.interface";
+import { ENV } from "../../config/env";
 
-const isConfigured = !!(
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET
-);
+const isConfigured = ENV.isCloudinaryConfigured;
 
 if (isConfigured) {
   cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
+    cloud_name: ENV.CLOUDINARY_CLOUD_NAME,
+    api_key: ENV.CLOUDINARY_API_KEY,
+    api_secret: ENV.CLOUDINARY_API_SECRET,
   });
 }
 

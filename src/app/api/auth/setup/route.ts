@@ -5,8 +5,9 @@ import { User } from "../../../../models/User";
 import { AuthService } from "../../../../domains/auth/auth.service";
 import { LoggerService } from "../../../../domains/logs/logger.service";
 import { withErrorHandling } from "../../../../middlewares/errors";
+import { ENV } from "../../../../config/env";
 
-const JWT_SECRET = process.env.JWT_SECRET || "spendflow-secure-jwt-secret-key-12345";
+const JWT_SECRET = ENV.JWT_SECRET;
 
 // GET: Validate invitation token and return email address
 export const GET = withErrorHandling(async (req: NextRequest) => {
@@ -100,7 +101,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   response.cookies.set("session", sessionToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: ENV.isProduction,
     sameSite: "strict",
     maxAge: 60 * 60 * 8, // 8 hours
     path: "/"

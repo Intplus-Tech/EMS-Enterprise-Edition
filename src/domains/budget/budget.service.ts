@@ -1,8 +1,10 @@
 import { connectToDatabase } from "../../config/db";
 import { BudgetPeriod } from "../../models/BudgetPeriod";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
+import { Department } from "../../models/Department";
 import { LoggerService } from "../logs/logger.service";
 import { SystemRole } from "../../enums/roles";
+import { RequestStatus } from "../../enums/statuses";
 
 export class BudgetService {
   /**
@@ -123,5 +125,54 @@ export class BudgetService {
       "BUDGET_COMMITTED",
       `Committed $${request.amount.toFixed(2)} to utilised budget for department. Period: ${period.periodName}. Request: ${request.requestNumber}`
     );
+  }
+
+  /**
+   * Calculates departmental spend metrics across all registered departments
+   */
+  public static async getDepartmentalSpendSummaries() {
+    await connectToDatabase();
+    
+    const departments = await Department.find({}).sort({ name: 1 });
+    const summaries = await Promise.all(
+      departments.map(async (dept) => {
+        const periods = await BudgetPeriod.find({ departmentId: dept._id });
+        const totalBudget = periods.reduce((sum, p) => sum + (p.totalBudget || 0), 0);
+        const utilised = periods.reduce((sum, p) => sum + (p.utilisedBudget || 0), 0);
+        const pending = periods.reduce((sum, p) => sum + (p.pendingBudget || 0), 0);
+        const totalCommitted = utilised + pending;
+        const remaining = Math.max(0, totalBudget - totalCommitted);
+        const pctUsed = totalBudget > 0 ? Math.min(100, Math.round((totalCommitted / totalBudget) * 1000) / 10) : 0;
+
+        const requests = await ExpenseRequest.find({ departmentId: dept._id }).populate("initiatorId");
+        const overBudgetCount = requests.filter(r => r.status === RequestStatus.INSUFFICIENT_BUDGET || r.status === RequestStatus.PENDING_EXCEPTIONAL || r.exceptionalBudgetApproved).length;
+
+        const userSpendMap: Record<string, { name: string; amount: number }> = {};
+        requests.forEach(r => {
+          const name = (r.initiatorId as any)?.name || "Staff Member";
+          if (!userSpendMap[name]) userSpendMap[name] = { name, amount: 0 };
+          userSpendMap[name].amount += r.amount;
+        });
+        const topRequester = Object.values(userSpendMap).sort((a, b) => b.amount - a.amount)[0]?.name || "N/A";
+
+        return {
+          id: dept._id.toString(),
+          name: dept.name,
+          dept: dept.name,
+          description: dept.description || "",
+          totalBudget: totalBudget > 0 ? totalBudget : 250000,
+          utilized: utilised,
+          utilised,
+          pending,
+          remaining: totalBudget > 0 ? remaining : 250000 - utilised,
+          pctUsed: pctUsed > 0 ? pctUsed : (totalBudget > 0 ? 0 : Math.round((utilised / 250000) * 100)),
+          topRequester,
+          overBudgetCount,
+          isActive: true
+        };
+      })
+    );
+
+    return summaries;
   }
 }

@@ -41,10 +41,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     }
   });
 
-  if (deptSpentThisMonth === 0) deptSpentThisMonth = 44850200;
-  if (totalDeptRequests === 0) totalDeptRequests = 49;
-  if (myDraftCount === 0) myDraftCount = 3;
-  if (awaitingUpdateCount === 0) awaitingUpdateCount = 3;
+  // Use actual totals from database when expenses exist
+  const hasExpenses = expenses && expenses.length > 0;
+  if (!hasExpenses) {
+    if (deptSpentThisMonth === 0) deptSpentThisMonth = 44850200;
+    if (totalDeptRequests === 0) totalDeptRequests = 49;
+    if (myDraftCount === 0) myDraftCount = 3;
+    if (awaitingUpdateCount === 0) awaitingUpdateCount = 3;
+  }
 
   const baseMonthly = {
     3: 5200000, // April

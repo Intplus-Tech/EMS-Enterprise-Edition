@@ -56,7 +56,21 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
     }
   ];
 
-  const displayLogs = mockLogs;
+  const formattedLiveLogs = logs && logs.length > 0 ? logs.map((l: any) => ({
+    id: l._id || l.id,
+    timestamp: l.timestamp ? new Date(l.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
+    userBadge: l.actorName ? l.actorName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "SYS",
+    userName: l.actorName || "System Engine",
+    userRole: l.actorRole || "System",
+    action: l.action || "Log Event",
+    statusFrom: l.details?.statusBefore || "System Event",
+    statusTo: l.details?.statusAfter || l.action || "Completed",
+    ipAddress: l.ipAddress || "192.168.1.1",
+    verbatimFeedback: l.message ? `"${l.message}"` : '"No comment recorded."',
+    attachmentsCount: l.details?.attachmentsCount || 0
+  })) : null;
+
+  const displayLogs = formattedLiveLogs || mockLogs;
 
   return (
     <div>

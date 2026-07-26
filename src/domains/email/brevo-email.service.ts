@@ -1,5 +1,6 @@
 import { IEmailService } from "./email-service.interface";
 import { getInviteEmailHtml, getResetCodeEmailHtml, compileTemplate } from "./templates";
+import { ENV } from "../../config/env";
 
 export class BrevoEmailService implements IEmailService {
   private apiKey: string;
@@ -8,8 +9,8 @@ export class BrevoEmailService implements IEmailService {
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.senderEmail = process.env.BREVO_SENDER_EMAIL || "noreply@spendflow.com";
-    this.senderName = process.env.BREVO_SENDER_NAME || "SpendFlow EMS";
+    this.senderEmail = ENV.BREVO_SENDER_EMAIL;
+    this.senderName = ENV.BREVO_SENDER_NAME;
   }
 
   private async sendSmtpEmail(
