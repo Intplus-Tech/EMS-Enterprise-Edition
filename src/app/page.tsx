@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../config/branding";
@@ -98,8 +98,8 @@ export default function Dashboard() {
     currency: "NGN",
     description: "",
     amount: "",
-    supportingDocument: "invoice_receipt_1024.pdf",
-    supportingDocuments: ["invoice_receipt_1024.pdf"],
+    supportingDocument: "",
+    supportingDocuments: [] as string[],
     vendorName: "",
     accountNumber: "",
     bankName: "",
@@ -107,6 +107,63 @@ export default function Dashboard() {
     requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString().split('T')[0], // 7 days from now
   });
   const [formError, setFormError] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const resubmitFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [uploadDocError, setUploadDocError] = useState("");
+
+  const handleFileUpload = async (files: FileList | File[] | null, isResubmit: boolean = false) => {
+    if (!files || files.length === 0) return;
+    setIsUploadingDoc(true);
+    setUploadDocError("");
+
+    const newDocs: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const docRef = data.url || data.publicId || data.name || file.name;
+          newDocs.push(docRef);
+        } else {
+          newDocs.push(file.name);
+        }
+      } catch (err) {
+        console.warn("Background upload error, falling back to filename", err);
+        newDocs.push(file.name);
+      }
+    }
+
+    if (isResubmit) {
+      if (newDocs.length > 0) {
+        setResubmitForm((prev: any) => ({
+          ...prev,
+          supportingDocument: newDocs[0],
+        }));
+      }
+    } else {
+      setNewRequest((prev) => {
+        const updatedDocs = [...prev.supportingDocuments, ...newDocs];
+        return {
+          ...prev,
+          supportingDocuments: updatedDocs,
+          supportingDocument: updatedDocs[0] || "",
+        };
+      });
+    }
+
+    setIsUploadingDoc(false);
+  };
 
   // Initiator-specific state
   const [notifications, setNotifications] = useState<any[]>([
@@ -426,6 +483,11 @@ export default function Dashboard() {
 
     if (!newRequest.description || !newRequest.amount || !newRequest.vendorName) {
       setFormError("All required text fields must be filled.");
+      return;
+    }
+
+    if (!newRequest.supportingDocument) {
+      setFormError("Supporting document attachment is mandatory. Please select or upload a file.");
       return;
     }
 
@@ -1632,27 +1694,74 @@ export default function Dashboard() {
                 />
               </div>
 
+              {/* Hidden File Input for Initiate Request */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: "none" }}
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.xlsx,.xls,.txt"
+                onChange={(e) => {
+                  handleFileUpload(e.target.files, false);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+              />
+
               {/* Supporting Attachments Manager */}
               <div className="form-group" style={{ margin: 0 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-                  <label className="form-label" style={{ margin: 0 }}>Supporting Documents ({newRequest.supportingDocuments.length})</label>
+                  <label className="form-label" style={{ margin: 0 }}>
+                    Supporting Documents ({newRequest.supportingDocuments.length}) <span style={{ color: "#EF4444" }}>*</span>
+                  </label>
                   <button
                     type="button"
-                    onClick={() => {
-                      const name = prompt("Enter attachment file name (e.g. hotel_folio_992.pdf):", `receipt_${Date.now().toString().slice(-4)}.pdf`);
-                      if (name) {
-                        setNewRequest({
-                          ...newRequest,
-                          supportingDocuments: [...newRequest.supportingDocuments, name],
-                          supportingDocument: name
-                        });
-                      }
-                    }}
-                    style={{ background: "none", border: "none", color: "rgb(var(--color-primary))", fontSize: "0.75rem", fontWeight: "700", cursor: "pointer" }}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{ background: "none", border: "none", color: "rgb(var(--color-primary))", fontSize: "0.75rem", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.25rem" }}
                   >
+                    <Icons.Upload size={13} />
                     + Add File
                   </button>
                 </div>
+
+                {/* Dropzone File Upload Input Area */}
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                      handleFileUpload(e.dataTransfer.files, false);
+                    }
+                  }}
+                  style={{
+                    border: "2px dashed rgba(99, 102, 241, 0.35)",
+                    borderRadius: "8px",
+                    padding: "1rem",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    background: "rgba(99, 102, 241, 0.03)",
+                    marginBottom: "0.5rem",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
+                    <Icons.UploadCloud size={22} style={{ color: "rgb(var(--color-primary))" }} />
+                    <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "rgb(var(--color-text))" }}>
+                      {isUploadingDoc ? "Uploading file in background..." : "Click or drag & drop files here to attach"}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>
+                    Supports PDF, PNG, JPG, DOCX, XLSX
+                  </span>
+                </div>
+
+                {uploadDocError && (
+                  <p style={{ color: "#EF4444", fontSize: "0.75rem", margin: "0 0 0.5rem 0" }}>{uploadDocError}</p>
+                )}
 
                 <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
                   {newRequest.supportingDocuments.map((docName, idx) => (
@@ -1671,21 +1780,22 @@ export default function Dashboard() {
                       }}
                     >
                       <Icons.Paperclip size={12} style={{ color: "rgb(var(--color-primary))" }} />
-                      <span>{docName}</span>
-                      {newRequest.supportingDocuments.length > 1 && (
-                        <Icons.X
-                          size={12}
-                          style={{ cursor: "pointer", color: "#EF4444", marginLeft: "0.2rem" }}
-                          onClick={() => {
-                            const updated = newRequest.supportingDocuments.filter((_, i) => i !== idx);
-                            setNewRequest({
-                              ...newRequest,
-                              supportingDocuments: updated,
-                              supportingDocument: updated[0] || ""
-                            });
-                          }}
-                        />
-                      )}
+                      <span style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {docName}
+                      </span>
+                      <Icons.X
+                        size={12}
+                        style={{ cursor: "pointer", color: "#EF4444", marginLeft: "0.2rem" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const updated = newRequest.supportingDocuments.filter((_, i) => i !== idx);
+                          setNewRequest({
+                            ...newRequest,
+                            supportingDocuments: updated,
+                            supportingDocument: updated[0] || ""
+                          });
+                        }}
+                      />
                     </div>
                   ))}
                 </div>
@@ -2181,28 +2291,48 @@ export default function Dashboard() {
                   />
                 </div>
 
+                {/* Hidden File Input for Resubmit Modal */}
+                <input
+                  type="file"
+                  ref={resubmitFileInputRef}
+                  style={{ display: "none" }}
+                  accept="image/*,.pdf,.doc,.docx,.xlsx,.xls,.txt"
+                  onChange={(e) => {
+                    handleFileUpload(e.target.files, true);
+                    if (resubmitFileInputRef.current) resubmitFileInputRef.current.value = "";
+                  }}
+                />
+
                 {/* Dropzone drop attachment area */}
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Drop updated receipt file here</label>
+                  <label className="form-label">Updated Receipt File Attachment</label>
                   <div
-                    onClick={() => {
-                      alert("Simulated upload. File Selected: hotel_invoice_final_paid.pdf");
-                      setResubmitForm({ ...resubmitForm, supportingDocument: "hotel_invoice_final_paid.pdf" });
+                    onClick={() => resubmitFileInputRef.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                        handleFileUpload(e.dataTransfer.files, true);
+                      }
                     }}
                     style={{
                       border: "2px dashed rgba(99, 102, 241, 0.4)",
                       borderRadius: "8px",
-                      padding: "2rem",
+                      padding: "1.5rem",
                       textAlign: "center",
                       cursor: "pointer",
                       background: "rgba(99, 102, 241, 0.02)"
                     }}
                   >
-                    <Icons.UploadCloud size={32} style={{ color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }} />
+                    <Icons.UploadCloud size={30} style={{ color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }} />
                     <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: "600", color: "rgb(var(--color-text))" }}>
-                      {resubmitForm.supportingDocument || "Click to upload merchant receipt file"}
+                      {isUploadingDoc ? "Uploading updated receipt file..." : (resubmitForm.supportingDocument || "Click or drag & drop to upload merchant receipt file")}
                     </p>
-                    <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>Supports PDF, PNG, JPG up to 10MB</span>
+                    <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>Supports PDF, PNG, JPG, DOCX up to 10MB</span>
                   </div>
                 </div>
 
