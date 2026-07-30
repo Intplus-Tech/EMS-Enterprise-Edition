@@ -50,7 +50,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
         width: "100%",
         maxWidth: "560px",
         padding: "1.75rem",
-        backgroundColor: "#1e293b",
+        backgroundColor: "rgb(var(--color-card))",
         border: "1px solid rgba(255, 255, 255, 0.1)",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
@@ -58,8 +58,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
           <div>
-            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", color: "#f8fafc" }}>Add New User</h3>
-            <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Add New User</h3>
+            <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.25rem" }}>
               Invite a new professional to the Precision Enterprise environment.
             </p>
           </div>
@@ -68,7 +68,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
             style={{
               background: "none",
               border: "none",
-              color: "#94a3b8",
+              color: "rgb(var(--color-text-muted))",
               cursor: "pointer",
               padding: "0.25rem"
             }}
@@ -98,7 +98,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
               <span style={{ fontSize: "0.65rem", fontWeight: "600", marginTop: "0.25rem" }}>Upload</span>
             </div>
             <div style={{ flexGrow: 1 }}>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Full Name
               </label>
               <input
@@ -113,7 +113,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
@@ -124,7 +124,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
           {/* Email & Contact */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Email Address
               </label>
               <input
@@ -139,14 +139,14 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Contact Number
               </label>
               <input
@@ -160,7 +160,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
@@ -171,7 +171,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
           {/* Department & Role */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Department
               </label>
               <select
@@ -183,20 +183,20 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
               >
                 {departments.map((d: any) => (
-                  <option key={d._id || d.id} value={d._id || d.id} style={{ background: "#1e293b" }}>
+                  <option key={d._id || d.id} value={d._id || d.id} style={{ background: "rgb(var(--color-card))" }}>
                     {d.name}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Role
               </label>
               <select
@@ -208,17 +208,17 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
               >
-                <option value="INITIATOR" style={{ background: "#1e293b" }}>Initiator</option>
-                <option value="APPROVER" style={{ background: "#1e293b" }}>Approver / Dept Manager</option>
-                <option value="FINANCE_OFFICER" style={{ background: "#1e293b" }}>Finance Officer</option>
-                <option value="FINANCE_MANAGER" style={{ background: "#1e293b" }}>Finance Manager</option>
-                <option value="FINANCE_HEAD" style={{ background: "#1e293b" }}>Finance Head</option>
-                <option value="ADMIN" style={{ background: "#1e293b" }}>System Admin</option>
+                <option value="INITIATOR" style={{ background: "rgb(var(--color-card))" }}>Initiator</option>
+                <option value="APPROVER" style={{ background: "rgb(var(--color-card))" }}>Approver / Dept Manager</option>
+                <option value="FINANCE_OFFICER" style={{ background: "rgb(var(--color-card))" }}>Finance Officer</option>
+                <option value="FINANCE_MANAGER" style={{ background: "rgb(var(--color-card))" }}>Finance Manager</option>
+                <option value="FINANCE_HEAD" style={{ background: "rgb(var(--color-card))" }}>Finance Head</option>
+                <option value="ADMIN" style={{ background: "rgb(var(--color-card))" }}>System Admin</option>
               </select>
             </div>
           </div>
@@ -250,7 +250,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 borderRadius: "0.5rem",
                 border: "1px solid rgba(255, 255, 255, 0.15)",
                 backgroundColor: "transparent",
-                color: "#f8fafc",
+                color: "rgb(var(--color-text))",
                 fontWeight: "600",
                 fontSize: "0.85rem",
                 cursor: "pointer"

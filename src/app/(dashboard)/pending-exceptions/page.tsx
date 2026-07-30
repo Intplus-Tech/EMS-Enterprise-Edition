@@ -7,7 +7,7 @@ import { PendingExceptionsTab } from "../../../components/PendingExceptionsTab";
 import { useDashboard } from "../DashboardProvider";
 
 export default function PendingExceptionsPage() {
-  const { currentUser, expenses, setSelectedExpense, loadDashboardData } = useDashboard();
+  const { currentUser, expenses, setSelectedExpense, expenseActions } = useDashboard();
   const [pendingExceptionSubView, setPendingExceptionSubView] = useState<"list" | "details">("list");
 
   if (currentUser?.role !== "FINANCE_HEAD") return null;
@@ -26,7 +26,7 @@ export default function PendingExceptionsPage() {
       currentUser={currentUser}
       expenses={expenses}
       setSelectedExpense={setSelectedExpense}
-      loadDashboardData={loadDashboardData}
+      actions={expenseActions}
       onBackToDashboard={() => setPendingExceptionSubView("list")}
     />
   );

@@ -2,6 +2,7 @@
 
 import React from "react";
 import * as Icons from "lucide-react";
+import { WorkflowActionType } from "../../enums/workflowActions";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
@@ -14,8 +15,8 @@ interface ExpenseDetailModalProps {
   paymentRef: string;
   setPaymentRef: (ref: string) => void;
   handleCancelRequest: (id: string) => Promise<void>;
-  handleExceptionalBudgetAction: (id: string, action: "APPROVE" | "REJECT" | "RETURN") => Promise<void>;
-  handleWorkflowAction: (id: string, action: "APPROVE" | "REJECT" | "RETURN") => Promise<void>;
+  handleExceptionalBudgetAction: (id: string, action: WorkflowActionType) => Promise<void>;
+  handleWorkflowAction: (id: string, action: WorkflowActionType) => Promise<void>;
   handleFinanceUpload: (id: string) => Promise<void>;
   handlePaymentRelease: (id: string) => Promise<void>;
 }
@@ -221,7 +222,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                         justifyContent: "center",
                         fontSize: "0.75rem",
                         fontWeight: "bold",
-                        color: step.active ? "#0f172a" : "rgb(var(--color-text-dim))"
+                        color: step.active ? "rgb(var(--color-background))" : "rgb(var(--color-text-dim))"
                       }}
                     >
                       {step.active ? "✓" : idx + 1}
@@ -257,13 +258,13 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   />
                 </div>
                 <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, "RETURN")} className="btn btn-secondary">
+                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.RETURN)} className="btn btn-secondary">
                     Return to Initiator
                   </button>
-                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, "REJECT")} className="btn btn-danger">
+                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger">
                     Reject Request
                   </button>
-                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, "APPROVE")} className="btn btn-primary" style={{ background: "rgb(var(--color-secondary))" }}>
+                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.APPROVE)} className="btn btn-primary" style={{ background: "rgb(var(--color-secondary))" }}>
                     Authorize Budget Expansion
                   </button>
                 </div>
@@ -284,13 +285,13 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   />
                 </div>
                 <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-                  <button onClick={() => handleWorkflowAction(selectedExpense._id, "RETURN")} className="btn btn-secondary">
+                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.RETURN)} className="btn btn-secondary">
                     Return to Initiator
                   </button>
-                  <button onClick={() => handleWorkflowAction(selectedExpense._id, "REJECT")} className="btn btn-danger">
+                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger">
                     Reject
                   </button>
-                  <button onClick={() => handleWorkflowAction(selectedExpense._id, "APPROVE")} className="btn btn-primary">
+                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.APPROVE)} className="btn btn-primary">
                     Approve Step
                   </button>
                 </div>

@@ -7,6 +7,7 @@ import { SystemRole } from "../../../../enums/roles";
 import { RequestStatus } from "../../../../enums/statuses";
 import { ExpenseInitiateSchema } from "../../../../validators/validation";
 import { LoggerService } from "../../../../domains/logs/logger.service";
+import { AuditAction } from "../../../../enums/auditActions";
 
 export const GET = withErrorHandling(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   await connectToDatabase();
@@ -74,7 +75,7 @@ export const PUT = withErrorHandling(async (req: NextRequest, { params }: { para
   // Log audit
   const logActor = { id: user.id, name: user.name, role: user.role };
   await LoggerService.logAudit(
-    "EXPENSE_UPDATED",
+    AuditAction.EXPENSE_UPDATED,
     `Request ${expense.requestNumber} details updated`,
     { requestId: expense._id },
     logActor

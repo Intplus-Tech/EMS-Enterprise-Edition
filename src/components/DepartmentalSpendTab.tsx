@@ -46,7 +46,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
     const item = liveDeptMap[dName];
     const remaining = Math.max(0, item.totalBudget - item.utilized);
     const percentUsed = Math.min(100, Math.round((item.utilized / item.totalBudget) * 100));
-    const colors = ["#2563EB", "#475569", "#DC2626", "#334155", "#94A3B8"];
+    const colors = ["#2563EB", "#475569", "#DC2626", "rgb(var(--color-card-border))", "#94A3B8"];
     const color = colors[idx % colors.length];
     return {
       id: `dept-${idx}`,

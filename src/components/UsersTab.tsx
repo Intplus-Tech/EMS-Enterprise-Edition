@@ -1,24 +1,28 @@
 import React from "react";
 import * as Icons from "lucide-react";
+import { AdminUserDto } from "../types/api";
+
+export interface ResendInviteInput {
+  name: string;
+  email: string;
+  role: string;
+  departmentId: string;
+}
 
 interface UsersTabProps {
   currentUser: any;
-  systemUsers: any[];
-  setInviteResult: (res: any) => void;
-  setShowInviteModal: (show: boolean) => void;
-  setInviteForm: (form: any) => void;
-  setInviteError: (err: string) => void;
-  setInviteSubmitting: (submitting: boolean) => void;
+  systemUsers: AdminUserDto[];
+  /** Opens a blank invitation dialog. */
+  onOpenInvite: () => void;
+  /** Re-issues an invitation; the page owns the request (engineering rule 1-D). */
+  onResendInvite: (input: ResendInviteInput) => void;
 }
 
 export const UsersTab: React.FC<UsersTabProps> = ({
   currentUser,
   systemUsers,
-  setInviteResult,
-  setShowInviteModal,
-  setInviteForm,
-  setInviteError,
-  setInviteSubmitting
+  onOpenInvite,
+  onResendInvite
 }) => {
   if (currentUser?.role !== "ADMIN") return null;
 
@@ -29,8 +33,8 @@ export const UsersTab: React.FC<UsersTabProps> = ({
           <h2>User & Invitation Directory</h2>
           <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.9rem" }}>Manage organization access rights and track invitation status.</p>
         </div>
-        <button 
-          onClick={() => { setInviteResult(null); setShowInviteModal(true); }} 
+        <button
+          onClick={() => onOpenInvite()}
           className="btn btn-primary"
         >
           <Icons.UserPlus size={16} /> Invite User
@@ -69,43 +73,14 @@ export const UsersTab: React.FC<UsersTabProps> = ({
                   <td>
                     {!user.isActive ? (
                       <button
-                        onClick={() => {
-                          setInviteForm({
+                        onClick={() =>
+                          onResendInvite({
                             name: user.name,
                             email: user.email,
                             role: user.role,
                             departmentId: user.department?.id || ""
-                          });
-                          
-                          const triggerResend = async () => {
-                            setInviteError("");
-                            setInviteSubmitting(true);
-                            try {
-                              const res = await fetch("/api/admin/invite", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  name: user.name,
-                                  email: user.email,
-                                  role: user.role,
-                                  departmentId: user.department?.id || ""
-                                })
-                              });
-                              const data = await res.json();
-                              if (data.success) {
-                                setInviteResult(data);
-                                setShowInviteModal(true);
-                              } else {
-                                alert(data.error || "Failed to generate link");
-                              }
-                            } catch (e) {
-                              alert("Error generating link");
-                            } finally {
-                              setInviteSubmitting(false);
-                            }
-                          };
-                          triggerResend();
-                        }}
+                          })
+                        }
                         className="btn btn-secondary"
                         style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}
                       >

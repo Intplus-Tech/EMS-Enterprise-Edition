@@ -69,7 +69,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
         width: "100%",
         maxWidth: "560px",
         padding: "1.75rem",
-        backgroundColor: "#1e293b",
+        backgroundColor: "rgb(var(--color-card))",
         border: "1px solid rgba(255, 255, 255, 0.1)",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
@@ -77,8 +77,8 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
           <div>
-            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", color: "#f8fafc" }}>Edit User Profile</h3>
-            <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Edit User Profile</h3>
+            <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.25rem" }}>
               Update identity, access roles, and permissions.
             </p>
           </div>
@@ -87,7 +87,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
             style={{
               background: "none",
               border: "none",
-              color: "#94a3b8",
+              color: "rgb(var(--color-text-muted))",
               cursor: "pointer",
               padding: "0.25rem"
             }}
@@ -121,19 +121,19 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 width: "24px",
                 height: "24px",
                 borderRadius: "50%",
-                backgroundColor: "#0f172a",
+                backgroundColor: "rgb(var(--color-background))",
                 border: "1px solid rgba(255, 255, 255, 0.2)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#94a3b8",
+                color: "rgb(var(--color-text-muted))",
                 cursor: "pointer"
               }}>
                 <Icons.Camera size={12} />
               </div>
             </div>
             <div style={{ flexGrow: 1 }}>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Full Name
               </label>
               <input
@@ -147,7 +147,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
@@ -158,7 +158,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
           {/* Email & Contact */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.25rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Email Address
               </label>
               <input
@@ -172,14 +172,14 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
               />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Contact Number
               </label>
               <input
@@ -192,7 +192,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
@@ -203,7 +203,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
           {/* Department & Role */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Department
               </label>
               <select
@@ -215,20 +215,20 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
               >
                 {departments.map((d: any) => (
-                  <option key={d._id || d.id} value={d._id || d.id} style={{ background: "#1e293b" }}>
+                  <option key={d._id || d.id} value={d._id || d.id} style={{ background: "rgb(var(--color-card))" }}>
                     {d.name}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+              <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
                 Role
               </label>
               <select
@@ -240,17 +240,17 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                   backgroundColor: "rgba(15, 23, 42, 0.6)",
                   border: "1px solid rgba(255, 255, 255, 0.12)",
                   borderRadius: "0.5rem",
-                  color: "#f8fafc",
+                  color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
                   outline: "none"
                 }}
               >
-                <option value="INITIATOR" style={{ background: "#1e293b" }}>Initiator</option>
-                <option value="APPROVER" style={{ background: "#1e293b" }}>Approver / Dept Manager</option>
-                <option value="FINANCE_OFFICER" style={{ background: "#1e293b" }}>Finance Officer</option>
-                <option value="FINANCE_MANAGER" style={{ background: "#1e293b" }}>Finance Manager</option>
-                <option value="FINANCE_HEAD" style={{ background: "#1e293b" }}>Finance Head</option>
-                <option value="ADMIN" style={{ background: "#1e293b" }}>System Admin</option>
+                <option value="INITIATOR" style={{ background: "rgb(var(--color-card))" }}>Initiator</option>
+                <option value="APPROVER" style={{ background: "rgb(var(--color-card))" }}>Approver / Dept Manager</option>
+                <option value="FINANCE_OFFICER" style={{ background: "rgb(var(--color-card))" }}>Finance Officer</option>
+                <option value="FINANCE_MANAGER" style={{ background: "rgb(var(--color-card))" }}>Finance Manager</option>
+                <option value="FINANCE_HEAD" style={{ background: "rgb(var(--color-card))" }}>Finance Head</option>
+                <option value="ADMIN" style={{ background: "rgb(var(--color-card))" }}>System Admin</option>
               </select>
             </div>
           </div>
@@ -268,7 +268,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
           }}>
             <div>
               <h4 style={{ fontSize: "0.85rem", fontWeight: "700", color: "#f87171" }}>Security & Access</h4>
-              <p style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.15rem" }}>
+              <p style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))", marginTop: "0.15rem" }}>
                 Restrict account or force password reset.
               </p>
             </div>
@@ -303,7 +303,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 borderRadius: "0.5rem",
                 border: "1px solid rgba(255, 255, 255, 0.15)",
                 backgroundColor: "transparent",
-                color: "#f8fafc",
+                color: "rgb(var(--color-text))",
                 fontWeight: "600",
                 fontSize: "0.85rem",
                 cursor: "pointer"

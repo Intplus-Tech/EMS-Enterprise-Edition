@@ -1,7 +1,12 @@
 "use client";
 
+/**
+ * Approvals route. Supplies the tab with data and workflow callbacks; the tab
+ * itself performs no I/O (engineering rule 1-D).
+ */
 import { ApprovalsTab } from "../../../components/ApprovalsTab";
 import { useDashboard } from "../DashboardProvider";
+import { SystemRole } from "../../../enums/roles";
 
 export default function ApprovalsPage() {
   const {
@@ -11,10 +16,12 @@ export default function ApprovalsPage() {
     approvalDatePicker, setApprovalDatePicker,
     amountSearchQuery, setAmountSearchQuery,
     selectedExpense, setSelectedExpense,
-    loadDashboardData,
+    expenseActions,
+    setAdminNotice,
   } = useDashboard();
 
-  if (currentUser?.role === "FINANCE_HEAD") return null;
+  // Finance Head reviews exceptions on its own route, not the approvals queue.
+  if (currentUser?.role === SystemRole.FINANCE_HEAD) return null;
 
   return (
     <ApprovalsTab
@@ -28,7 +35,8 @@ export default function ApprovalsPage() {
       setAmountSearchQuery={setAmountSearchQuery}
       setSelectedExpense={setSelectedExpense}
       selectedExpense={selectedExpense}
-      loadDashboardData={loadDashboardData}
+      actions={expenseActions}
+      onNotify={setAdminNotice}
     />
   );
 }

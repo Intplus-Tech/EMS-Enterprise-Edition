@@ -7,6 +7,7 @@ import { authenticate } from "../../../../middlewares/auth";
 import { withErrorHandling } from "../../../../middlewares/errors";
 import { WorkflowConfigUpdateSchema } from "../../../../validators/validation";
 import { SystemRole } from "../../../../enums/roles";
+import { AuditAction } from "../../../../enums/auditActions";
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   await connectToDatabase();
@@ -34,7 +35,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   const logActor = { id: user.id, name: user.name, role: user.role };
   await LoggerService.logAudit(
-    "WORKFLOW_CONFIG_UPDATED",
+    AuditAction.WORKFLOW_CONFIG_UPDATED,
     `Admin ${user.name} modified the dynamic approval workflow configuration`,
     { steps: config.steps },
     logActor

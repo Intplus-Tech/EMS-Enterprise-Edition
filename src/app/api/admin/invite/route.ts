@@ -9,6 +9,7 @@ import { withErrorHandling } from "../../../../middlewares/errors";
 import { EmailService } from "../../../../domains/email/email.service";
 import { LoggerService } from "../../../../domains/logs/logger.service";
 import { AuthService } from "../../../../domains/auth/auth.service";
+import { AuditAction } from "../../../../enums/auditActions";
 
 export const POST = withErrorHandling(async (req: NextRequest) => {
   await connectToDatabase();
@@ -48,7 +49,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
 
       await LoggerService.logAudit(
-        "USER_RE_INVITED",
+        AuditAction.USER_RE_INVITED,
         `User invitation re-sent for ${name} (${email}) as ${role}`,
         { email, role },
         { id: actor.id, name: actor.name, role: actor.role }
@@ -95,7 +96,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   // 7. Log audit entry
   await LoggerService.logAudit(
-    "USER_INVITED",
+    AuditAction.USER_INVITED,
     `User ${name} (${email}) invited as ${role} by ${actor.name}`,
     { email, role },
     { id: actor.id, name: actor.name, role: actor.role }

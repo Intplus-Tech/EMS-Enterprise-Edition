@@ -3,6 +3,7 @@ import { connectToDatabase } from "../../../../../config/db";
 import { ExpenseRequest } from "../../../../../models/ExpenseRequest";
 import { BudgetService } from "../../../../../domains/budget/budget.service";
 import { LoggerService } from "../../../../../domains/logs/logger.service";
+import { AuditAction } from "../../../../../enums/auditActions";
 import { authenticate } from "../../../../../middlewares/auth";
 import { withErrorHandling } from "../../../../../middlewares/errors";
 import { SystemRole } from "../../../../../enums/roles";
@@ -66,7 +67,7 @@ export const POST = withErrorHandling(async (req: NextRequest, { params }: { par
   // Log audit trail
   const logActor = { id: user.id, name: user.name, role: user.role };
   await LoggerService.logAudit(
-    "EXPENSE_CANCELLED",
+    AuditAction.EXPENSE_CANCELLED,
     `Request ${expense.requestNumber} was withdrawn by initiator`,
     { requestId: expense._id, previousStatus },
     logActor

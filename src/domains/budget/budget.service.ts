@@ -2,9 +2,15 @@ import { connectToDatabase } from "../../config/db";
 import { BudgetPeriod } from "../../models/BudgetPeriod";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
 import { Department } from "../../models/Department";
-import { LoggerService } from "../logs/logger.service";
-import { SystemRole } from "../../enums/roles";
+import { LoggerService, ILogActor } from "../logs/logger.service";
+import { AuditAction } from "../../enums/auditActions";
 import { RequestStatus } from "../../enums/statuses";
+import { IBudgetLineItem } from "../../types/domain";
+import { BudgetPeriodDto, DepartmentSpendDto } from "../../types/api";
+
+/** Amounts in log lines and validation messages are Naira, matching the UI. */
+const NAIRA = "₦";
+const money = (amount: number) => `${NAIRA}${Number(amount || 0).toLocaleString()}`;
 
 export class BudgetService {
   /**
@@ -54,7 +60,7 @@ export class BudgetService {
       isValid: false,
       remaining: availableBudget,
       periodName: period.periodName,
-      message: `Insufficient budget available. Required: $${amount.toFixed(2)}, Available: $${availableBudget.toFixed(2)}.`
+      message: `Insufficient budget available. Required: ${money(amount)}, Available: ${money(availableBudget)}.`
     };
   }
 
@@ -76,10 +82,10 @@ export class BudgetService {
 
     period.pendingBudget += request.amount;
     await period.save();
-    
+
     await LoggerService.logApp(
-      "BUDGET_LOCKED", 
-      `Locked $${request.amount.toFixed(2)} in pending budget for period ${period.periodName} for request ${request.requestNumber}`
+      AuditAction.BUDGET_LOCKED,
+      `Locked ${money(request.amount)} in pending budget for period ${period.periodName} for request ${request.requestNumber}`
     );
   }
 
@@ -97,10 +103,10 @@ export class BudgetService {
 
     period.pendingBudget = Math.max(0, period.pendingBudget - request.amount);
     await period.save();
-    
+
     await LoggerService.logApp(
-      "BUDGET_UNLOCKED", 
-      `Unlocked $${request.amount.toFixed(2)} from pending budget for period ${period.periodName} for request ${request.requestNumber}`
+      AuditAction.BUDGET_UNLOCKED,
+      `Unlocked ${money(request.amount)} from pending budget for period ${period.periodName} for request ${request.requestNumber}`
     );
   }
 
@@ -122,57 +128,167 @@ export class BudgetService {
     await period.save();
     
     await LoggerService.logAudit(
-      "BUDGET_COMMITTED",
-      `Committed $${request.amount.toFixed(2)} to utilised budget for department. Period: ${period.periodName}. Request: ${request.requestNumber}`
+      AuditAction.BUDGET_COMMITTED,
+      `Committed ${money(request.amount)} to utilised budget for department. Period: ${period.periodName}. Request: ${request.requestNumber}`
     );
   }
 
   /**
-   * Calculates departmental spend metrics across all registered departments
+   * Calculates departmental spend metrics across all registered departments.
+   *
+   * Reports only what is configured: a department with no budget period returns
+   * zeroes and `hasBudget: false` so the oversight screens can prompt an admin
+   * to set one. It previously invented a ₦250,000 allocation, which made an
+   * unconfigured department indistinguishable from a funded one.
    */
-  public static async getDepartmentalSpendSummaries() {
+  public static async getDepartmentalSpendSummaries(): Promise<DepartmentSpendDto[]> {
     await connectToDatabase();
-    
+
     const departments = await Department.find({}).sort({ name: 1 });
-    const summaries = await Promise.all(
+
+    return Promise.all(
       departments.map(async (dept) => {
-        const periods = await BudgetPeriod.find({ departmentId: dept._id });
+        const [periods, requests] = await Promise.all([
+          BudgetPeriod.find({ departmentId: dept._id }),
+          ExpenseRequest.find({ departmentId: dept._id }).populate("initiatorId", "name"),
+        ]);
+
         const totalBudget = periods.reduce((sum, p) => sum + (p.totalBudget || 0), 0);
         const utilised = periods.reduce((sum, p) => sum + (p.utilisedBudget || 0), 0);
         const pending = periods.reduce((sum, p) => sum + (p.pendingBudget || 0), 0);
-        const totalCommitted = utilised + pending;
-        const remaining = Math.max(0, totalBudget - totalCommitted);
-        const pctUsed = totalBudget > 0 ? Math.min(100, Math.round((totalCommitted / totalBudget) * 1000) / 10) : 0;
+        const committed = utilised + pending;
+        const remaining = Math.max(0, totalBudget - committed);
+        const pctUsed =
+          totalBudget > 0 ? Math.min(100, Math.round((committed / totalBudget) * 1000) / 10) : 0;
 
-        const requests = await ExpenseRequest.find({ departmentId: dept._id }).populate("initiatorId");
-        const overBudgetCount = requests.filter(r => r.status === RequestStatus.INSUFFICIENT_BUDGET || r.status === RequestStatus.PENDING_EXCEPTIONAL || r.exceptionalBudgetApproved).length;
+        const overBudgetCount = requests.filter(
+          (r) =>
+            r.status === RequestStatus.INSUFFICIENT_BUDGET ||
+            r.status === RequestStatus.PENDING_EXCEPTIONAL ||
+            r.exceptionalBudgetApproved
+        ).length;
 
-        const userSpendMap: Record<string, { name: string; amount: number }> = {};
-        requests.forEach(r => {
-          const name = (r.initiatorId as any)?.name || "Staff Member";
-          if (!userSpendMap[name]) userSpendMap[name] = { name, amount: 0 };
-          userSpendMap[name].amount += r.amount;
+        // Highest-spending initiator, shown on the departmental oversight card.
+        const spendByRequester = new Map<string, number>();
+        requests.forEach((r) => {
+          const name = (r.initiatorId as { name?: string } | null)?.name;
+          if (!name) return;
+          spendByRequester.set(name, (spendByRequester.get(name) ?? 0) + r.amount);
         });
-        const topRequester = Object.values(userSpendMap).sort((a, b) => b.amount - a.amount)[0]?.name || "N/A";
+        const topRequester =
+          [...spendByRequester.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "N/A";
 
         return {
           id: dept._id.toString(),
           name: dept.name,
-          dept: dept.name,
           description: dept.description || "",
-          totalBudget: totalBudget > 0 ? totalBudget : 250000,
-          utilized: utilised,
+          totalBudget,
           utilised,
           pending,
-          remaining: totalBudget > 0 ? remaining : 250000 - utilised,
-          pctUsed: pctUsed > 0 ? pctUsed : (totalBudget > 0 ? 0 : Math.round((utilised / 250000) * 100)),
+          remaining,
+          pctUsed,
           topRequester,
           overBudgetCount,
-          isActive: true
+          hasBudget: periods.length > 0,
+          isActive: dept.isActive !== false,
         };
       })
     );
+  }
 
-    return summaries;
+  /** Every configured budget period, for the Admin budget management screens. */
+  public static async listPeriods(): Promise<BudgetPeriodDto[]> {
+    await connectToDatabase();
+
+    const periods = await BudgetPeriod.find({})
+      .populate("departmentId", "name")
+      .sort({ startDate: -1 });
+
+    return periods.map((p) => ({
+      id: p._id.toString(),
+      departmentId: p.departmentId?._id?.toString() ?? String(p.departmentId),
+      departmentName: (p.departmentId as { name?: string } | null)?.name ?? "Unknown",
+      periodName: p.periodName,
+      totalBudget: p.totalBudget,
+      utilisedBudget: p.utilisedBudget,
+      pendingBudget: p.pendingBudget,
+      availableBudget: p.totalBudget - p.utilisedBudget - p.pendingBudget,
+      lineItems: (p.lineItems ?? []).map((item: IBudgetLineItem) => ({
+        name: item.name,
+        description: item.description,
+        amount: item.amount,
+      })),
+      startDate: p.startDate.toISOString(),
+      endDate: p.endDate.toISOString(),
+    }));
+  }
+
+  /**
+   * Creates or replaces a department's allocation for a period.
+   *
+   * Upserts on (departmentId, periodName) to match the schema's compound unique
+   * index, so re-saving the Set Budget modal adjusts the existing period rather
+   * than failing on a duplicate key. `utilisedBudget` / `pendingBudget` are
+   * never touched here — they are ledger state owned by the workflow.
+   */
+  public static async upsertBudgetPeriod(
+    data: {
+      departmentId: string;
+      periodName: string;
+      totalBudget: number;
+      lineItems?: IBudgetLineItem[];
+      startDate: string | Date;
+      endDate: string | Date;
+    },
+    actor: ILogActor
+  ) {
+    await connectToDatabase();
+
+    const department = await Department.findById(data.departmentId);
+    if (!department) throw new Error("Department not found");
+
+    const startDate = new Date(data.startDate);
+    const endDate = new Date(data.endDate);
+    if (endDate <= startDate) {
+      throw new Error("Invalid request: the period end date must fall after the start date.");
+    }
+
+    const existing = await BudgetPeriod.findOne({
+      departmentId: data.departmentId,
+      periodName: data.periodName,
+    });
+
+    // Refuse to shrink an allocation below what is already spent or locked —
+    // that would render the period permanently over-committed.
+    if (existing) {
+      const committed = existing.utilisedBudget + existing.pendingBudget;
+      if (data.totalBudget < committed) {
+        throw new Error(
+          `Invalid request: ${money(committed)} is already utilised or locked in '${data.periodName}'. The allocation cannot be set below that.`
+        );
+      }
+    }
+
+    const period = await BudgetPeriod.findOneAndUpdate(
+      { departmentId: data.departmentId, periodName: data.periodName },
+      {
+        departmentId: data.departmentId,
+        periodName: data.periodName,
+        totalBudget: data.totalBudget,
+        lineItems: data.lineItems ?? [],
+        startDate,
+        endDate,
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    await LoggerService.logAudit(
+      existing ? AuditAction.BUDGET_PERIOD_UPDATED : AuditAction.BUDGET_PERIOD_CREATED,
+      `Budget for '${department.name}' period '${data.periodName}' set to ${money(data.totalBudget)}`,
+      { departmentId: data.departmentId, periodName: data.periodName, totalBudget: data.totalBudget },
+      actor
+    );
+
+    return period;
   }
 }

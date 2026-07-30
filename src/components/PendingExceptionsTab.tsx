@@ -3,12 +3,14 @@ import * as Icons from "lucide-react";
 import { RequestJustificationModal } from "./RequestJustificationModal";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
+import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
 
 interface PendingExceptionsTabProps {
   currentUser?: any;
   expenses?: any[];
   setSelectedExpense?: (expense: any) => void;
-  loadDashboardData?: (user: any) => Promise<void>;
+  /** Budget-expansion operations injected by the page; no I/O happens here. */
+  actions: ExpenseActions;
   onBackToDashboard?: () => void;
 }
 
@@ -16,7 +18,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   currentUser,
   expenses = [],
   setSelectedExpense,
-  loadDashboardData,
+  actions,
   onBackToDashboard
 }) => {
   const [showJustificationModal, setShowJustificationModal] = useState(false);
@@ -365,7 +367,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                         </span>
                       </div>
 
-                      <p style={{ fontSize: "0.875rem", fontStyle: "italic", color: item.isOverbudget ? "#991B1B" : "#334155", margin: 0, lineHeight: 1.5, fontWeight: item.isOverbudget ? "600" : "normal" }}>
+                      <p style={{ fontSize: "0.875rem", fontStyle: "italic", color: item.isOverbudget ? "#991B1B" : "rgb(var(--color-card-border))", margin: 0, lineHeight: 1.5, fontWeight: item.isOverbudget ? "600" : "normal" }}>
                         {item.comment}
                       </p>
                     </div>
@@ -528,7 +530,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               fontWeight: "600",
               border: "1px solid #CBD5E1",
               background: "#FFFFFF",
-              color: "#334155",
+              color: "rgb(var(--color-card-border))",
               cursor: "pointer"
             }}
           >
@@ -593,26 +595,12 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         remainingBudget={budgetContext.remaining}
         deficitAmount={budgetContext.criticalGap}
         onConfirm={async (notes) => {
-          const targetExp = expenses?.find(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET") || expenses?.[0];
-          if (targetExp && targetExp._id && !targetExp._id.startsWith("exc-")) {
-            try {
-              const res = await fetch(`/api/expenses/${targetExp._id}/exceptional`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "APPROVE", comment: notes })
-              });
-              const data = await res.json();
-              if (!data.success) {
-                alert(data.error || "Failed to authorize budget expansion.");
-                return;
-              }
-            } catch (err) {
-              console.error(err);
-            }
+          if (!targetExp?._id) return;
+          // Only close on a confirmed save — the previous version reported
+          // success even when the request had failed.
+          if (await actions.approveExpansion(targetExp._id, notes)) {
+            setShowApproveModal(false);
           }
-          alert("One-Time Budget Expansion Authorized successfully!");
-          setShowApproveModal(false);
-          if (loadDashboardData && currentUser) await loadDashboardData(currentUser);
         }}
       />
 
@@ -624,26 +612,10 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         remainingBudget={budgetContext.remaining}
         deficitAmount={budgetContext.criticalGap}
         onConfirm={async (reason) => {
-          const targetExp = expenses?.find(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET") || expenses?.[0];
-          if (targetExp && targetExp._id && !targetExp._id.startsWith("exc-")) {
-            try {
-              const res = await fetch(`/api/expenses/${targetExp._id}/exceptional`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "REJECT", comment: reason })
-              });
-              const data = await res.json();
-              if (!data.success) {
-                alert(data.error || "Failed to reject budget expansion.");
-                return;
-              }
-            } catch (err) {
-              console.error(err);
-            }
+          if (!targetExp?._id) return;
+          if (await actions.rejectExpansion(targetExp._id, reason)) {
+            setShowRejectModal(false);
           }
-          alert("Budget Expansion Request Rejected successfully.");
-          setShowRejectModal(false);
-          if (loadDashboardData && currentUser) await loadDashboardData(currentUser);
         }}
       />
     </div>

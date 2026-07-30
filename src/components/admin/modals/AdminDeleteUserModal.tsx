@@ -41,7 +41,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
         width: "100%",
         maxWidth: "500px",
         padding: "1.75rem",
-        backgroundColor: "#1e293b",
+        backgroundColor: "rgb(var(--color-card))",
         border: "1px solid rgba(255, 255, 255, 0.1)",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
@@ -62,14 +62,14 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
             <Icons.AlertTriangle size={22} />
           </div>
           <div style={{ flexGrow: 1 }}>
-            <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "#f8fafc" }}>
+            <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
               Delete User Account
             </h3>
-            <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem", lineHeight: "1.4" }}>
-              This action is permanent and will remove <strong style={{ color: "#f8fafc" }}>{userName}</strong> from all active workflows. Historical audit logs will be preserved.
+            <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.25rem", lineHeight: "1.4" }}>
+              This action is permanent and will remove <strong style={{ color: "rgb(var(--color-text))" }}>{userName}</strong> from all active workflows. Historical audit logs will be preserved.
             </p>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer" }}>
             <Icons.X size={18} />
           </button>
         </div>
@@ -86,7 +86,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
             <Icons.Info size={14} />
             IMPACT ASSESSMENT
           </div>
-          <ul style={{ fontSize: "0.8rem", color: "#cbd5e1", paddingLeft: "1.25rem", lineHeight: "1.5" }}>
+          <ul style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))", paddingLeft: "1.25rem", lineHeight: "1.5" }}>
             <li style={{ marginBottom: "0.3rem" }}>3 pending approvals will be cancelled</li>
             <li style={{ marginBottom: "0.3rem" }}>Access to "Corporate Q3 Budget" workflow will be revoked immediately.</li>
             <li>Assigned hardware assets will be flagged for recovery.</li>
@@ -109,7 +109,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
             onChange={(e) => setConfirmed(e.target.checked)}
             style={{ cursor: "pointer" }}
           />
-          <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>
+          <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>
             I understand that this action cannot be undone.
           </span>
         </div>
@@ -124,7 +124,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
               borderRadius: "0.5rem",
               border: "1px solid rgba(255, 255, 255, 0.15)",
               backgroundColor: "transparent",
-              color: "#f8fafc",
+              color: "rgb(var(--color-text))",
               fontWeight: "600",
               fontSize: "0.85rem",
               cursor: "pointer"
@@ -140,7 +140,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
               border: "none",
-              backgroundColor: confirmed ? "#f87171" : "#64748b",
+              backgroundColor: confirmed ? "#f87171" : "rgb(var(--color-text-dim))",
               color: "#ffffff",
               fontWeight: "600",
               fontSize: "0.85rem",

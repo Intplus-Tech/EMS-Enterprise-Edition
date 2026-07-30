@@ -7,6 +7,19 @@ const BudgetPeriodSchema = new Schema(
     totalBudget: { type: Number, required: true, default: 0 },
     utilisedBudget: { type: Number, required: true, default: 0 },
     pendingBudget: { type: Number, required: true, default: 0 }, // Locked for in-flight requests
+    // Allocation breakdown shown in the Set Budget / Add Item modals. The sum of
+    // these drives totalBudget, but totalBudget is stored so historical periods
+    // stay accurate if a line item is later removed.
+    lineItems: {
+      type: [
+        {
+          name: { type: String, required: true },
+          description: { type: String },
+          amount: { type: Number, required: true, default: 0 },
+        },
+      ],
+      default: [],
+    },
     startDate: { type: Date, required: true },
     endDate: { type: Date, required: true },
   },

@@ -1,8 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LoggerService } from "../domains/logs/logger.service";
-import { SystemRole } from "../enums/roles";
+import { AuditAction } from "../enums/auditActions";
 
 type ApiHandler = (req: NextRequest, params?: any) => Promise<NextResponse>;
+
+/**
+ * Turns a ZodError into one readable sentence for the UI's error banner.
+ * Raw Zod output is a nested array the forms cannot render, so callers were
+ * previously left showing the useless literal "Invalid input".
+ */
+function summariseZodError(error: any): string {
+  const issues: any[] = error.issues ?? error.errors ?? [];
+  if (issues.length === 0) return "Invalid request payload.";
+
+  return issues
+    .map((issue) => {
+      const field = Array.isArray(issue.path) ? issue.path.join(".") : "";
+      return field ? `${field}: ${issue.message}` : issue.message;
+    })
+    .join("; ");
+}
 
 /**
  * Higher-Order Function wrapper to handle exceptions cleanly in API routes.
@@ -14,6 +31,7 @@ export function withErrorHandling(handler: ApiHandler): ApiHandler {
       return await handler(req, params);
     } catch (error: any) {
       const errorMessage = error.message || "An unexpected system error occurred";
+      const isZodError = error.name === "ZodError";
       let statusCode = 500;
 
       // Determine status code based on common error patterns
@@ -28,7 +46,7 @@ export function withErrorHandling(handler: ApiHandler): ApiHandler {
         errorMessage.includes("Invalid") || 
         errorMessage.includes("exceeds") ||
         errorMessage.includes("Must") ||
-        error.name === "ZodError"
+        isZodError
       ) {
         statusCode = 400;
       }
@@ -38,7 +56,7 @@ export function withErrorHandling(handler: ApiHandler): ApiHandler {
       const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
       
       await LoggerService.logException(
-        "API_ROUTE_ERROR",
+        AuditAction.API_ROUTE_ERROR,
         `Error in API [${req.method}] ${req.nextUrl.pathname}: ${errorMessage}`,
         error,
         { ipAddress: ip }
@@ -47,8 +65,10 @@ export function withErrorHandling(handler: ApiHandler): ApiHandler {
       return NextResponse.json(
         {
           success: false,
-          error: errorMessage,
-          details: error.name === "ZodError" ? error.errors : undefined
+          // Zod v4 renamed `.errors` to `.issues`; both are read so the field
+          // survives a future major bump rather than silently going undefined.
+          error: isZodError ? summariseZodError(error) : errorMessage,
+          details: isZodError ? error.issues ?? error.errors : undefined
         },
         { status: statusCode }
       );

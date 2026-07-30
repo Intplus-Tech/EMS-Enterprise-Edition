@@ -41,7 +41,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
         width: "100%",
         maxWidth: "520px",
         padding: "1.75rem",
-        backgroundColor: "#1e293b",
+        backgroundColor: "rgb(var(--color-card))",
         border: "1px solid rgba(255, 255, 255, 0.1)",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
@@ -62,14 +62,14 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
             <Icons.AlertTriangle size={22} />
           </div>
           <div style={{ flexGrow: 1 }}>
-            <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "#f8fafc" }}>
+            <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
               Delete '{deptName}'?
             </h3>
-            <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+            <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.2rem" }}>
               This action is permanent and cannot be reversed.
             </p>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer" }}>
             <Icons.X size={18} />
           </button>
         </div>
@@ -115,10 +115,10 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
             style={{ marginTop: "3px", cursor: "pointer" }}
           />
           <div>
-            <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#f8fafc" }}>
+            <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
               I understand that this action is permanent
             </div>
-            <div style={{ fontSize: "0.78rem", color: "#94a3b8", marginTop: "0.15rem", lineHeight: "1.35" }}>
+            <div style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))", marginTop: "0.15rem", lineHeight: "1.35" }}>
               I acknowledge that all department history will be archived and cannot be managed through the active dashboard.
             </div>
           </div>
@@ -134,7 +134,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
               borderRadius: "0.5rem",
               border: "1px solid rgba(255, 255, 255, 0.15)",
               backgroundColor: "transparent",
-              color: "#f8fafc",
+              color: "rgb(var(--color-text))",
               fontWeight: "600",
               fontSize: "0.85rem",
               cursor: "pointer"
@@ -150,7 +150,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
               border: "none",
-              backgroundColor: confirmed ? "#ef4444" : "#64748b",
+              backgroundColor: confirmed ? "#ef4444" : "rgb(var(--color-text-dim))",
               color: "#ffffff",
               fontWeight: "600",
               fontSize: "0.85rem",

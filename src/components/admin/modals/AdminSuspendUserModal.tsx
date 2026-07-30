@@ -40,7 +40,7 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
         width: "100%",
         maxWidth: "480px",
         padding: "1.75rem",
-        backgroundColor: "#1e293b",
+        backgroundColor: "rgb(var(--color-card))",
         border: "1px solid rgba(255, 255, 255, 0.1)",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
@@ -61,14 +61,14 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
             <Icons.Lock size={22} />
           </div>
           <div style={{ flexGrow: 1 }}>
-            <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "#f8fafc" }}>
+            <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
               Suspend User Access
             </h3>
-            <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.2rem" }}>
+            <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.2rem" }}>
               Confirm security action
             </p>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer" }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer" }}>
             <Icons.X size={18} />
           </button>
         </div>
@@ -100,7 +100,7 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
             {initials}
           </div>
           <div>
-            <div style={{ fontSize: "0.9rem", fontWeight: "700", color: "#f8fafc" }}>
+            <div style={{ fontSize: "0.9rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
               {userName}
             </div>
             <div style={{ fontSize: "0.8rem", color: "#93c5fd", marginTop: "0.2rem", lineHeight: "1.4" }}>
@@ -136,7 +136,7 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
               borderRadius: "0.5rem",
               border: "1px solid rgba(255, 255, 255, 0.15)",
               backgroundColor: "transparent",
-              color: "#f8fafc",
+              color: "rgb(var(--color-text))",
               fontWeight: "600",
               fontSize: "0.85rem",
               cursor: "pointer"

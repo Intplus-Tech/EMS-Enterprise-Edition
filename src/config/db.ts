@@ -8,6 +8,7 @@ import "../models/BudgetPeriod";
 import "../models/ExpenseRequest";
 import "../models/Log";
 import "../models/WorkflowConfig";
+import "../models/RolePermission";
 
 const MONGODB_URI = ENV.MONGODB_URI;
 

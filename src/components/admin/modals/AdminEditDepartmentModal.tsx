@@ -31,13 +31,6 @@ interface AdminEditDepartmentModalProps {
 // Utilisation at or above this share is flagged so admins can react before an overrun.
 const AT_RISK_THRESHOLD = 85;
 
-// Fallback allocation lines keep the breakdown legible before budget data is seeded.
-const FALLBACK_LINES: BudgetLine[] = [
-  { category: "Hardware & Infrastructure", amount: 18500000, utilization: 75 },
-  { category: "Software Subscriptions", amount: 12000000, utilization: 92 },
-  { category: "Training & Development", amount: 8500000, utilization: 40 },
-];
-
 export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> = ({
   isOpen,
   onClose,
@@ -57,17 +50,23 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
     if (department) {
       setDeptName(department.name || "");
       setHead(department.head || department.headName || "");
-      setTotalBudget(department.totalBudget || department.budget || 250000);
-      setLines(department.budgetItems?.length ? department.budgetItems : FALLBACK_LINES);
+      // Show what is actually allocated. Placeholder figures (a ₦250,000 budget
+      // and three invented allocation lines) previously made an unconfigured
+      // department look funded, and saving would have persisted the fiction.
+      setTotalBudget(department.totalBudget ?? 0);
+      setLines(department.budgetItems ?? []);
       setUserSearch("");
     }
   }, [department]);
 
   if (!isOpen || !department) return null;
 
-  const roster: any[] = users || department.members || [];
+  // Only staff assigned to this department belong on its roster.
+  const roster: any[] = (users || department.members || []).filter(
+    (u: any) => !u.department || u.department.id === (department.id || department._id)
+  );
   const headcount = department.usersCount ?? roster.length;
-  const spentToDate = department.utilized || 0;
+  const spentToDate = department.utilised ?? department.utilized ?? 0;
 
   // Head list falls back to the roster so the select is never empty in demo data.
   const headOptions: string[] = departmentHeads?.length

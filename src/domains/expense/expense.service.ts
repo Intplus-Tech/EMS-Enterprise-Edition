@@ -7,6 +7,8 @@ import { LoggerService } from "../logs/logger.service";
 import { EmailService } from "../email/email.service";
 import { RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
+import { AuditAction } from "../../enums/auditActions";
+import { WorkflowActionType } from "../../enums/workflowActions";
 import { IUser } from "../../types";
 
 const getActorId = (actor: any): string => {
@@ -15,14 +17,38 @@ const getActorId = (actor: any): string => {
 
 export class ExpenseService {
   /**
-   * Helper to generate a unique request number, e.g. EXP-2026-0001
+   * Generates a unique request number, e.g. EXP-2026-0001.
+   *
+   * Derives the sequence from the highest existing number for the year rather
+   * than a document count: counting collides whenever two requests are created
+   * concurrently, and `requestNumber` carries a unique index, so one of the two
+   * submissions used to fail with a duplicate-key error. The retry loop closes
+   * the remaining race between reading the max and inserting.
    */
-  private static async generateRequestNumber(): Promise<string> {
+  private static async generateRequestNumber(attempt = 0): Promise<string> {
     await connectToDatabase();
     const year = new Date().getFullYear();
-    const count = await ExpenseRequest.countDocuments();
-    const sequence = String(count + 1).padStart(4, '0');
-    return `EXP-${year}-${sequence}`;
+    const prefix = `EXP-${year}-`;
+
+    const latest = await ExpenseRequest.findOne({ requestNumber: { $regex: `^${prefix}` } })
+      .sort({ requestNumber: -1 })
+      .select("requestNumber")
+      .lean();
+
+    const lastSequence = latest ? Number(latest.requestNumber.slice(prefix.length)) || 0 : 0;
+    const candidate = `${prefix}${String(lastSequence + 1 + attempt).padStart(4, "0")}`;
+
+    // A parallel request may have claimed this number between the read above and
+    // our insert; step forward until we find a free one.
+    const taken = await ExpenseRequest.exists({ requestNumber: candidate });
+    if (taken) {
+      if (attempt > 25) {
+        throw new Error("Unable to allocate a unique request number. Please retry.");
+      }
+      return this.generateRequestNumber(attempt + 1);
+    }
+
+    return candidate;
   }
 
   /**
@@ -87,8 +113,8 @@ export class ExpenseService {
     
     const logActor = { id: actorId, name: actor.name, role: actor.role };
     await LoggerService.logAudit(
-      "EXPENSE_CREATED",
-      `Draft request ${requestNumber} created for $${request.amount.toFixed(2)}`,
+      AuditAction.EXPENSE_CREATED,
+      `Draft request ${requestNumber} created for ₦${request.amount.toLocaleString()}`,
       { requestId: request._id },
       logActor
     );
@@ -157,7 +183,7 @@ export class ExpenseService {
         
         await request.save();
         await LoggerService.logAudit(
-          "EXPENSE_SUBMITTED_APPROVED_BUDGET",
+          AuditAction.EXPENSE_SUBMITTED_APPROVED_BUDGET,
           `Request ${request.requestNumber} passed budget check and routed to ${nextRouting.step.stepName}`,
           undefined,
           logActor
@@ -183,7 +209,7 @@ export class ExpenseService {
       await request.save();
       
       await LoggerService.logAudit(
-        "BUDGET_OVERRUN",
+        AuditAction.BUDGET_OVERRUN,
         `Request ${request.requestNumber} triggered a budget overrun alert. Flagged: PENDING_EXCEPTIONAL`,
         { budgetCheck },
         logActor
@@ -196,7 +222,7 @@ export class ExpenseService {
   /**
    * Processes exceptional budget approval from Finance Head
    */
-  public static async processExceptionalBudget(requestId: string, actor: IUser, action: "APPROVE" | "REJECT" | "RETURN", comment?: string, adjustedAmount?: number) {
+  public static async processExceptionalBudget(requestId: string, actor: IUser, action: WorkflowActionType, comment?: string, adjustedAmount?: number) {
     await connectToDatabase();
     if (actor.role !== SystemRole.FINANCE_HEAD) {
       throw new Error("Only the Finance Head can perform exceptional budget actions.");
@@ -212,7 +238,7 @@ export class ExpenseService {
     const actorId = getActorId(actor);
     const logActor = { id: actorId, name: actor.name, role: actor.role };
 
-    if (action === "APPROVE") {
+    if (action === WorkflowActionType.APPROVE) {
       request.exceptionalBudgetApproved = true;
       request.exceptionalApprovedBy = actorId as any;
       
@@ -241,12 +267,12 @@ export class ExpenseService {
       
       await request.save();
       await LoggerService.logAudit(
-        "EXCEPTIONAL_BUDGET_APPROVED",
+        AuditAction.EXCEPTIONAL_BUDGET_APPROVED,
         `Finance Head approved exceptional budget expansion for request ${request.requestNumber}`,
         { comment, amount: request.amount },
         logActor
       );
-    } else if (action === "REJECT") {
+    } else if (action === WorkflowActionType.REJECT) {
       request.status = RequestStatus.REJECTED;
       request.history.push({
         statusBefore: previousStatus,
@@ -261,7 +287,7 @@ export class ExpenseService {
       
       await request.save();
       await LoggerService.logAudit(
-        "EXCEPTIONAL_BUDGET_REJECTED",
+        AuditAction.EXCEPTIONAL_BUDGET_REJECTED,
         `Finance Head rejected budget expansion for request ${request.requestNumber}`,
         { comment },
         logActor
@@ -282,7 +308,7 @@ export class ExpenseService {
       
       await request.save();
       await LoggerService.logAudit(
-        "EXCEPTIONAL_BUDGET_RETURNED",
+        AuditAction.EXCEPTIONAL_BUDGET_RETURNED,
         `Finance Head returned request ${request.requestNumber} for budget correction`,
         { comment },
         logActor
@@ -295,7 +321,7 @@ export class ExpenseService {
   /**
    * Processes a standard workflow step action (Approve, Reject, Return) by an approver
    */
-  public static async processWorkflowAction(requestId: string, actor: IUser, action: "APPROVE" | "REJECT" | "RETURN", comment?: string) {
+  public static async processWorkflowAction(requestId: string, actor: IUser, action: WorkflowActionType, comment?: string) {
     await connectToDatabase();
     
     const request = await ExpenseRequest.findById(requestId);
@@ -319,7 +345,7 @@ export class ExpenseService {
     const actorId = getActorId(actor);
     const logActor = { id: actorId, name: actor.name, role: actor.role };
 
-    if (action === "APPROVE") {
+    if (action === WorkflowActionType.APPROVE) {
       // Look up next step in the sequence
       request.currentStepIndex = nextRouting.index + 1;
       const nextStep = await WorkflowService.getNextStepForRequest(request);
@@ -339,7 +365,7 @@ export class ExpenseService {
         await request.save();
         
         await LoggerService.logAudit(
-          "EXPENSE_STEP_APPROVED",
+          AuditAction.EXPENSE_STEP_APPROVED,
           `Request ${request.requestNumber} approved by ${actor.name} at step '${nextRouting.step.stepName}'. Routed to '${nextStep.step.stepName}'`,
           undefined,
           logActor
@@ -360,13 +386,13 @@ export class ExpenseService {
         await request.save();
         
         await LoggerService.logAudit(
-          "EXPENSE_WORKFLOW_COMPLETED",
+          AuditAction.EXPENSE_WORKFLOW_COMPLETED,
           `Request ${request.requestNumber} completed all workflow approvals. Sent to Finance.`,
           undefined,
           logActor
         );
       }
-    } else if (action === "REJECT") {
+    } else if (action === WorkflowActionType.REJECT) {
       // Unlock budget and mark request as rejected
       await BudgetService.unlockBudget(request._id.toString());
       request.status = RequestStatus.REJECTED;
@@ -384,7 +410,7 @@ export class ExpenseService {
       await request.save();
       
       await LoggerService.logAudit(
-        "EXPENSE_REJECTED",
+        AuditAction.EXPENSE_REJECTED,
         `Request ${request.requestNumber} rejected by ${actor.name} during '${nextRouting.step.stepName}'`,
         { comment },
         logActor
@@ -409,7 +435,7 @@ export class ExpenseService {
       await request.save();
       
       await LoggerService.logAudit(
-        "EXPENSE_RETURNED",
+        AuditAction.EXPENSE_RETURNED,
         `Request ${request.requestNumber} returned to initiator by ${actor.name} for clarification`,
         { comment },
         logActor
@@ -452,7 +478,7 @@ export class ExpenseService {
     
     const logActor = { id: actorId, name: actor.name, role: actor.role };
     await LoggerService.logAudit(
-      "EXPENSE_BANK_UPLOADED",
+      AuditAction.EXPENSE_BANK_UPLOADED,
       `Finance Officer ${actor.name} uploaded payment file for request ${request.requestNumber} to the bank platform`,
       undefined,
       logActor
@@ -506,7 +532,7 @@ export class ExpenseService {
     
     const logActor = { id: actorId, name: actor.name, role: actor.role };
     await LoggerService.logAudit(
-      "PAYMENT_RELEASED",
+      AuditAction.PAYMENT_RELEASED,
       `Payment released for request ${request.requestNumber}. Reference: ${reference}`,
       { reference, receipt: request.paymentReceipt },
       logActor
@@ -529,7 +555,7 @@ export class ExpenseService {
     
     await request.save();
     await LoggerService.logApp(
-      "EXPENSE_CLOSED",
+      AuditAction.EXPENSE_CLOSED,
       `Request ${request.requestNumber} transitioned to CLOSED. Ledger and audits locked.`
     );
 

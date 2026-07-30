@@ -1,14 +1,22 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+/**
+ * Admin "Users & Roles" route. Wires the dashboard context to the presentational
+ * tab — the tab itself performs no I/O (engineering rule 1-D).
+ */
 import { AdminUsersAndRolesTab } from "../../../components/admin/AdminUsersAndRolesTab";
 import { useDashboard } from "../DashboardProvider";
+import { AdminUserDto, RolePermissionDto } from "../../../types/api";
+import { SystemRole } from "../../../enums/roles";
 
 export default function UsersRolesPage() {
   const {
     currentUser,
     systemUsers,
     departments,
+    rolePermissions,
+    adminBusy,
+    saveRolePermissions,
     setSelectedAdminUser,
     setShowAdminAddUserModal,
     setShowAdminEditUserProfileModal,
@@ -18,29 +26,32 @@ export default function UsersRolesPage() {
     setShowAdminDeleteUserModal,
   } = useDashboard();
 
-  if (currentUser?.role !== "ADMIN") return null;
+  if (currentUser?.role !== SystemRole.ADMIN) return null;
 
   return (
     <AdminUsersAndRolesTab
       systemUsers={systemUsers}
       departments={departments}
+      rolePermissions={rolePermissions}
+      busy={adminBusy}
       onOpenAddUser={() => setShowAdminAddUserModal(true)}
-      onOpenEditUserProfile={(user: any) => {
+      onOpenEditUserProfile={(user: AdminUserDto) => {
         setSelectedAdminUser(user);
         setShowAdminEditUserProfileModal(true);
       }}
-      onOpenEditRole={(roleData: any) => {
+      onOpenEditRole={(roleData: RolePermissionDto) => {
         setSelectedAdminRole(roleData);
         setShowAdminEditRoleModal(true);
       }}
-      onOpenSuspendUser={(user: any) => {
+      onOpenSuspendUser={(user: AdminUserDto) => {
         setSelectedAdminUser(user);
         setShowAdminSuspendUserModal(true);
       }}
-      onOpenDeleteUser={(user: any) => {
+      onOpenDeleteUser={(user: AdminUserDto) => {
         setSelectedAdminUser(user);
         setShowAdminDeleteUserModal(true);
       }}
+      onSaveRolePermissions={saveRolePermissions}
     />
   );
 }

@@ -20,11 +20,9 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
   onCreateDepartment
 }) => {
   const [deptName, setDeptName] = useState("");
-  const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: "1", name: "Cloud Infrastructure", description: "AWS and Azure monthly hosting fees", amount: 4500000 },
-    { id: "2", name: "Cybersecurity License", description: "Annual enterprise security suite renewal", amount: 2000000 },
-    { id: "3", name: "Hardware Refresh", description: "Replacement of aging laptop fleet", amount: 2500000 }
-  ]);
+  // Starts empty: the modal used to pre-fill three invented allocation lines
+  // totalling ₦9,000,000, which would have been saved verbatim on submit.
+  const [lineItems, setLineItems] = useState<LineItem[]>([]);
 
   if (!isOpen) return null;
 
@@ -79,7 +77,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
         width: "100%",
         maxWidth: "600px",
         padding: "1.75rem",
-        backgroundColor: "#1e293b",
+        backgroundColor: "rgb(var(--color-card))",
         border: "1px solid rgba(255, 255, 255, 0.1)",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
@@ -89,8 +87,8 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
           <div>
-            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", color: "#f8fafc" }}>Create New Department</h3>
-            <p style={{ fontSize: "0.85rem", color: "#94a3b8", marginTop: "0.25rem" }}>
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Create New Department</h3>
+            <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.25rem" }}>
               Establish a new operational unit and assign resources.
             </p>
           </div>
@@ -99,7 +97,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             style={{
               background: "none",
               border: "none",
-              color: "#94a3b8",
+              color: "rgb(var(--color-text-muted))",
               cursor: "pointer",
               padding: "0.25rem"
             }}
@@ -111,7 +109,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
         <form onSubmit={handleSubmit}>
           {/* Department Name */}
           <div style={{ marginBottom: "1.5rem" }}>
-            <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "#94a3b8", marginBottom: "0.35rem" }}>
+            <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
               Department Name
             </label>
             <input
@@ -126,7 +124,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                 backgroundColor: "rgba(15, 23, 42, 0.6)",
                 border: "1px solid rgba(255, 255, 255, 0.12)",
                 borderRadius: "0.5rem",
-                color: "#f8fafc",
+                color: "rgb(var(--color-text))",
                 fontSize: "0.9rem",
                 outline: "none"
               }}
@@ -146,7 +144,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             </div>
 
             <div style={{ marginBottom: "1rem" }}>
-              <div style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: "600" }}>TOTAL ALLOCATION</div>
+              <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>TOTAL ALLOCATION</div>
               <div style={{ fontSize: "1.35rem", fontWeight: "800", color: "#38bdf8", marginTop: "0.15rem" }}>
                 ₦{totalAllocation.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </div>
@@ -173,7 +171,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                       style={{
                         background: "none",
                         border: "none",
-                        color: "#f8fafc",
+                        color: "rgb(var(--color-text))",
                         fontWeight: "600",
                         fontSize: "0.85rem",
                         width: "100%",
@@ -187,7 +185,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                       style={{
                         background: "none",
                         border: "none",
-                        color: "#94a3b8",
+                        color: "rgb(var(--color-text-muted))",
                         fontSize: "0.75rem",
                         width: "100%",
                         outline: "none"
@@ -195,7 +193,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                     />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span style={{ fontSize: "0.85rem", color: "#94a3b8", fontWeight: "600" }}>₦</span>
+                    <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>₦</span>
                     <input
                       type="number"
                       value={item.amount}
@@ -206,7 +204,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                         backgroundColor: "rgba(30, 41, 59, 0.8)",
                         border: "1px solid rgba(255, 255, 255, 0.1)",
                         borderRadius: "0.375rem",
-                        color: "#f8fafc",
+                        color: "rgb(var(--color-text))",
                         fontSize: "0.85rem",
                         textAlign: "right",
                         outline: "none"
@@ -260,7 +258,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                 borderRadius: "0.5rem",
                 border: "1px solid rgba(255, 255, 255, 0.15)",
                 backgroundColor: "transparent",
-                color: "#f8fafc",
+                color: "rgb(var(--color-text))",
                 fontWeight: "600",
                 fontSize: "0.85rem",
                 cursor: "pointer"

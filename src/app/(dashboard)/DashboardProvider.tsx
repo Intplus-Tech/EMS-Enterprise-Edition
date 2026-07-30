@@ -5,6 +5,14 @@ import { createContext, useContext, useEffect, useMemo, useState, useRef, useCal
 import { useRouter, usePathname } from "next/navigation";
 import { getAllowedRoutesForRole, getDefaultRouteForRole } from "./roleRoutes";
 import { buildNotifications, formatRelativeTime } from "../../domains/notifications/notification.builder";
+import { useAdminAdministration } from "./hooks/useAdminAdministration";
+import { useExpenseActions } from "./hooks/useExpenseActions";
+import { ExpenseClient } from "../../services/expense.client";
+import { AdminClient } from "../../services/admin.client";
+import { AuthClient } from "../../services/auth.client";
+import { ApiRequestError, toErrorMessage } from "../../services/http";
+import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
+import { WorkflowActionType } from "../../enums/workflowActions";
 
 const DISMISSED_NOTIFICATIONS_KEY = "ems.notifications.dismissed";
 const READ_NOTIFICATIONS_KEY = "ems.notifications.read";
@@ -20,6 +28,24 @@ function readStoredIds(key: string): string[] {
   }
 }
 
+/** Blank New Request form. Extracted so create and reset cannot drift apart. */
+function emptyRequestForm() {
+  return {
+    category: DEFAULT_EXPENSE_CATEGORY as string,
+    currency: "NGN",
+    description: "",
+    amount: "",
+    supportingDocument: "",
+    supportingDocuments: [] as string[],
+    vendorName: "",
+    accountNumber: "",
+    bankName: "",
+    accountName: "",
+    // Default the payment date a week out, matching designs/initiator/New Request.png.
+    requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString().split("T")[0],
+  };
+}
+
 function writeStoredIds(key: string, ids: string[]) {
   if (typeof window === "undefined") return;
   try {
@@ -29,17 +55,13 @@ function writeStoredIds(key: string, ids: string[]) {
   }
 }
 
-const DashboardContext = createContext<any>(null);
-
-export function useDashboard() {
-  const ctx = useContext(DashboardContext);
-  if (!ctx) {
-    throw new Error("useDashboard must be used within a DashboardProvider");
-  }
-  return ctx;
-}
-
-export function DashboardProvider({ children }: { children: React.ReactNode }) {
+/**
+ * Builds every value the dashboard exposes. Kept as a hook (rather than inlined
+ * in the provider) so `DashboardContextValue` can be *inferred* from it — the
+ * context was previously typed `any`, which erased type safety for all ~90
+ * values at every consuming component.
+ */
+function useDashboardState() {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -48,9 +70,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [startupError, setStartupError] = useState("");
   const [seeding, setSeeding] = useState(false);
 
-  // Users and departments (Admin)
-  const [systemUsers, setSystemUsers] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
+  // Toast-style feedback for admin mutations. Replaces the `alert()` calls the
+  // admin modals used to fire, which reported success even when nothing saved.
+  const [adminNotice, setAdminNotice] = useState<{ tone: "success" | "error"; message: string } | null>(null);
+
+  const notifySuccess = useCallback((message: string) => {
+    setAdminNotice({ tone: "success", message });
+  }, []);
+  const notifyError = useCallback((message: string) => {
+    setAdminNotice({ tone: "error", message });
+  }, []);
+
+  // Users, departments, budgets and role permissions (Admin) — all persisted.
+  const admin = useAdminAdministration({ onSuccess: notifySuccess, onError: notifyError });
+  const { systemUsers, departments } = admin;
+
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteResult, setInviteResult] = useState<any>(null);
   const [inviteForm, setInviteForm] = useState({
@@ -96,19 +130,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   // New request form state
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newRequest, setNewRequest] = useState({
-    category: "Travel",
-    currency: "NGN",
-    description: "",
-    amount: "",
-    supportingDocument: "",
-    supportingDocuments: [] as string[],
-    vendorName: "",
-    accountNumber: "",
-    bankName: "",
-    accountName: "",
-    requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString().split('T')[0], // 7 days from now
-  });
+  const [newRequest, setNewRequest] = useState(emptyRequestForm);
   const [formError, setFormError] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,31 +143,18 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setIsUploadingDoc(true);
     setUploadDocError("");
 
-    const newDocs: string[] = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const docRef = data.url || data.publicId || data.name || file.name;
-          newDocs.push(docRef);
-        } else {
-          newDocs.push(file.name);
+    // Uploads run in parallel; ExpenseClient falls back to the local filename
+    // so a storage outage does not block the form.
+    const newDocs = await Promise.all(
+      Array.from(files).map(async (file) => {
+        try {
+          return await ExpenseClient.uploadDocument(file);
+        } catch (err) {
+          console.warn("Background upload error, falling back to filename", err);
+          return file.name;
         }
-      } catch (err) {
-        console.warn("Background upload error, falling back to filename", err);
-        newDocs.push(file.name);
-      }
-    }
+      })
+    );
 
     if (isResubmit) {
       if (newDocs.length > 0) {
@@ -308,24 +317,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const fetchSession = async () => {
     try {
-      const res = await fetch("/api/auth/me");
-      if (res.status === 401) {
+      const user = await AuthClient.me();
+      setCurrentUser(user);
+      loadDashboardData(user);
+    } catch (e) {
+      // 401 is the normal signed-out path, not a startup failure.
+      if (e instanceof ApiRequestError && e.status === 401) {
         router.push("/login");
         return;
       }
-      if (!res.ok) {
-        throw new Error(`Server returned error status: ${res.status}`);
-      }
-      const data = await res.json();
-      if (data.success) {
-        setCurrentUser(data.user);
-        loadDashboardData(data.user);
-      } else {
-        router.push("/login");
-      }
-    } catch (e: any) {
       console.error(e);
-      setStartupError("Database connection failed. Please ensure MONGODB_URI is correctly configured in your Vercel Project Settings and whitelisted (0.0.0.0/0) in your MongoDB Atlas cluster.");
+      setStartupError(
+        "Database connection failed. Please ensure MONGODB_URI is correctly configured in your Vercel Project Settings and whitelisted (0.0.0.0/0) in your MongoDB Atlas cluster."
+      );
     } finally {
       setLoading(false);
     }
@@ -333,63 +337,41 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const loadDashboardData = async (user: any) => {
     try {
-      // Load expenses
-      const expRes = await fetch("/api/expenses");
-      const expData = await expRes.json();
-      if (expData.success) {
-        setExpenses(expData.expenses);
-      }
-
-      // Load analytics stats if authorized
-      if (["ADMIN", "FINANCE_HEAD", "FINANCE_OFFICER", "FINANCE_MANAGER"].includes(user.role)) {
-        const statsRes = await fetch("/api/admin/stats");
-        const statsData = await statsRes.json();
-        if (statsData.success) {
-          setMetrics(statsData.stats);
-        }
-      }
-
-      // Load workflow config and system logs
-      if (["ADMIN", "FINANCE_HEAD", "FINANCE_OFFICER", "FINANCE_MANAGER", "APPROVER"].includes(user.role)) {
-        loadLogs("ALL");
-        loadUsers();
-      }
-
-      if (user.role === "ADMIN") {
-        const wfRes = await fetch("/api/admin/workflow");
-        const wfData = await wfRes.json();
-        if (wfData.success) {
-          setWorkflowSteps(wfData.steps);
-        }
-      }
+      setExpenses(await ExpenseClient.list());
     } catch (e) {
-      console.error("Error loading dashboard data:", e);
+      console.error("Error loading expenses:", e);
+    }
+
+    // Analytics stats — finance roles and admin only.
+    if (["ADMIN", "FINANCE_HEAD", "FINANCE_OFFICER", "FINANCE_MANAGER"].includes(user.role)) {
+      try {
+        setMetrics(await AuthClient.stats());
+      } catch (e) {
+        console.error("Error loading stats:", e);
+      }
+    }
+
+    if (["ADMIN", "FINANCE_HEAD", "FINANCE_OFFICER", "FINANCE_MANAGER", "APPROVER"].includes(user.role)) {
+      loadLogs("ALL");
+    }
+
+    // Users, departments, budgets and the role matrix.
+    admin.loadAdminData(user.role);
+
+    if (user.role === "ADMIN") {
+      try {
+        setWorkflowSteps(await AdminClient.getWorkflow());
+      } catch (e) {
+        console.error("Error loading workflow config:", e);
+      }
     }
   };
 
   const loadLogs = async (filter: string) => {
     try {
-      const url = filter && filter !== "ALL" ? `/api/admin/logs?type=${filter}` : "/api/admin/logs";
-      const res = await fetch(url);
-      const data = await res.json();
-      if (data.success) {
-        setSystemLogs(data.logs);
-      }
+      setSystemLogs(await AdminClient.listLogs(filter));
     } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const loadUsers = async () => {
-    try {
-      const res = await fetch("/api/admin/invite");
-      const data = await res.json();
-      if (data.success) {
-        setSystemUsers(data.users);
-        setDepartments(data.departments || []);
-      }
-    } catch (e) {
-      console.error("Error loading users:", e);
+      console.error("Error loading logs:", e);
     }
   };
 
@@ -398,21 +380,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setInviteError("");
     setInviteSubmitting(true);
     try {
-      const res = await fetch("/api/admin/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(inviteForm)
-      });
-      const data = await res.json();
-      if (data.success) {
-        setInviteResult(data);
-        setInviteForm({ name: "", email: "", role: "INITIATOR", departmentId: "" });
-        loadUsers();
-      } else {
-        setInviteError(data.error || "Failed to invite user");
-      }
-    } catch (e) {
-      setInviteError("An error occurred. Please try again.");
+      const result = await AdminClient.inviteUser(inviteForm);
+      setInviteResult(result);
+      setInviteForm({ name: "", email: "", role: "INITIATOR", departmentId: "" });
+      admin.loadUsers();
+    } catch (err) {
+      setInviteError(toErrorMessage(err, "Failed to invite user"));
     } finally {
       setInviteSubmitting(false);
     }
@@ -420,11 +393,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await AuthClient.logout();
+    } catch (e) {
+      // Navigate away regardless — a failed logout call must not strand the
+      // user in an authenticated-looking shell.
+      console.error("Logout failed:", e);
+    } finally {
       router.push("/login");
       router.refresh();
-    } catch (e) {
-      console.error("Logout failed:", e);
     }
   };
 
@@ -443,78 +419,57 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Vendor bank details used to fall back to placeholder values ("1234567890",
+    // "Corporate Bank Plc") when left blank, which would have sent a real payment
+    // instruction to a fabricated account. They are now required.
+    if (!newRequest.accountNumber || !newRequest.bankName) {
+      setFormError("Vendor bank name and account number are required to raise a payment request.");
+      return;
+    }
+
     try {
-      const payload = {
+      const created = await ExpenseClient.create({
         category: newRequest.category,
         description: newRequest.description,
         amount: Number(newRequest.amount),
         supportingDocument: newRequest.supportingDocument,
         vendorName: newRequest.vendorName,
         vendorBankDetails: {
-          accountNumber: newRequest.accountNumber || "1234567890",
-          bankName: newRequest.bankName || "Corporate Bank Plc",
+          accountNumber: newRequest.accountNumber,
+          bankName: newRequest.bankName,
           accountName: newRequest.accountName || newRequest.vendorName,
         },
         requiredPaymentDate: newRequest.requiredPaymentDate,
-      };
-
-      const res = await fetch("/api/expenses", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
       });
-      const data = await res.json();
 
-      if (data.success) {
-        const createdId = data.request._id;
-
-        if (shouldSubmit) {
-          // Immediately submit after creation
-          const submitRes = await fetch(`/api/expenses/${createdId}/submit`, { method: "POST" });
-          const submitData = await submitRes.json();
-          if (!submitData.success) {
-            setFormError("Draft saved, but failed to submit: " + submitData.error);
-            loadDashboardData(currentUser);
-            return;
-          }
+      if (shouldSubmit) {
+        try {
+          await ExpenseClient.submit(created._id);
+        } catch (submitError) {
+          // The draft did save, so say so rather than implying nothing happened.
+          setFormError(`Draft saved, but failed to submit: ${toErrorMessage(submitError)}`);
+          loadDashboardData(currentUser);
+          return;
         }
-
-        setShowCreateModal(false);
-        setNewRequest({
-          category: "Travel",
-          currency: "NGN",
-          description: "",
-          amount: "",
-          supportingDocument: "invoice_receipt_1024.pdf",
-          supportingDocuments: ["invoice_receipt_1024.pdf"],
-          vendorName: "",
-          accountNumber: "",
-          bankName: "",
-          accountName: "",
-          requiredPaymentDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString().split('T')[0],
-        });
-        loadDashboardData(currentUser);
-      } else {
-        setFormError(data.error || "Failed to create request");
       }
-    } catch (e: any) {
-      setFormError(e.message);
+
+      setShowCreateModal(false);
+      setNewRequest(emptyRequestForm());
+      loadDashboardData(currentUser);
+    } catch (err) {
+      setFormError(toErrorMessage(err, "Failed to create request"));
     }
   };
 
   // Initiator submits a draft request
   const handleSubmitRequest = async (id: string) => {
     try {
-      const res = await fetch(`/api/expenses/${id}/submit`, { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        setSelectedExpense(null);
-        loadDashboardData(currentUser);
-      } else {
-        alert(data.error);
-      }
-    } catch (e) {
-      console.error(e);
+      await ExpenseClient.submit(id);
+      setSelectedExpense(null);
+      loadDashboardData(currentUser);
+      notifySuccess("Request submitted for approval.");
+    } catch (err) {
+      notifyError(toErrorMessage(err));
     }
   };
 
@@ -526,7 +481,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     if (!selectedResubmitExpense) return;
 
     try {
-      const updatePayload = {
+      // Update the details, then re-enter the workflow. Both must succeed for
+      // the resubmission to count, so they share one try block.
+      await ExpenseClient.update(selectedResubmitExpense._id, {
         category: selectedResubmitExpense.category,
         description: resubmitForm.justification || selectedResubmitExpense.description,
         amount: Number(selectedResubmitExpense.amount),
@@ -534,60 +491,33 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         vendorName: selectedResubmitExpense.vendorName,
         vendorBankDetails: selectedResubmitExpense.vendorBankDetails,
         requiredPaymentDate: selectedResubmitExpense.requiredPaymentDate,
-      };
-
-      // 1. Update details
-      const putRes = await fetch(`/api/expenses/${selectedResubmitExpense._id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatePayload)
       });
-      const putData = await putRes.json();
+      await ExpenseClient.submit(selectedResubmitExpense._id);
 
-      if (!putData.success) {
-        setFormError(putData.error || "Failed to update request details.");
-        return;
-      }
-
-      // 2. Submit request
-      const submitRes = await fetch(`/api/expenses/${selectedResubmitExpense._id}/submit`, { method: "POST" });
-      const submitData = await submitRes.json();
-
-      if (submitData.success) {
-        setShowResubmitModal(false);
-        setSelectedResubmitExpense(null);
-        setResubmitForm({
-          justification: "",
-          supportingDocument: "hotel_invoice_final_paid.pdf",
-          notifyAuditor: true
-        });
-        loadDashboardData(currentUser);
-      } else {
-        setFormError(submitData.error || "Failed to resubmit request.");
-      }
-    } catch (e: any) {
-      setFormError(e.message);
+      setShowResubmitModal(false);
+      setSelectedResubmitExpense(null);
+      setResubmitForm({ justification: "", supportingDocument: "", notifyAuditor: true });
+      loadDashboardData(currentUser);
+      notifySuccess("Request updated and resubmitted.");
+    } catch (err) {
+      setFormError(toErrorMessage(err, "Failed to resubmit request."));
     }
   };
 
   // Initiator withdraws / cancels a request
   const handleCancelRequest = async (id: string) => {
-    const confirmWithdraw = window.confirm("Are you sure you want to withdraw this request? This will release any locked budget funds.");
+    const confirmWithdraw = window.confirm(
+      "Are you sure you want to withdraw this request? This will release any locked budget funds."
+    );
     if (!confirmWithdraw) return;
 
     try {
-      const res = await fetch(`/api/expenses/${id}/cancel`, { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        setSelectedExpense(null);
-        loadDashboardData(currentUser);
-        alert("Request successfully withdrawn.");
-      } else {
-        alert(data.error || "Failed to withdraw request.");
-      }
-    } catch (e) {
-      console.error(e);
-      alert("An error occurred. Please try again.");
+      await ExpenseClient.cancel(id);
+      setSelectedExpense(null);
+      loadDashboardData(currentUser);
+      notifySuccess("Request successfully withdrawn.");
+    } catch (err) {
+      notifyError(toErrorMessage(err, "Failed to withdraw request."));
     }
   };
 
@@ -603,146 +533,86 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const res = await fetch("/api/auth/change-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentPassword: settingsForm.currentPassword,
-          newPassword: settingsForm.newPassword
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSettingsMessage("Password successfully updated!");
-        setSettingsForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      } else {
-        setSettingsError(data.error || "Failed to update password.");
-      }
-    } catch (e) {
-      setSettingsError("An error occurred. Please try again.");
+      await AuthClient.changePassword(settingsForm.currentPassword, settingsForm.newPassword);
+      setSettingsMessage("Password successfully updated!");
+      setSettingsForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+    } catch (err) {
+      setSettingsError(toErrorMessage(err, "Failed to update password."));
     }
   };
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     if (e) e.preventDefault();
     try {
-      const res = await fetch("/api/auth/me", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: editProfileForm.name,
-          email: editProfileForm.email,
-          officialContact: editProfileForm.officialContact,
-          personalContact: editProfileForm.personalContact,
-          avatar: editProfileForm.avatar
-        })
+      const user = await AuthClient.updateProfile({
+        name: editProfileForm.name,
+        email: editProfileForm.email,
+        officialContact: editProfileForm.officialContact,
+        personalContact: editProfileForm.personalContact,
+        avatar: editProfileForm.avatar,
       });
-      const data = await res.json();
-      if (data.success) {
-        setCurrentUser({
-          ...currentUser,
-          name: data.user.name,
-          email: data.user.email,
-          officialContact: data.user.officialContact,
-          personalContact: data.user.personalContact,
-          avatar: data.user.avatar
-        });
-        setShowEditProfileModal(false);
-        setShowUpdatePhotoModal(false);
-      } else {
-        alert(data.error || "Failed to update profile.");
-      }
+      setCurrentUser({ ...currentUser, ...user });
+      setShowEditProfileModal(false);
+      setShowUpdatePhotoModal(false);
+      notifySuccess("Profile updated.");
     } catch (err) {
-      console.error(err);
-      alert("An error occurred. Please try again.");
+      notifyError(toErrorMessage(err, "Failed to update profile."));
     }
   };
 
-  // Finance Head exceptional approval
-  const handleExceptionalBudgetAction = async (id: string, action: "APPROVE" | "REJECT" | "RETURN") => {
+  // Finance Head exceptional approval (from the request detail modal)
+  const handleExceptionalBudgetAction = async (id: string, action: WorkflowActionType) => {
     try {
-      const res = await fetch(`/api/expenses/${id}/exceptional`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          comment: actionComment,
-          adjustedAmount: adjustedAmount > 0 ? adjustedAmount : undefined,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSelectedExpense(null);
-        setActionComment("");
-        setAdjustedAmount(0);
-        loadDashboardData(currentUser);
-      } else {
-        alert(data.error);
-      }
-    } catch (e) {
-      console.error(e);
+      await ExpenseClient.exceptionalAction(id, action, actionComment, adjustedAmount);
+      setSelectedExpense(null);
+      setActionComment("");
+      setAdjustedAmount(0);
+      loadDashboardData(currentUser);
+      notifySuccess("Decision recorded.");
+    } catch (err) {
+      notifyError(toErrorMessage(err));
     }
   };
 
-  // Approver approval
-  const handleWorkflowAction = async (id: string, action: "APPROVE" | "REJECT" | "RETURN") => {
+  // Approver decision (from the request detail modal)
+  const handleWorkflowAction = async (id: string, action: WorkflowActionType) => {
     try {
-      const res = await fetch(`/api/expenses/${id}/workflow`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, comment: actionComment }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSelectedExpense(null);
-        setActionComment("");
-        loadDashboardData(currentUser);
-      } else {
-        alert(data.error);
-      }
-    } catch (e) {
-      console.error(e);
+      await ExpenseClient.workflowAction(id, action, actionComment);
+      setSelectedExpense(null);
+      setActionComment("");
+      loadDashboardData(currentUser);
+      notifySuccess("Decision recorded.");
+    } catch (err) {
+      notifyError(toErrorMessage(err));
     }
   };
 
   // Finance Officer verify and upload
   const handleFinanceUpload = async (id: string) => {
     try {
-      const res = await fetch(`/api/expenses/${id}/upload`, { method: "POST" });
-      const data = await res.json();
-      if (data.success) {
-        setSelectedExpense(null);
-        loadDashboardData(currentUser);
-      } else {
-        alert(data.error);
-      }
-    } catch (e) {
-      console.error(e);
+      await ExpenseClient.financeUpload(id);
+      setSelectedExpense(null);
+      loadDashboardData(currentUser);
+      notifySuccess("Instruction uploaded to the bank platform.");
+    } catch (err) {
+      notifyError(toErrorMessage(err));
     }
   };
 
   // Finance Manager release payment
   const handlePaymentRelease = async (id: string) => {
     if (!paymentRef) {
-      alert("Payment transaction reference is required to release cash");
+      notifyError("A payment transaction reference is required to release cash.");
       return;
     }
     try {
-      const res = await fetch(`/api/expenses/${id}/release`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reference: paymentRef }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSelectedExpense(null);
-        setPaymentRef("");
-        loadDashboardData(currentUser);
-      } else {
-        alert(data.error);
-      }
-    } catch (e) {
-      console.error(e);
+      await ExpenseClient.releasePayment(id, paymentRef);
+      setSelectedExpense(null);
+      setPaymentRef("");
+      loadDashboardData(currentUser);
+      notifySuccess(`Payment released. Reference: ${paymentRef}`);
+    } catch (err) {
+      notifyError(toErrorMessage(err));
     }
   };
 
@@ -750,21 +620,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const handleSaveWorkflowConfig = async () => {
     setWorkflowMessage("");
     try {
-      const res = await fetch("/api/admin/workflow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ steps: workflowSteps }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setWorkflowSteps(data.steps);
-        setWorkflowMessage("Workflow steps configuration updated successfully!");
-        loadDashboardData(currentUser);
-      } else {
-        setWorkflowMessage("Error: " + data.error);
-      }
-    } catch (e: any) {
-      setWorkflowMessage("Error: " + e.message);
+      setWorkflowSteps(await AdminClient.saveWorkflow(workflowSteps));
+      setWorkflowMessage("Workflow steps configuration updated successfully!");
+      loadDashboardData(currentUser);
+    } catch (err) {
+      setWorkflowMessage(`Error: ${toErrorMessage(err)}`);
     }
   };
 
@@ -792,6 +652,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setWorkflowSteps(steps);
   };
 
+  // Workflow actions shared by every approval surface. Injected into the tabs as
+  // props so those components stay presentational (engineering rule 1-D).
+  const expenseActions = useExpenseActions({
+    currentUser,
+    reload: () => loadDashboardData(currentUser),
+    onSuccess: notifySuccess,
+    onError: notifyError,
+  });
+
   const value = {
     router,
     pathname,
@@ -799,8 +668,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     loading, setLoading,
     startupError, setStartupError,
     seeding, setSeeding,
-    systemUsers, setSystemUsers,
-    departments, setDepartments,
+    // Admin datasets + persisted mutations (see useAdminAdministration).
+    ...admin,
+    adminNotice, setAdminNotice,
     showInviteModal, setShowInviteModal,
     inviteResult, setInviteResult,
     inviteForm, setInviteForm,
@@ -873,10 +743,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     showPasswordNewToggle, setShowPasswordNewToggle,
     theme, setTheme, toggleTheme,
     alertDialog, setAlertDialog,
+    expenseActions,
     fetchSession,
     loadDashboardData,
     loadLogs,
-    loadUsers,
     handleInviteUser,
     handleLogout,
     handleCreateRequest,
@@ -893,6 +763,25 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     moveWorkflowStep,
     handleStepDetailChange,
   };
+
+  return value;
+}
+
+/** Everything the dashboard exposes, inferred from the state hook above. */
+export type DashboardContextValue = ReturnType<typeof useDashboardState>;
+
+const DashboardContext = createContext<DashboardContextValue | null>(null);
+
+export function useDashboard(): DashboardContextValue {
+  const ctx = useContext(DashboardContext);
+  if (!ctx) {
+    throw new Error("useDashboard must be used within a DashboardProvider");
+  }
+  return ctx;
+}
+
+export function DashboardProvider({ children }: { children: React.ReactNode }) {
+  const value = useDashboardState();
 
   return (
     <DashboardContext.Provider value={value}>

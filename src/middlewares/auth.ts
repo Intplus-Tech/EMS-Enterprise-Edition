@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { AuthService } from "../domains/auth/auth.service";
+import { PermissionService } from "../domains/permissions/permission.service";
 import { SystemRole } from "../enums/roles";
+import { PermissionAction, PermissionResource } from "../enums/permissions";
 
 export interface AuthenticatedRequestState {
   id: string;
@@ -52,4 +54,27 @@ export async function authenticate(
     role: decoded.role as SystemRole,
     departmentId: decoded.departmentId,
   };
+}
+
+/**
+ * Authenticates, then checks the caller's role against the admin-editable
+ * permissions matrix. Prefer this over a hardcoded `allowedRoles` list for
+ * anything an admin is expected to be able to re-delegate from the UI — the
+ * grid on screen and the guard here resolve to the same stored grants.
+ */
+export async function requirePermission(
+  req: NextRequest,
+  resource: PermissionResource,
+  action: PermissionAction
+): Promise<AuthenticatedRequestState> {
+  const user = await authenticate(req);
+
+  const permitted = await PermissionService.can(user.role, resource, action);
+  if (!permitted) {
+    throw new Error(
+      `Forbidden: Role '${user.role}' is not permitted to ${action} ${resource}.`
+    );
+  }
+
+  return user;
 }

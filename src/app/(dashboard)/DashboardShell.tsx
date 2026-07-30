@@ -19,6 +19,7 @@ import { EditProfileModal } from "../../components/modals/EditProfileModal";
 import { UpdatePhotoModal } from "../../components/modals/UpdatePhotoModal";
 import { ChangePasswordModal } from "../../components/modals/ChangePasswordModal";
 import { GlobalAlertDialogModal } from "../../components/modals/GlobalAlertDialogModal";
+import { NoticeBanner } from "../../components/ui/NoticeBanner";
 
 // System Admin Modals
 import { AdminAddUserModal } from "../../components/admin/modals/AdminAddUserModal";
@@ -82,7 +83,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     showInviteModal, setShowInviteModal,
     inviteError,
     inviteForm, setInviteForm,
-    departments, setDepartments,
+    departments,
     inviteSubmitting,
     handleInviteUser,
     inviteResult, setInviteResult,
@@ -97,7 +98,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     showPasswordCurrentToggle, setShowPasswordCurrentToggle,
     showPasswordNewToggle, setShowPasswordNewToggle,
     handleChangePassword,
-    systemUsers, setSystemUsers,
+    systemUsers,
+    // Persisted admin mutations from useAdminAdministration.
+    createDepartment, updateDepartment, deleteDepartment,
+    inviteUser, updateUser, setUserActive, deleteUser,
+    saveBudgetPeriod, saveRolePermissions,
+    adminNotice, setAdminNotice, adminBusy,
     showAdminAddUserModal, setShowAdminAddUserModal,
     showAdminEditUserProfileModal, setShowAdminEditUserProfileModal,
     selectedAdminUser,
@@ -679,6 +685,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
+        {/* Feedback for persisted admin actions — sits above the active page so
+            a rejected save is visible next to the screen that triggered it. */}
+        <NoticeBanner notice={adminNotice} onDismiss={() => setAdminNotice(null)} />
+
         {/* Active route page renders here */}
         {children}
 
@@ -793,15 +803,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         handleChangePassword={handleChangePassword}
       />
 
-      {/* SYSTEM ADMIN MODALS */}
+      {/* SYSTEM ADMIN MODALS — every action persists via useAdminAdministration
+          and refetches, so a refresh reflects what was actually saved. */}
       <AdminAddUserModal
         isOpen={showAdminAddUserModal}
         onClose={() => setShowAdminAddUserModal(false)}
         departments={departments}
-        onSaveUser={(userData: any) => {
-          setSystemUsers([...systemUsers, { id: Date.now().toString(), ...userData, isActive: true }]);
-          alert("User successfully invited!");
-        }}
+        onSaveUser={(userData: any) =>
+          inviteUser({
+            name: userData.fullName,
+            email: userData.email,
+            role: userData.role,
+            departmentId: userData.departmentId || undefined,
+          })
+        }
       />
 
       <AdminEditUserProfileModal
@@ -809,68 +824,87 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onClose={() => setShowAdminEditUserProfileModal(false)}
         user={selectedAdminUser}
         departments={departments}
-        onUpdateUser={(updatedUser: any) => {
-          setSystemUsers(systemUsers.map((u: any) => ((u.id || u._id) === (updatedUser.id || updatedUser._id) ? updatedUser : u)));
-          alert("User profile updated!");
-        }}
-        onForceLogOut={() => alert("Session forced closed.")}
+        onUpdateUser={(updatedUser: any) =>
+          updateUser(updatedUser.id || updatedUser._id, {
+            name: updatedUser.fullName,
+            email: updatedUser.email,
+            role: updatedUser.role,
+            departmentId: updatedUser.departmentId || null,
+            officialContact: updatedUser.contactNumber,
+          })
+        }
       />
 
       <AdminCreateDepartmentModal
         isOpen={showAdminCreateDeptModal}
         onClose={() => setShowAdminCreateDeptModal(false)}
-        onCreateDepartment={(deptData: any) => {
-          setDepartments([...departments, { id: Date.now().toString(), ...deptData, utilized: 0, pctUsed: 0, usersCount: 1, isActive: true }]);
-          alert("Department created successfully!");
-        }}
+        onCreateDepartment={(deptData: any) =>
+          createDepartment({
+            name: deptData.name,
+            description: deptData.description,
+            totalBudget: deptData.totalBudget,
+            lineItems: (deptData.lineItems || []).map((item: any) => ({
+              name: item.name,
+              description: item.description,
+              amount: Number(item.amount) || 0,
+            })),
+          })
+        }
       />
 
       <AdminEditDepartmentModal
         isOpen={showAdminEditDeptModal}
         onClose={() => setShowAdminEditDeptModal(false)}
         department={selectedAdminDept}
-        onUpdateDepartment={(updatedDept: any) => {
-          setDepartments(departments.map((d: any) => ((d.id || d._id) === (updatedDept.id || updatedDept._id) ? updatedDept : d)));
-          alert("Department updated!");
-        }}
+        users={systemUsers}
+        onUpdateDepartment={(updatedDept: any) =>
+          updateDepartment(updatedDept.id || updatedDept._id, {
+            name: updatedDept.name,
+            description: updatedDept.description,
+            totalBudget: updatedDept.totalBudget,
+            lineItems: (updatedDept.budgetItems || []).map((line: any) => ({
+              name: line.category ?? line.name,
+              description: line.description,
+              amount: Number(line.amount) || 0,
+            })),
+          })
+        }
       />
 
       <AdminDeleteDepartmentModal
         isOpen={showAdminDeleteDeptModal}
         onClose={() => setShowAdminDeleteDeptModal(false)}
         department={selectedAdminDept}
-        onConfirmDelete={(deptId: any) => {
-          setDepartments(departments.filter((d: any) => (d.id || d._id) !== deptId));
-          alert("Department deleted!");
-        }}
+        onConfirmDelete={(deptId: string) => deleteDepartment(deptId)}
       />
 
       <AdminDeleteUserModal
         isOpen={showAdminDeleteUserModal}
         onClose={() => setShowAdminDeleteUserModal(false)}
         user={selectedAdminUser}
-        onConfirmDelete={(userId: any) => {
-          setSystemUsers(systemUsers.filter((u: any) => (u.id || u._id) !== userId));
-          alert("User deleted!");
-        }}
+        onConfirmDelete={(userId: string) => deleteUser(userId)}
       />
 
       <AdminSuspendUserModal
         isOpen={showAdminSuspendUserModal}
         onClose={() => setShowAdminSuspendUserModal(false)}
         user={selectedAdminUser}
-        onConfirmSuspend={(userId: any) => {
-          setSystemUsers(systemUsers.map((u: any) => ((u.id || u._id) === userId ? { ...u, isActive: false } : u)));
-          alert("User access suspended!");
-        }}
+        onConfirmSuspend={(userId: string) => setUserActive(userId, false)}
       />
 
       <AdminEditRoleModal
         isOpen={showAdminEditRoleModal}
         onClose={() => setShowAdminEditRoleModal(false)}
         roleData={selectedAdminRole}
-        onSaveRole={() => alert("Role configuration updated!")}
-        onDeleteRole={() => alert("Role deleted!")}
+        busy={adminBusy}
+        onSaveRole={(roleData: any) =>
+          saveRolePermissions({
+            role: roleData.role,
+            grants: roleData.grants,
+            description: roleData.description,
+            isActive: roleData.isActive,
+          })
+        }
         onOpenMatrix={() => navTo("/users-roles")}
       />
 
@@ -878,7 +912,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         isOpen={showAdminSetBudgetModal}
         onClose={() => setShowAdminSetBudgetModal(false)}
         departments={departments}
-        onSetBudget={() => alert("Department budget updated successfully!")}
+        onSetBudget={(departmentId: string, totalAmount: number, lineItems: any[]) =>
+          saveBudgetPeriod({
+            departmentId,
+            totalBudget: totalAmount,
+            lineItems: lineItems.map((item) => ({
+              name: item.name,
+              description: item.description,
+              amount: Number(item.amount) || 0,
+            })),
+          })
+        }
       />
 
       <GlobalAlertDialogModal
