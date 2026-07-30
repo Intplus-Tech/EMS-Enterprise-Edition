@@ -9,6 +9,10 @@ import { RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
 import { IUser } from "../../types";
 
+const getActorId = (actor: any): string => {
+  return (actor?._id || actor?.id)?.toString() || "";
+};
+
 export class ExpenseService {
   /**
    * Helper to generate a unique request number, e.g. EXP-2026-0001
@@ -24,19 +28,45 @@ export class ExpenseService {
   /**
    * Create a new draft expense request
    */
-  public static async createRequest(actor: IUser, data: any) {
+  public static async createRequest(actor: IUser | any, data: any) {
     await connectToDatabase();
     
     if (!data.supportingDocument) {
       throw new Error("Supporting documentation / invoice is mandatory.");
     }
     
+    const actorId = getActorId(actor);
+    if (!actorId) {
+      throw new Error("Initiator ID is required.");
+    }
+
+    let departmentId = actor.departmentId || data.departmentId;
+
+    if (!departmentId) {
+      const dbUser = await User.findById(actorId);
+      if (dbUser && dbUser.departmentId) {
+        departmentId = dbUser.departmentId;
+      }
+    }
+
+    if (!departmentId) {
+      const Department = (await import("../../models/Department")).Department;
+      const defaultDept = await Department.findOne();
+      if (defaultDept) {
+        departmentId = defaultDept._id;
+      }
+    }
+
+    if (!departmentId) {
+      throw new Error("Department ID is required.");
+    }
+
     const requestNumber = await this.generateRequestNumber();
     
     const request = new ExpenseRequest({
       requestNumber,
-      departmentId: actor.departmentId || data.departmentId,
-      initiatorId: actor._id,
+      departmentId,
+      initiatorId: actorId,
       category: data.category,
       description: data.description,
       amount: Number(data.amount),
@@ -55,7 +85,7 @@ export class ExpenseService {
 
     await request.save();
     
-    const logActor = { id: actor._id, name: actor.name, role: actor.role };
+    const logActor = { id: actorId, name: actor.name, role: actor.role };
     await LoggerService.logAudit(
       "EXPENSE_CREATED",
       `Draft request ${requestNumber} created for $${request.amount.toFixed(2)}`,
@@ -82,13 +112,14 @@ export class ExpenseService {
     request.status = RequestStatus.SUBMITTED;
     await request.save();
     
-    const logActor = { id: actor._id, name: actor.name, role: actor.role };
+    const actorId = getActorId(actor);
+    const logActor = { id: actorId, name: actor.name, role: actor.role };
     
     // Add to history
     request.history.push({
       statusBefore: previousStatus,
       statusAfter: RequestStatus.SUBMITTED,
-      actorId: actor._id!,
+      actorId: actorId,
       actorName: actor.name,
       actorRole: actor.role,
       action: "Submit Request",
@@ -117,7 +148,7 @@ export class ExpenseService {
         request.history.push({
           statusBefore: RequestStatus.BUDGET_CHECK,
           statusAfter: RequestStatus.PENDING_APPROVAL,
-          actorId: actor._id!,
+          actorId: actorId,
           actorName: "System Engine",
           actorRole: SystemRole.ADMIN,
           action: `Budget Validated. Routed to: ${nextRouting.step.stepName}`,
@@ -142,7 +173,7 @@ export class ExpenseService {
       request.history.push({
         statusBefore: RequestStatus.BUDGET_CHECK,
         statusAfter: RequestStatus.PENDING_EXCEPTIONAL,
-        actorId: actor._id!,
+        actorId: actorId,
         actorName: "System Engine",
         actorRole: SystemRole.ADMIN,
         action: `Budget Overrun. Flagged: ${budgetCheck.message}`,
@@ -178,11 +209,12 @@ export class ExpenseService {
     }
 
     const previousStatus = request.status;
-    const logActor = { id: actor._id, name: actor.name, role: actor.role };
+    const actorId = getActorId(actor);
+    const logActor = { id: actorId, name: actor.name, role: actor.role };
 
     if (action === "APPROVE") {
       request.exceptionalBudgetApproved = true;
-      request.exceptionalApprovedBy = actor._id;
+      request.exceptionalApprovedBy = actorId as any;
       
       if (adjustedAmount && adjustedAmount > 0) {
         request.originalAmount = request.amount;
@@ -199,7 +231,7 @@ export class ExpenseService {
       request.history.push({
         statusBefore: previousStatus,
         statusAfter: RequestStatus.PENDING_APPROVAL,
-        actorId: actor._id!,
+        actorId: actorId,
         actorName: actor.name,
         actorRole: actor.role,
         action: "Approve One-Time Budget Expansion",
@@ -219,7 +251,7 @@ export class ExpenseService {
       request.history.push({
         statusBefore: previousStatus,
         statusAfter: RequestStatus.REJECTED,
-        actorId: actor._id!,
+        actorId: actorId,
         actorName: actor.name,
         actorRole: actor.role,
         action: "Reject Exceptional Budget",
@@ -240,7 +272,7 @@ export class ExpenseService {
       request.history.push({
         statusBefore: previousStatus,
         statusAfter: RequestStatus.RETURNED,
-        actorId: actor._id!,
+        actorId: actorId,
         actorName: actor.name,
         actorRole: actor.role,
         action: "Return for Budget Adjustments",
@@ -284,7 +316,8 @@ export class ExpenseService {
     }
 
     const previousStatus = request.status;
-    const logActor = { id: actor._id, name: actor.name, role: actor.role };
+    const actorId = getActorId(actor);
+    const logActor = { id: actorId, name: actor.name, role: actor.role };
 
     if (action === "APPROVE") {
       // Look up next step in the sequence
@@ -296,7 +329,7 @@ export class ExpenseService {
         request.history.push({
           statusBefore: previousStatus,
           statusAfter: RequestStatus.PENDING_APPROVAL,
-          actorId: actor._id!,
+          actorId: actorId,
           actorName: actor.name,
           actorRole: actor.role,
           action: `Approve Step: ${nextRouting.step.stepName}`,
@@ -317,7 +350,7 @@ export class ExpenseService {
         request.history.push({
           statusBefore: previousStatus,
           statusAfter: RequestStatus.SENT_TO_FINANCE,
-          actorId: actor._id!,
+          actorId: actorId,
           actorName: actor.name,
           actorRole: actor.role,
           action: "Final Workflow Approval Completed",
@@ -341,7 +374,7 @@ export class ExpenseService {
       request.history.push({
         statusBefore: previousStatus,
         statusAfter: RequestStatus.REJECTED,
-        actorId: actor._id!,
+        actorId: actorId,
         actorName: actor.name,
         actorRole: actor.role,
         action: "Reject Request",
@@ -366,7 +399,7 @@ export class ExpenseService {
       request.history.push({
         statusBefore: previousStatus,
         statusAfter: RequestStatus.RETURNED,
-        actorId: actor._id!,
+        actorId: actorId,
         actorName: actor.name,
         actorRole: actor.role,
         action: "Return to Initiator",
@@ -401,13 +434,14 @@ export class ExpenseService {
       throw new Error("Request is not awaiting finance audit.");
     }
 
+    const actorId = getActorId(actor);
     const previousStatus = request.status;
     request.status = RequestStatus.UPLOADED_TO_BANK;
     
     request.history.push({
       statusBefore: previousStatus,
       statusAfter: RequestStatus.UPLOADED_TO_BANK,
-      actorId: actor._id!,
+      actorId: actorId,
       actorName: actor.name,
       actorRole: actor.role,
       action: "Confirm Documentation & Upload Instruction to Bank Platform",
@@ -416,7 +450,7 @@ export class ExpenseService {
 
     await request.save();
     
-    const logActor = { id: actor._id, name: actor.name, role: actor.role };
+    const logActor = { id: actorId, name: actor.name, role: actor.role };
     await LoggerService.logAudit(
       "EXPENSE_BANK_UPLOADED",
       `Finance Officer ${actor.name} uploaded payment file for request ${request.requestNumber} to the bank platform`,
@@ -448,6 +482,7 @@ export class ExpenseService {
       throw new Error("Request has not been uploaded to the bank yet.");
     }
 
+    const actorId = getActorId(actor);
     const previousStatus = request.status;
     
     // Save bank transaction records
@@ -459,7 +494,7 @@ export class ExpenseService {
     request.history.push({
       statusBefore: previousStatus,
       statusAfter: RequestStatus.PAID,
-      actorId: actor._id!,
+      actorId: actorId,
       actorName: actor.name,
       actorRole: actor.role,
       action: "Authorize Payment Release",
@@ -469,7 +504,7 @@ export class ExpenseService {
 
     await request.save();
     
-    const logActor = { id: actor._id, name: actor.name, role: actor.role };
+    const logActor = { id: actorId, name: actor.name, role: actor.role };
     await LoggerService.logAudit(
       "PAYMENT_RELEASED",
       `Payment released for request ${request.requestNumber}. Reference: ${reference}`,
@@ -485,7 +520,7 @@ export class ExpenseService {
     request.history.push({
       statusBefore: RequestStatus.PAID,
       statusAfter: RequestStatus.CLOSED,
-      actorId: actor._id!,
+      actorId: actorId as any,
       actorName: "System Engine",
       actorRole: SystemRole.ADMIN,
       action: "Final Closure & Audit Logs Solidified",
