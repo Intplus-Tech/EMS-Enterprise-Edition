@@ -68,9 +68,31 @@ export async function runDatabaseSeed() {
     endDate: julyEnd
   });
 
+  const salesBudget = new BudgetPeriod({
+    departmentId: salesDept._id,
+    periodName: `${currentYear}-July`,
+    totalBudget: 10000000,
+    utilisedBudget: 0,
+    pendingBudget: 0,
+    startDate: julyStart,
+    endDate: julyEnd
+  });
+
+  const legalBudget = new BudgetPeriod({
+    departmentId: legalDept._id,
+    periodName: `${currentYear}-July`,
+    totalBudget: 8000000,
+    utilisedBudget: 7000,
+    pendingBudget: 0,
+    startDate: julyStart,
+    endDate: julyEnd
+  });
+
   await engBudget.save();
   await mktBudget.save();
   await techBudget.save();
+  await salesBudget.save();
+  await legalBudget.save();
   console.log("Budgets created.");
 
   // 4. Create Users (with hashed passwords)
@@ -81,14 +103,42 @@ export async function runDatabaseSeed() {
   const officerPassword = await AuthService.hashPassword("officer123");
   const managerPassword = await AuthService.hashPassword("manager123");
 
+  const userDocs: Array<InstanceType<typeof User>> = [];
+
+  // Global / Unrestricted accounts (no department restriction)
   const adminUser = new User({
     email: "admin@spendflow.com",
-    name: "Alice Admin",
+    name: "Alice Admin (Global)",
     role: SystemRole.ADMIN,
     passwordHash: adminPassword,
     isActive: true,
   });
 
+  const headUser = new User({
+    email: "head@spendflow.com",
+    name: "Helen Head (Global)",
+    role: SystemRole.FINANCE_HEAD,
+    passwordHash: headPassword,
+    isActive: true,
+  });
+
+  const officerUser = new User({
+    email: "officer@spendflow.com",
+    name: "Jane Doe (Global Officer)",
+    role: SystemRole.FINANCE_OFFICER,
+    passwordHash: officerPassword,
+    isActive: true,
+  });
+
+  const managerUser = new User({
+    email: "manager@spendflow.com",
+    name: "Jerry Doe (Global Manager)",
+    role: SystemRole.FINANCE_MANAGER,
+    passwordHash: managerPassword,
+    isActive: true,
+  });
+
+  // Default Engineering Initiator & Approver for demo requests backwards-compatibility
   const initiatorUser = new User({
     email: "initiator@spendflow.com",
     name: "Ian Initiator",
@@ -107,37 +157,84 @@ export async function runDatabaseSeed() {
     isActive: true,
   });
 
-  const headUser = new User({
-    email: "head@spendflow.com",
-    name: "Helen Head",
-    role: SystemRole.FINANCE_HEAD,
-    passwordHash: headPassword,
-    isActive: true,
-  });
+  userDocs.push(adminUser, headUser, officerUser, managerUser, initiatorUser, approverUser);
 
-  const officerUser = new User({
-    email: "officer@spendflow.com",
-    name: "Jane Doe", // matches "Jane Doe" from the mockups
-    role: SystemRole.FINANCE_OFFICER,
-    passwordHash: officerPassword,
-    isActive: true,
-  });
+  // Department definitions map for full matrix seeding
+  const deptList = [
+    { key: "eng", dept: engDept, name: "Engineering" },
+    { key: "mkt", dept: mktDept, name: "Marketing" },
+    { key: "sales", dept: salesDept, name: "Sales" },
+    { key: "tech", dept: techDept, name: "Technology" },
+    { key: "legal", dept: legalDept, name: "Legal" },
+  ];
 
-  const managerUser = new User({
-    email: "manager@spendflow.com",
-    name: "Jerry Doe", // matches "Jerry Doe" from workflow stepper
-    role: SystemRole.FINANCE_MANAGER,
-    passwordHash: managerPassword,
-    isActive: true,
-  });
+  // Seed every role for every department
+  for (const { key, dept, name } of deptList) {
+    // 1. Department Admin (Admin assigned to a specific department)
+    userDocs.push(new User({
+      email: `admin.${key}@spendflow.com`,
+      name: `${name} Admin`,
+      role: SystemRole.ADMIN,
+      departmentId: dept._id,
+      passwordHash: adminPassword,
+      isActive: true,
+    }));
 
-  await adminUser.save();
-  await initiatorUser.save();
-  await approverUser.save();
-  await headUser.save();
-  await officerUser.save();
-  await managerUser.save();
-  console.log("Default users seeded.");
+    // 2. Department Initiator
+    userDocs.push(new User({
+      email: `initiator.${key}@spendflow.com`,
+      name: `${name} Initiator`,
+      role: SystemRole.INITIATOR,
+      departmentId: dept._id,
+      passwordHash: initPassword,
+      isActive: true,
+    }));
+
+    // 3. Department Approver
+    userDocs.push(new User({
+      email: `approver.${key}@spendflow.com`,
+      name: `${name} Approver`,
+      role: SystemRole.APPROVER,
+      departmentId: dept._id,
+      passwordHash: appPassword,
+      isActive: true,
+    }));
+
+    // 4. Department Finance Officer
+    userDocs.push(new User({
+      email: `officer.${key}@spendflow.com`,
+      name: `${name} Finance Officer`,
+      role: SystemRole.FINANCE_OFFICER,
+      departmentId: dept._id,
+      passwordHash: officerPassword,
+      isActive: true,
+    }));
+
+    // 5. Department Finance Manager
+    userDocs.push(new User({
+      email: `manager.${key}@spendflow.com`,
+      name: `${name} Finance Manager`,
+      role: SystemRole.FINANCE_MANAGER,
+      departmentId: dept._id,
+      passwordHash: managerPassword,
+      isActive: true,
+    }));
+
+    // 6. Department Finance Head
+    userDocs.push(new User({
+      email: `head.${key}@spendflow.com`,
+      name: `${name} Finance Head`,
+      role: SystemRole.FINANCE_HEAD,
+      departmentId: dept._id,
+      passwordHash: headPassword,
+      isActive: true,
+    }));
+  }
+
+  for (const u of userDocs) {
+    await u.save();
+  }
+  console.log(`Default and per-department users seeded (${userDocs.length} users total).`);
 
   // 5. Create Default Active Workflow configuration
   const defaultWorkflow = new WorkflowConfig({
