@@ -8,8 +8,6 @@ export default function RequestsPage() {
     currentUser,
     expenses,
     searchQuery, setSearchQuery,
-    showNotifications, setShowNotifications,
-    notifications, setNotifications,
     setSelectedResubmitExpense,
     setResubmitForm,
     setShowResubmitModal,
@@ -30,10 +28,6 @@ export default function RequestsPage() {
       expenses={expenses}
       searchQuery={searchQuery}
       setSearchQuery={setSearchQuery}
-      showNotifications={showNotifications}
-      setShowNotifications={setShowNotifications}
-      notifications={notifications}
-      setNotifications={setNotifications}
       setSelectedResubmitExpense={setSelectedResubmitExpense}
       setResubmitForm={setResubmitForm}
       setShowResubmitModal={setShowResubmitModal}

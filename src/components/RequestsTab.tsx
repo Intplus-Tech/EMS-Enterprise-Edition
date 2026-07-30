@@ -6,10 +6,6 @@ interface RequestsTabProps {
   expenses: any[];
   searchQuery: string;
   setSearchQuery: (q: string) => void;
-  showNotifications: boolean;
-  setShowNotifications: (show: boolean) => void;
-  notifications: any[];
-  setNotifications: (notifs: any[]) => void;
   setSelectedResubmitExpense: (expense: any) => void;
   setResubmitForm: (form: any) => void;
   setShowResubmitModal: (show: boolean) => void;
@@ -35,10 +31,6 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
   expenses,
   searchQuery,
   setSearchQuery,
-  showNotifications,
-  setShowNotifications,
-  notifications,
-  setNotifications,
   setSelectedResubmitExpense,
   setResubmitForm,
   setShowResubmitModal,

@@ -5,6 +5,7 @@ import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
 
 import { DynamicIcon } from "../../components/DynamicIcon";
+import { NotificationsPanel } from "../../components/NotificationsPanel";
 
 // Modular Dialog Modals
 import { InitiateExpenseRequestModal } from "../../components/modals/InitiateExpenseRequestModal";
@@ -44,6 +45,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     fetchSession,
     expenses,
     notifications,
+    unreadNotificationCount,
+    dismissNotification,
+    markAllNotificationsRead,
     searchQuery, setSearchQuery,
     showNotifications, setShowNotifications,
     setShowCreateModal,
@@ -111,6 +115,32 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const navTo = (route: string) => router.push(route);
   const isActive = (route: string) => pathname === route;
+
+  // Notification actions resolve back to the live expense record they were derived from.
+  const handleNotificationAction = (notification: any) => {
+    const expense = expenses.find((e: any) => String(e._id) === String(notification.requestId));
+    setShowNotifications(false);
+    if (!expense) return;
+
+    if (notification.type === "RETURNED") {
+      setSelectedResubmitExpense(expense);
+      setResubmitForm({
+        justification: "",
+        supportingDocument: expense.supportingDocument || "",
+        notifyAuditor: true,
+      });
+      setShowResubmitModal(true);
+      return;
+    }
+
+    if (notification.type === "PAID" && expense.paymentReceipt) {
+      setSelectedReceiptData(expense);
+      setShowReceiptModal(true);
+      return;
+    }
+
+    setSelectedExpense(expense);
+  };
 
   if (startupError) {
     return (
@@ -188,7 +218,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               >
                 <Icons.Receipt size={18} /> Requests
                 {(() => {
-                  const pendingCount = expenses.filter((e: any) => ["DRAFT", "RETURNED"].includes(e.status)).length + notifications.filter((n: any) => n.type === "RETURNED").length;
+                  const pendingCount = expenses.filter((e: any) => ["DRAFT", "RETURNED"].includes(e.status)).length;
                   return pendingCount > 0 ? (
                     <span style={{
                       marginLeft: "auto",
@@ -610,9 +640,23 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
-            <div style={{ position: "relative", cursor: "pointer" }} onClick={() => setShowNotifications(!showNotifications)}>
-              <Icons.Bell size={20} style={{ color: "rgb(var(--color-text-muted))" }} />
-              <span style={{ position: "absolute", top: -2, right: -2, width: 8, height: 8, borderRadius: "50%", background: "#EF4444" }} />
+            <div style={{ position: "relative" }}>
+              <div style={{ position: "relative", cursor: "pointer" }} onClick={() => setShowNotifications(!showNotifications)}>
+                <Icons.Bell size={20} style={{ color: "rgb(var(--color-text-muted))" }} />
+                {unreadNotificationCount > 0 && (
+                  <span style={{ position: "absolute", top: -2, right: -2, width: 8, height: 8, borderRadius: "50%", background: "#EF4444" }} />
+                )}
+              </div>
+
+              {showNotifications && (
+                <NotificationsPanel
+                  notifications={notifications}
+                  onClose={() => setShowNotifications(false)}
+                  onDismiss={dismissNotification}
+                  onMarkAllRead={markAllNotificationsRead}
+                  onPrimaryAction={handleNotificationAction}
+                />
+              )}
             </div>
 
             <button

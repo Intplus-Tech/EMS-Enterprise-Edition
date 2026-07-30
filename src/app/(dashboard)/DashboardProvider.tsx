@@ -1,9 +1,33 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getAllowedRoutesForRole, getDefaultRouteForRole } from "./roleRoutes";
+import { buildNotifications, formatRelativeTime } from "../../domains/notifications/notification.builder";
+
+const DISMISSED_NOTIFICATIONS_KEY = "ems.notifications.dismissed";
+const READ_NOTIFICATIONS_KEY = "ems.notifications.read";
+
+function readStoredIds(key: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredIds(key: string, ids: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(ids));
+  } catch {
+    // Storage unavailable (private mode / quota) - state stays in memory only.
+  }
+}
 
 const DashboardContext = createContext<any>(null);
 
@@ -144,67 +168,45 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     setIsUploadingDoc(false);
   };
 
-  // Initiator-specific state
-  const [notifications, setNotifications] = useState<any[]>([
-    {
-      id: "notif-1",
-      type: "RETURNED",
-      title: "Returned for Correction: REQ-0519",
-      time: "2 mins ago",
-      message: "Your travel expense request for ₦3,200 was returned by Sarah Okafor. Reason: Missing original hotel receipt.",
-      requestId: "mock-519",
-      meta: {
-        requestNumber: "REQ-0519",
-        category: "Travel Expense",
-        amount: 3200,
-        auditor: "Sarah Okafor",
-        auditorRole: "Approver / Auditor",
-        comment: "Missing original hotel receipt. The current attachment only shows the booking confirmation, not the final payment receipt from the merchant.",
-        justification: "Accommodation for Q3 regional sales summit in Lagos. One night stay at Continental Hotel.",
-        attachments: [{ name: "Booking_Confirmation_Lagos.pdf", size: "420 KB" }]
-      }
-    },
-    {
-      id: "notif-2",
-      type: "APPROVED",
-      title: "Request Approved: REQ-0498",
-      time: "3 hours ago",
-      message: "Your IT equipment purchase for ₦5,400 was approved by the Departmental Approver. Moving to Finance for payment.",
-      requestId: "mock-498",
-      meta: {
-        requestNumber: "REQ-0498",
-        category: "Office Equipment",
-        amount: 5400,
-        description: "IT equipment purchase (monitor and keyboard)",
-        vendorName: "IT Solutions Ltd",
-        bankName: "Zenith Bank",
-        accountNumber: "1029384756",
-        accountName: "IT Solutions Ltd",
-        status: "APPROVED"
-      }
-    },
-    {
-      id: "notif-3",
-      type: "PAID",
-      title: "Payment Completed: REQ-0482",
-      time: "Yesterday, 2:30 PM",
-      message: "Your vendor invoice for ₦12,000 (Project Alpha) has been paid. Bank Ref: BNK-2026-0829-01.",
-      requestId: "mock-482",
-      meta: {
-        requestNumber: "REQ-0482",
-        category: "Software & Services",
-        amount: 12000,
-        reference: "BNK-2026-0829-01"
-      }
-    },
-    {
-      id: "notif-4",
-      type: "POLICY",
-      title: "Reminder: Per Diem Policy Update",
-      time: "Yesterday, 9:00 AM",
-      message: "New domestic travel per diem rates are effective from August 1, 2026. Check the policy before submitting claims."
-    }
-  ]);
+  // Notifications are derived from real expense workflow history. Read/dismissed
+  // state is per-browser because there is no notification collection server-side.
+  const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setDismissedNotificationIds(readStoredIds(DISMISSED_NOTIFICATIONS_KEY));
+    setReadNotificationIds(readStoredIds(READ_NOTIFICATIONS_KEY));
+  }, []);
+
+  const notifications = useMemo(() => {
+    return buildNotifications(expenses, currentUser)
+      .filter((n) => !dismissedNotificationIds.includes(n.id))
+      .map((n) => ({
+        ...n,
+        time: formatRelativeTime(n.timestamp),
+        read: readNotificationIds.includes(n.id),
+      }));
+  }, [expenses, currentUser, dismissedNotificationIds, readNotificationIds]);
+
+  const unreadNotificationCount = notifications.filter((n) => !n.read).length;
+
+  const dismissNotification = useCallback((id: string) => {
+    setDismissedNotificationIds((prev) => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      writeStoredIds(DISMISSED_NOTIFICATIONS_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setReadNotificationIds((prev) => {
+      const next = Array.from(new Set([...prev, ...notifications.map((n) => n.id)]));
+      writeStoredIds(READ_NOTIFICATIONS_KEY, next);
+      return next;
+    });
+  }, [notifications]);
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [showResubmitModal, setShowResubmitModal] = useState(false);
   const [selectedResubmitExpense, setSelectedResubmitExpense] = useState<any>(null);
@@ -523,15 +525,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
     if (!selectedResubmitExpense) return;
 
-    // Check if it is the mockup notification request REQ-0519
-    if (selectedResubmitExpense.id === "mock-519") {
-      setNotifications(prev => prev.filter(n => n.id !== "notif-1"));
-      setShowResubmitModal(false);
-      setSelectedResubmitExpense(null);
-      alert("Mock Request REQ-0519 resubmitted successfully!");
-      return;
-    }
-
     try {
       const updatePayload = {
         category: selectedResubmitExpense.category,
@@ -569,8 +562,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           notifyAuditor: true
         });
         loadDashboardData(currentUser);
-        // Clear matching notification
-        setNotifications(prev => prev.filter(n => n.requestId !== selectedResubmitExpense._id));
       } else {
         setFormError(submitData.error || "Failed to resubmit request.");
       }
@@ -845,7 +836,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     isUploadingDoc, setIsUploadingDoc,
     uploadDocError, setUploadDocError,
     handleFileUpload,
-    notifications, setNotifications,
+    notifications,
+    unreadNotificationCount,
+    dismissNotification,
+    markAllNotificationsRead,
     showNotifications, setShowNotifications,
     showResubmitModal, setShowResubmitModal,
     selectedResubmitExpense, setSelectedResubmitExpense,
