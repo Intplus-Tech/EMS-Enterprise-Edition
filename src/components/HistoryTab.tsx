@@ -1,5 +1,21 @@
-import React from "react";
+/**
+ * HistoryTab — finalized/archived request history for initiators and approvers.
+ *
+ * Mirrors `designs/initiator/History.png`: KPI row, a staged filter panel, the
+ * REQUEST ID / DATE / CATEGORY / AMOUNT / STATUS / ACTIONS table and a paginated
+ * footer. Presentational only — the page layer owns the filter state it shares
+ * with other screens.
+ */
+
+import React, { useMemo, useState } from "react";
 import * as Icons from "lucide-react";
+import { StatCard } from "./ui/StatCard";
+import { Pagination } from "./ui/Pagination";
+import { EmptyState } from "./ui/EmptyState";
+import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, statusBadgeClass } from "./ui/format";
+
+/** Design shows five rows per page in the history table. */
+const ROWS_PER_PAGE = 5;
 
 interface HistoryTabProps {
   currentUser: any;
@@ -28,94 +44,174 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
   setHistorySubTab,
   setSelectedExpense
 }) => {
-  const historical = expenses.filter(e => {
-    // Gather history statuses
+  // Draft filter values — the design commits them via "Apply Filters" rather than
+  // filtering on every keystroke, so they are staged locally first.
+  const [draftCategory, setDraftCategory] = useState(historyFilterCategory);
+  const [draftStatus, setDraftStatus] = useState(historyFilterStatus);
+  const [draftFrom, setDraftFrom] = useState("");
+  const [draftTo, setDraftTo] = useState("");
+  const [appliedFrom, setAppliedFrom] = useState("");
+  const [appliedTo, setAppliedTo] = useState("");
+  const [page, setPage] = useState(1);
+
+  // Requests visible to this user, before any UI filter is applied. Kept separate
+  // so the KPI tiles always describe the full history, not the filtered slice.
+  const scoped = useMemo(() => expenses.filter(e => {
     const isHistory = ["PAID", "CLOSED", "REJECTED", "CANCELLED", "APPROVED"].includes(e.status);
     if (!isHistory) return false;
 
-    // Gated to user role or department if Approver
-    const inDept = currentUser?.role === "INITIATOR"
+    return currentUser?.role === "INITIATOR"
       ? e.initiatorId?._id === currentUser?._id
-      : (["ADMIN", "FINANCE_MANAGER", "FINANCE_OFFICER", "FINANCE_HEAD"].includes(currentUser?.role) || e.departmentId === currentUser?.departmentId || e.initiatorId?.departmentId === currentUser?.departmentId || (e.departmentId as any)?.name === currentUser?.departmentName);
-    if (!inDept) return false;
+      : (["ADMIN", "FINANCE_MANAGER", "FINANCE_OFFICER", "FINANCE_HEAD"].includes(currentUser?.role)
+        || e.departmentId === currentUser?.departmentId
+        || e.initiatorId?.departmentId === currentUser?.departmentId
+        || (e.departmentId as any)?.name === currentUser?.departmentName);
+  }), [expenses, currentUser]);
 
-    // Filter by category
+  // KPI figures derived from the scoped list so they stay consistent with the table.
+  const stats = useMemo(() => {
+    const now = new Date();
+    const spentThisMonth = scoped
+      .filter(e => {
+        if (!["PAID", "CLOSED"].includes(e.status)) return false;
+        const d = new Date(e.createdAt);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+
+    return {
+      spentThisMonth,
+      total: scoped.length,
+      approved: scoped.filter(e => ["APPROVED", "PAID", "CLOSED"].includes(e.status)).length,
+      rejected: scoped.filter(e => ["REJECTED", "CANCELLED"].includes(e.status)).length,
+    };
+  }, [scoped]);
+
+  const historical = useMemo(() => scoped.filter(e => {
     if (historyFilterCategory !== "ALL" && e.category !== historyFilterCategory) return false;
-
-    // Filter by status dropdown
     if (historyFilterStatus !== "ALL" && e.status !== historyFilterStatus) return false;
 
-    // Filter by search query
-    const matchesSearch = e.description.toLowerCase().includes(historySearchQuery.toLowerCase()) || e.requestNumber.toLowerCase().includes(historySearchQuery.toLowerCase());
+    // Inclusive date window; `appliedTo` is pushed to end-of-day so the selected
+    // day itself is never excluded.
+    const created = new Date(e.createdAt).getTime();
+    if (appliedFrom && created < new Date(appliedFrom).getTime()) return false;
+    if (appliedTo && created > new Date(appliedTo).getTime() + 86_399_999) return false;
+
+    const query = historySearchQuery.toLowerCase();
+    const matchesSearch = e.description.toLowerCase().includes(query) || e.requestNumber.toLowerCase().includes(query);
     if (!matchesSearch) return false;
 
-    // Filter by sub-tab (all vs approved/paid vs rejected/cancelled)
-    if (historySubTab === "approved") {
-      return ["PAID", "CLOSED", "APPROVED"].includes(e.status);
-    }
-    if (historySubTab === "rejected") {
-      return ["REJECTED", "CANCELLED"].includes(e.status);
-    }
-
+    if (historySubTab === "approved") return ["PAID", "CLOSED", "APPROVED"].includes(e.status);
+    if (historySubTab === "rejected") return ["REJECTED", "CANCELLED"].includes(e.status);
     return true;
-  });
+  }), [scoped, historyFilterCategory, historyFilterStatus, historySearchQuery, historySubTab, appliedFrom, appliedTo]);
+
+  // Guard against landing on a page that no longer exists after filtering.
+  const safePage = Math.min(page, Math.max(1, Math.ceil(historical.length / ROWS_PER_PAGE)));
+  const visibleRows = historical.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
+
+  const applyFilters = () => {
+    setHistoryFilterCategory(draftCategory);
+    setHistoryFilterStatus(draftStatus);
+    setAppliedFrom(draftFrom);
+    setAppliedTo(draftTo);
+    setPage(1);
+  };
+
+  const resetFilters = () => {
+    setDraftCategory("ALL");
+    setDraftStatus("ALL");
+    setDraftFrom("");
+    setDraftTo("");
+    setHistoryFilterCategory("ALL");
+    setHistoryFilterStatus("ALL");
+    setAppliedFrom("");
+    setAppliedTo("");
+    setHistorySearchQuery("");
+    setPage(1);
+  };
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
+      {/* Page heading + free-text search */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>
         <div>
           <h2>Request History</h2>
-          <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.95rem" }}>View finalized or archived expense requests.</p>
+          <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.95rem" }}>
+            View and manage your previous financial requests and expenditure logs.
+          </p>
         </div>
 
-        {/* Top Filters Bar */}
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center" }}>
-          {/* Category Filter */}
-          <select
-            value={historyFilterCategory}
-            onChange={(e) => setHistoryFilterCategory(e.target.value)}
-            className="form-select"
-            style={{ width: "150px", background: "rgba(30, 41, 59, 0.45)", borderRadius: "8px", fontSize: "0.85rem", padding: "0.5rem" }}
-          >
-            <option value="ALL">All Categories</option>
-            <option value="Travel">Travel</option>
-            <option value="Software">Software</option>
-            <option value="Marketing">Marketing</option>
-            <option value="Office Equipment">Office Equipment</option>
-            <option value="Meals">Meals</option>
-          </select>
+        <div style={{ position: "relative", minWidth: "220px" }}>
+          <Icons.Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))" }} />
+          <input
+            type="text"
+            placeholder="Search history..."
+            value={historySearchQuery}
+            onChange={(e) => { setHistorySearchQuery(e.target.value); setPage(1); }}
+            className="form-input"
+            style={{ paddingLeft: "2.25rem", fontSize: "0.85rem", padding: "0.5rem 0.5rem 0.5rem 2.25rem", borderRadius: "8px", height: "auto" }}
+          />
+        </div>
+      </div>
 
-          {/* Status Filter */}
-          <select
-            value={historyFilterStatus}
-            onChange={(e) => setHistoryFilterStatus(e.target.value)}
-            className="form-select"
-            style={{ width: "150px", background: "rgba(30, 41, 59, 0.45)", borderRadius: "8px", fontSize: "0.85rem", padding: "0.5rem" }}
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="PAID">Paid</option>
-            <option value="CLOSED">Closed</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
+      {/* KPI row — always describes the full history, never the filtered slice */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
+        <StatCard label="Total Spent" hint="this month" value={formatNaira(stats.spentThisMonth)} icon={<Icons.CreditCard size={18} />} />
+        <StatCard label="Total Request" hint="across all statuses" value={stats.total} icon={<Icons.FileText size={18} />} />
+        <StatCard label="Total Approved" hint="all approved and paid" value={stats.approved} icon={<Icons.CheckCheck size={18} />} tone="neutral" />
+        <StatCard label="Total Rejected" hint="not considered" value={stats.rejected} icon={<Icons.AlertCircle size={18} />} tone="danger" />
+      </div>
 
-          {/* Search query */}
-          <div style={{ position: "relative", minWidth: "200px" }}>
-            <Icons.Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))" }} />
-            <input
-              type="text"
-              placeholder="Search history..."
-              value={historySearchQuery}
-              onChange={(e) => setHistorySearchQuery(e.target.value)}
-              className="form-input"
-              style={{ paddingLeft: "2.25rem", fontSize: "0.85rem", padding: "0.5rem 0.5rem 0.5rem 2.25rem", background: "rgba(30, 41, 59, 0.45)", borderRadius: "8px", height: "auto" }}
-            />
+      {/* Staged filter panel — nothing is applied until "Apply Filters" is pressed */}
+      <div className="glass-panel" style={{ padding: "1.15rem 1.25rem", marginBottom: "1.5rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr)) auto", gap: "1rem", alignItems: "end" }}>
+          <div>
+            <label className="form-label" style={{ fontSize: "0.78rem" }}>Filter by Category</label>
+            <select value={draftCategory} onChange={(e) => setDraftCategory(e.target.value)} className="form-select">
+              <option value="ALL">All Categories</option>
+              <option value="Travel">Travel</option>
+              <option value="Software">Software</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Office Equipment">Office Equipment</option>
+              <option value="Meals">Meals</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: "0.78rem" }}>Status</label>
+            <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value)} className="form-select">
+              <option value="ALL">All Statuses</option>
+              <option value="APPROVED">Approved</option>
+              <option value="PAID">Paid</option>
+              <option value="CLOSED">Closed</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label" style={{ fontSize: "0.78rem" }}>Date Range</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <input type="date" aria-label="From date" value={draftFrom} onChange={(e) => setDraftFrom(e.target.value)} className="form-input" style={{ fontSize: "0.82rem" }} />
+              <span style={{ color: "rgb(var(--color-text-dim))", fontSize: "0.8rem" }}>&ndash;</span>
+              <input type="date" aria-label="To date" value={draftTo} onChange={(e) => setDraftTo(e.target.value)} className="form-input" style={{ fontSize: "0.82rem" }} />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <button type="button" onClick={applyFilters} className="btn btn-primary" style={{ background: "#2563EB", border: "none" }}>
+              Apply Filters
+            </button>
+            <button type="button" onClick={resetFilters} style={{ background: "none", border: "none", color: "#2563EB", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
+              Reset
+            </button>
           </div>
         </div>
       </div>
 
       {/* Sub-Tabs for History (All Requests, Approved, Rejected) */}
-      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", borderBottom: "1px solid rgb(var(--color-card-border))", marginBottom: "1.5rem" }}>
         {[
           { id: "all", label: "All Requests" },
           { id: "approved", label: "Approved" },
@@ -123,7 +219,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
         ].map(subTab => (
           <button
             key={subTab.id}
-            onClick={() => setHistorySubTab(subTab.id as any)}
+            onClick={() => { setHistorySubTab(subTab.id as any); setPage(1); }}
             style={{
               padding: "0.75rem 1.5rem",
               background: "none",
@@ -140,51 +236,59 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
       </div>
 
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Category</th>
-                <th>Description</th>
-                <th>Amount</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {historical.length > 0 ? historical.map((exp) => (
-                <tr key={exp._id}>
-                  <td><strong>{exp.requestNumber}</strong></td>
-                  <td>{exp.category}</td>
-                  <td>{exp.description}</td>
-                  <td>₦{exp.amount.toLocaleString()}</td>
-                  <td>{new Date(exp.createdAt).toLocaleDateString()}</td>
-                  <td>
-                    {(() => {
-                      let badgeClass = "badge-pending";
-                      if (["PAID", "APPROVED", "CLOSED"].includes(exp.status)) badgeClass = "badge-approved";
-                      else if (["REJECTED", "CANCELLED"].includes(exp.status)) badgeClass = "badge-danger";
-                      return <span className={`badge ${badgeClass}`}>{exp.status}</span>;
-                    })()}
-                  </td>
-                  <td>
-                    <button onClick={() => setSelectedExpense(exp)} className="btn btn-secondary" style={{ padding: "0.4rem 0.8rem", fontSize: "0.8rem" }}>
-                      View Details
-                    </button>
-                  </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={7} style={{ textAlign: "center", color: "rgb(var(--color-text-dim))", padding: "2rem" }}>
-                    No completed requests found in history.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        {historical.length > 0 ? (
+          <>
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>REQUEST ID</th>
+                    <th>DATE</th>
+                    <th>CATEGORY</th>
+                    <th style={{ textAlign: "right" }}>AMOUNT (₦)</th>
+                    <th>STATUS</th>
+                    <th style={{ textAlign: "right" }}>ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleRows.map((exp) => (
+                    <tr key={exp._id}>
+                      <td><strong>{exp.requestNumber}</strong></td>
+                      <td>{formatDate(exp.createdAt)}</td>
+                      <td>{exp.category}</td>
+                      <td style={{ textAlign: "right", fontWeight: 700 }}>{formatNairaPrecise(exp.amount)}</td>
+                      <td>
+                        <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          onClick={() => setSelectedExpense(exp)}
+                          style={{ background: "none", border: "none", color: "#2563EB", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              page={safePage}
+              rowsPerPage={ROWS_PER_PAGE}
+              totalCount={historical.length}
+              onPageChange={setPage}
+              itemLabel="entries"
+            />
+          </>
+        ) : (
+          <EmptyState
+            icon={<Icons.Archive size={20} />}
+            title="No completed requests found in history"
+            description="Requests appear here once they have been approved, paid, rejected or cancelled."
+          />
+        )}
       </div>
     </div>
   );

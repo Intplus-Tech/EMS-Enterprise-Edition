@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
+import { ApproveRequestModal, ApproveRequestPayload } from "./modals/ApproveRequestModal";
+import { RejectOrClarifyModal, RejectOrClarifyPayload } from "./modals/RejectOrClarifyModal";
 
 interface ApprovalsTabProps {
   currentUser: any;
@@ -53,6 +55,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [showThreadModal, setShowThreadModal] = useState(false);
   const [showApproveExpansionModal, setShowApproveExpansionModal] = useState(false);
   const [showRejectExpansionModal, setShowRejectExpansionModal] = useState(false);
+
+  // Approver decision dialogs (designs/approval/Approve Request Modal.png & Comment Modal.png).
+  // Every financial decision must be signed off in a dialog rather than fired inline.
+  const [showApproveRequestModal, setShowApproveRequestModal] = useState(false);
+  const [showRejectClarifyModal, setShowRejectClarifyModal] = useState(false);
   const [expansionModalTarget, setExpansionModalTarget] = useState<any>(null);
   const [activeReleaseItem, setActiveReleaseItem] = useState<any>(null);
   const [bankRefNumber, setBankRefNumber] = useState("");
@@ -86,8 +93,13 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     }
   }, [selectedExpense]);
 
-  // Handler for custom actions (Approve, Insufficient Budget)
-  const handleWorkflowClick = async (actionType: "APPROVE" | "INSUFFICIENT" | "CLARIFY" | "ESCALATE") => {
+  // Handler for custom actions (Approve, Insufficient Budget).
+  // `decisionComment` carries the justification captured by the approval dialog so it
+  // lands on the audit trail instead of being dropped at the button click.
+  const handleWorkflowClick = async (
+    actionType: "APPROVE" | "INSUFFICIENT" | "CLARIFY" | "ESCALATE",
+    decisionComment?: string
+  ) => {
     if (!selectedExpense || submittingAction) return;
     setSubmittingAction(true);
 
@@ -109,7 +121,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           const res = await fetch(`/api/expenses/${selectedExpense._id}/exceptional`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "APPROVE", comment: "Approved exceptional budget" })
+            body: JSON.stringify({ action: "APPROVE", comment: decisionComment || "Approved exceptional budget" })
           });
           const data = await res.json();
           if (data.success) {
@@ -130,6 +142,21 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           const data = await res.json();
           if (data.success) {
             alert(`Payment released successfully. Reference: ${ref}`);
+            setSelectedExpense(null);
+            if (loadDashboardData) await loadDashboardData(currentUser);
+          } else {
+            alert(data.error || "Action failed.");
+          }
+        } else {
+          // Departmental approver — advances the request to the next workflow step.
+          const res = await fetch(`/api/expenses/${selectedExpense._id}/workflow`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "APPROVE", comment: decisionComment || "Approved." })
+          });
+          const data = await res.json();
+          if (data.success) {
+            alert("Request approved and forwarded to the next approval stage.");
             setSelectedExpense(null);
             if (loadDashboardData) await loadDashboardData(currentUser);
           } else {
@@ -210,6 +237,53 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         } else {
           alert(data.error || "Escalation failed.");
         }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("An error occurred. Please try again.");
+    } finally {
+      setSubmittingAction(false);
+    }
+  };
+
+  // Confirms the "Approve Financial Request" dialog and hands off to the shared
+  // workflow handler so the role-specific endpoint routing stays in one place.
+  const handleApproveConfirm = async (payload: ApproveRequestPayload) => {
+    const budgetNote = payload.budgetItem ? ` [Budget item: ${payload.budgetItem}]` : "";
+    setShowApproveRequestModal(false);
+    await handleWorkflowClick("APPROVE", `${payload.justification || "Approved."}${budgetNote}`);
+  };
+
+  // Confirms the "Reject or Request Clarification" dialog. REJECT closes the request
+  // outright; CLARIFY returns it to the initiator for an update.
+  const handleRejectOrClarifyConfirm = async (payload: RejectOrClarifyPayload) => {
+    if (!selectedExpense || submittingAction) return;
+    setSubmittingAction(true);
+
+    try {
+      const isRejection = payload.decision === "REJECT";
+      const comment = isRejection ? payload.reason : `[Clarification Required]: ${payload.reason}`;
+
+      // Finance Head decisions run through the exceptional-budget route instead.
+      const endpoint =
+        currentUser?.role === "FINANCE_HEAD"
+          ? `/api/expenses/${selectedExpense._id}/exceptional`
+          : `/api/expenses/${selectedExpense._id}/workflow`;
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: isRejection ? "REJECT" : "RETURN", comment })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        alert(isRejection ? "Request rejected successfully." : "Clarification request sent to the requester.");
+        setShowRejectClarifyModal(false);
+        setSelectedExpense(null);
+        if (loadDashboardData) await loadDashboardData(currentUser);
+      } else {
+        alert(data.error || "Action failed.");
       }
     } catch (err) {
       console.error(err);
@@ -422,6 +496,15 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   >
                     Insufficient Budget
                   </button>
+                  {/* Opens the signed "Reject or Request Clarification" dialog */}
+                  <button
+                    onClick={() => setShowRejectClarifyModal(true)}
+                    className="btn"
+                    style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent", borderWidth: "1.5px" }}
+                    disabled={submittingAction}
+                  >
+                    Reject
+                  </button>
                   <button 
                     onClick={() => setShowClarificationForm(true)}
                     className="btn" 
@@ -442,7 +525,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     </button>
                   ) : (
                     <button 
-                      onClick={() => handleWorkflowClick("APPROVE")}
+                      onClick={() => setShowApproveRequestModal(true)}
                       className="btn btn-primary"
                       style={{ background: "#2563EB", border: "none" }}
                       disabled={submittingAction}
@@ -1870,6 +1953,23 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Approver decision dialogs — every approve/reject is signed off in a modal */}
+      <ApproveRequestModal
+        isOpen={showApproveRequestModal}
+        onClose={() => setShowApproveRequestModal(false)}
+        expense={selectedExpense}
+        submitting={submittingAction}
+        onConfirm={handleApproveConfirm}
+      />
+
+      <RejectOrClarifyModal
+        isOpen={showRejectClarifyModal}
+        onClose={() => setShowRejectClarifyModal(false)}
+        expense={selectedExpense}
+        submitting={submittingAction}
+        onConfirm={handleRejectOrClarifyConfirm}
+      />
 
       {/* Finance Head Approve One-Time Budget Expansion Modal */}
       <ApproveExpansionModal

@@ -1,6 +1,7 @@
 "use client";
 
 import { HistoryTab } from "../../../components/HistoryTab";
+import { PaymentHistoryTab } from "../../../components/PaymentHistoryTab";
 import { useDashboard } from "../DashboardProvider";
 
 export default function HistoryPage() {
@@ -15,6 +16,11 @@ export default function HistoryPage() {
   } = useDashboard();
 
   if (currentUser?.role === "FINANCE_HEAD") return null;
+
+  // The Finance Manager's history is a payment ledger, not a request log.
+  if (currentUser?.role === "FINANCE_MANAGER") {
+    return <PaymentHistoryTab expenses={expenses} />;
+  }
 
   return (
     <HistoryTab

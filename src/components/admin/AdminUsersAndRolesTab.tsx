@@ -1,5 +1,9 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { Pagination } from "../ui/Pagination";
+
+// Matches the row density shown in designs/system-admin/Admin_ User & Role.png
+const ROWS_PER_PAGE = 7;
 
 interface AdminUsersAndRolesTabProps {
   systemUsers: any[];
@@ -25,6 +29,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRoleFilter, setSelectedRoleFilter] = useState("ALL");
   const [selectedDeptFilter, setSelectedDeptFilter] = useState("ALL");
+  const [page, setPage] = useState(1);
 
   // Fallback user list if empty
   const userList = systemUsers && systemUsers.length > 0 ? systemUsers : [
@@ -65,6 +70,10 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
     const matchesDept = selectedDeptFilter === "ALL" || (u.departmentName || "").toLowerCase() === selectedDeptFilter.toLowerCase();
     return matchesSearch && matchesRole && matchesDept;
   });
+
+  // Clamp the page so filtering never strands the table on an out-of-range page.
+  const safePage = Math.min(page, Math.max(1, Math.ceil(filteredUsers.length / ROWS_PER_PAGE)));
+  const visibleUsers = filteredUsers.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
 
   // IF VIEWING ROLE PERMISSIONS MATRIX
   if (viewMode === "matrix") {
@@ -514,7 +523,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((u: any, idx: number) => {
+              {visibleUsers.map((u: any, idx: number) => {
                 const userName = u.name || u.fullName || "User";
                 const userEmail = u.email || "";
                 const deptName = u.departmentName || u.department?.name || "General";
@@ -641,16 +650,13 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
         </div>
 
         {/* Pagination */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.25rem", fontSize: "0.8rem", color: "#94a3b8" }}>
-          <span>Showing 1 to {filteredUsers.length} of 124 users</span>
-          <div style={{ display: "flex", gap: "0.35rem" }}>
-            <button style={{ padding: "0.25rem 0.5rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "#cbd5e1" }}>&lt;</button>
-            <button style={{ padding: "0.25rem 0.65rem", backgroundColor: "#2563eb", border: "none", borderRadius: "0.25rem", color: "#ffffff", fontWeight: "700" }}>1</button>
-            <button style={{ padding: "0.25rem 0.65rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "#cbd5e1" }}>2</button>
-            <button style={{ padding: "0.25rem 0.65rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "#cbd5e1" }}>3</button>
-            <button style={{ padding: "0.25rem 0.5rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "#cbd5e1" }}>&gt;</button>
-          </div>
-        </div>
+        <Pagination
+          page={safePage}
+          rowsPerPage={ROWS_PER_PAGE}
+          totalCount={filteredUsers.length}
+          onPageChange={setPage}
+          itemLabel="users"
+        />
       </div>
 
       {/* Departmental Access Overview Card at Bottom */}

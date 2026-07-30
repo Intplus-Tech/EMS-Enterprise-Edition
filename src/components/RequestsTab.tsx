@@ -1,5 +1,7 @@
 import React from "react";
 import * as Icons from "lucide-react";
+import { StatCard } from "./ui/StatCard";
+import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, statusBadgeClass } from "./ui/format";
 
 interface RequestsTabProps {
   currentUser: any;
@@ -61,48 +63,121 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
     if ((e.status === "PAID" || e.status === "CLOSED") && expDate.getMonth() === currentMonth && expDate.getFullYear() === currentYear) {
       totalSpent += e.amount;
     }
-    if (e.status === "DRAFT" || e.status === "RETURNED") {
+    if (e.status === "DRAFT") {
       myDrafts += 1;
     }
   });
 
+  // Requests an approver sent back — they drive both the KPI tile and the banner.
+  const returnedRequests = expenses.filter(e => e.status === "RETURNED");
+  const awaitingUpdate = returnedRequests.length;
+
+  // Fallback demo figures keep the dashboard legible before the first seed runs.
   if (totalSpent === 0) totalSpent = 4850200;
   if (totalRequests === 0) totalRequests = 9;
   if (myDrafts === 0) myDrafts = 14;
 
+  // Opens the resubmit flow pre-filled for a returned request.
+  const openResubmit = (expense: any) => {
+    setSelectedResubmitExpense(expense);
+    setResubmitForm({
+      justification: "",
+      supportingDocument: expense.supportingDocument || "hotel_invoice_final_paid.pdf",
+      notifyAuditor: true
+    });
+    setShowResubmitModal(true);
+  };
+
   return (
     <div>
+      {/* Awaiting-response banner — only rendered when an approver returned a request */}
+      {returnedRequests.length > 0 && (
+        <div style={{ marginBottom: "2rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.85rem" }}>
+            <h2 style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "1.35rem", fontWeight: 800, margin: 0 }}>
+              <span style={{ color: "#EF4444" }}>!</span> Awaiting Your Response
+            </h2>
+            <span style={{ fontSize: "0.82rem", color: "rgb(var(--color-text-muted))" }}>
+              {awaitingUpdate} action{awaitingUpdate === 1 ? "" : "s"} required
+            </span>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {returnedRequests.map((req) => {
+              // Latest approver comment is the question the initiator must answer.
+              const approverQuestion = [...(req.history || [])]
+                .reverse()
+                .find((h: any) => h.comment && h.actorRole !== "INITIATOR")?.comment;
+
+              return (
+                <div
+                  key={req._id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    gap: "1.5rem",
+                    padding: "1.35rem 1.5rem",
+                    borderRadius: "0.9rem",
+                    background: "rgba(37, 99, 235, 0.12)",
+                    border: "1px solid rgba(37, 99, 235, 0.22)",
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "0.6rem" }}>
+                      <span className="badge badge-submitted">{req.requestNumber}</span>
+                      <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
+                        Submitted {formatDate(req.createdAt)}
+                      </span>
+                    </div>
+                    <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: "0.75rem" }}>{req.description}</h3>
+
+                    <div
+                      style={{
+                        maxWidth: "34rem",
+                        padding: "0.85rem 1rem",
+                        borderRadius: "0.6rem",
+                        background: "rgb(var(--color-card))",
+                        border: "1px solid rgb(var(--color-card-border))",
+                      }}
+                    >
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.05em", color: "#2563EB", marginBottom: "0.35rem" }}>
+                        APPROVER&apos;S QUESTION:
+                      </div>
+                      <p style={{ fontSize: "0.88rem", fontStyle: "italic", color: "rgb(var(--color-text))", margin: 0 }}>
+                        &quot;{approverQuestion || "Please provide additional clarification for this request."}&quot;
+                      </p>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.05em", color: "rgb(var(--color-text-muted))" }}>
+                      TOTAL AMOUNT
+                    </div>
+                    <div style={{ fontSize: "1.6rem", fontWeight: 800, margin: "0.2rem 0 1rem" }}>
+                      {formatNairaPrecise(req.amount)}
+                    </div>
+                    <button
+                      onClick={() => openResubmit(req)}
+                      className="btn btn-primary"
+                      style={{ background: "#2563EB", border: "none", display: "inline-flex", alignItems: "center", gap: "0.45rem" }}
+                    >
+                      <Icons.CornerUpLeft size={16} /> Reply
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Metrics cards (Naira metrics!) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem", marginBottom: "2.5rem" }}>
-        <div className="glass-card" style={{ display: "flex", alignItems: "center", gap: "1.25rem", background: "rgba(30, 41, 59, 0.3)" }}>
-          <div style={{ padding: "0.85rem", borderRadius: "0.75rem", background: "rgba(99, 102, 241, 0.15)", color: "rgb(var(--color-primary))", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icons.DollarSign size={24} />
-          </div>
-          <div>
-            <p style={{ color: "rgb(var(--color-text-dim))", fontSize: "0.85rem", fontWeight: "600", textTransform: "uppercase" }}>Total Spent this month</p>
-            <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", marginTop: "0.25rem" }}>₦{totalSpent.toLocaleString()}</h3>
-          </div>
-        </div>
-
-        <div className="glass-card" style={{ display: "flex", alignItems: "center", gap: "1.25rem", background: "rgba(30, 41, 59, 0.3)" }}>
-          <div style={{ padding: "0.85rem", borderRadius: "0.75rem", background: "rgba(16, 185, 129, 0.15)", color: "rgb(var(--color-secondary))", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icons.FileText size={24} />
-          </div>
-          <div>
-            <p style={{ color: "rgb(var(--color-text-dim))", fontSize: "0.85rem", fontWeight: "600", textTransform: "uppercase" }}>Total Requests across all statuses</p>
-            <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", marginTop: "0.25rem" }}>{totalRequests}</h3>
-          </div>
-        </div>
-
-        <div className="glass-card" style={{ display: "flex", alignItems: "center", gap: "1.25rem", background: "rgba(30, 41, 59, 0.3)" }}>
-          <div style={{ padding: "0.85rem", borderRadius: "0.75rem", background: "rgba(245, 158, 11, 0.15)", color: "rgb(var(--color-accent))", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Icons.FolderOpen size={24} />
-          </div>
-          <div>
-            <p style={{ color: "rgb(var(--color-text-dim))", fontSize: "0.85rem", fontWeight: "600", textTransform: "uppercase" }}>My Draft not yet submitted</p>
-            <h3 style={{ fontSize: "1.5rem", fontWeight: "bold", marginTop: "0.25rem" }}>{myDrafts}</h3>
-          </div>
-        </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1.25rem", marginBottom: "2.5rem" }}>
+        <StatCard label="Total Spent" hint="this month" value={formatNaira(totalSpent)} icon={<Icons.CreditCard size={18} />} />
+        <StatCard label="Total Request" hint="across all statuses" value={totalRequests} icon={<Icons.FileText size={18} />} />
+        <StatCard label="My Draft" hint="not yet submitted" value={myDrafts} icon={<Icons.FolderOpen size={18} />} tone="neutral" />
+        <StatCard label="Awaiting Update" hint="returned for clarification" value={awaitingUpdate} icon={<Icons.AlertCircle size={18} />} tone="danger" />
       </div>
 
       {currentUser?.role === "INITIATOR" ? (
@@ -120,8 +195,8 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
 
                 return drafts.length > 0 ? drafts.map((draft) => (
                   <div key={draft._id} className="glass-card" style={{
-                    background: "rgba(30, 41, 59, 0.35)",
-                    border: draft.status === "RETURNED" ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(255,255,255,0.06)",
+                    background: "rgba(var(--color-surface-secondary), 0.45)",
+                    border: draft.status === "RETURNED" ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgb(var(--color-card-border))",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center"
@@ -140,13 +215,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                     <button
                       onClick={() => {
                         if (draft.status === "RETURNED") {
-                          setSelectedResubmitExpense(draft);
-                          setResubmitForm({
-                            justification: "",
-                            supportingDocument: draft.supportingDocument || "hotel_invoice_final_paid.pdf",
-                            notifyAuditor: true
-                          });
-                          setShowResubmitModal(true);
+                          openResubmit(draft);
                         } else {
                           setSelectedExpense(draft);
                         }
@@ -173,8 +242,10 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                   <thead>
                     <tr>
                       <th>ID</th>
-                      <th>Title</th>
-                      <th>Status</th>
+                      <th>TITLE</th>
+                      <th style={{ textAlign: "right" }}>AMOUNT</th>
+                      <th>STATUS</th>
+                      <th style={{ textAlign: "right" }}>ACTIONS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -188,13 +259,24 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                         <tr key={exp._id} onClick={() => setSelectedExpense(exp)} style={{ cursor: "pointer" }}>
                           <td><strong>{exp.requestNumber}</strong></td>
                           <td>{exp.description}</td>
+                          <td style={{ textAlign: "right", fontWeight: 700 }}>{formatNairaPrecise(exp.amount)}</td>
                           <td>
-                            <span className={`badge badge-${exp.status.toLowerCase().replace(/_/g, '-')}`}>{exp.status}</span>
+                            <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            {/* Stop propagation so the icon does not double-fire the row handler */}
+                            <button
+                              onClick={(ev) => { ev.stopPropagation(); setSelectedExpense(exp); }}
+                              aria-label={`View ${exp.requestNumber}`}
+                              style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer", padding: "0.2rem" }}
+                            >
+                              <Icons.Eye size={16} />
+                            </button>
                           </td>
                         </tr>
                       )) : (
                         <tr>
-                          <td colSpan={3} style={{ textAlign: "center", color: "rgb(var(--color-text-dim))", padding: "1rem" }}>No active requests.</td>
+                          <td colSpan={5} style={{ textAlign: "center", color: "rgb(var(--color-text-dim))", padding: "1rem" }}>No active requests.</td>
                         </tr>
                       );
                     })()}
@@ -207,7 +289,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
       ) : (
         // MANAGING ROLES TABS VIEW (My Requests & Dept. Requests)
         <div>
-          <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "2rem" }}>
+          <div style={{ display: "flex", borderBottom: "1px solid rgb(var(--color-card-border))", marginBottom: "2rem" }}>
             <button 
               onClick={() => setRequestsSubTab("my-requests")} 
               style={{
@@ -251,8 +333,8 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
 
                   return drafts.length > 0 ? drafts.map((draft) => (
                     <div key={draft._id} className="glass-card" style={{
-                      background: "rgba(30, 41, 59, 0.35)",
-                      border: draft.status === "RETURNED" ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgba(255,255,255,0.06)",
+                      background: "rgba(var(--color-surface-secondary), 0.45)",
+                      border: draft.status === "RETURNED" ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgb(var(--color-card-border))",
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center"

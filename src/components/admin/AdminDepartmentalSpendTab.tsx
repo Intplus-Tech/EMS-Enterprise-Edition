@@ -1,4 +1,8 @@
 import React, { useState } from "react";
+import { Pagination } from "../ui/Pagination";
+
+// Matches the row density shown in designs/system-admin/Admin_ Department Management.png
+const ROWS_PER_PAGE = 5;
 import * as Icons from "lucide-react";
 
 interface AdminDepartmentalSpendTabProps {
@@ -15,8 +19,13 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
   onOpenDeleteDept
 }) => {
   const [selectedAnalyticsDept, setSelectedAnalyticsDept] = useState<any | null>(null);
+  const [page, setPage] = useState(1);
 
   const deptList = departments;
+
+  // Clamp the page so a shrinking department list never strands an empty page.
+  const safePage = Math.min(page, Math.max(1, Math.ceil(deptList.length / ROWS_PER_PAGE)));
+  const visibleDepts = deptList.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
 
   // If Analytics Detail view is selected
   if (selectedAnalyticsDept) {
@@ -398,7 +407,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
               </tr>
             </thead>
             <tbody>
-              {deptList.map((d: any, idx: number) => {
+              {visibleDepts.map((d: any, idx: number) => {
                 const pct = d.pctUsed || (d.utilized && d.totalBudget ? Math.round((d.utilized / d.totalBudget) * 100) : 45);
                 const isHighPct = pct > 80;
                 return (
@@ -469,14 +478,13 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         </div>
 
         {/* Pagination bar */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.25rem", fontSize: "0.8rem", color: "#94a3b8" }}>
-          <span>Showing 5 of 12 departments</span>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <button style={{ padding: "0.25rem 0.5rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "#cbd5e1" }}>&lt;</button>
-            <span style={{ color: "#f8fafc", fontWeight: "600" }}>Page 1 of 3</span>
-            <button style={{ padding: "0.25rem 0.5rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "#cbd5e1" }}>&gt;</button>
-          </div>
-        </div>
+        <Pagination
+          page={safePage}
+          rowsPerPage={ROWS_PER_PAGE}
+          totalCount={deptList.length}
+          onPageChange={setPage}
+          itemLabel="departments"
+        />
       </div>
 
       {/* Bottom Section: Budget Trends & Efficiency Score Card */}
