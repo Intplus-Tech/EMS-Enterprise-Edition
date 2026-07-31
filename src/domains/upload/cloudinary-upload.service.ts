@@ -42,6 +42,16 @@ export class CloudinaryUploadServiceClass implements IFileUploadService {
         },
         (error, result) => {
           if (error) {
+            if (!ENV.isProduction) {
+              console.warn(
+                `[CloudinaryUploadService] Upload failed (${error.message}). Falling back to mock URL in development.`
+              );
+              const mockPublicId = `mock_${Date.now()}_${fileName.replace(/\s+/g, "_")}`;
+              return resolve({
+                url: `/uploads/${mockPublicId}`,
+                publicId: mockPublicId,
+              });
+            }
             return reject(error);
           }
           if (!result) {

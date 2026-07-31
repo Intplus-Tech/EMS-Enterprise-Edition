@@ -107,7 +107,7 @@ export async function runDatabaseSeed() {
 
   // Global / Unrestricted accounts (no department restriction)
   const adminUser = new User({
-    email: "admin@spendflow.com",
+    email: "admin@mailinator.com",
     name: "Alice Admin (Global)",
     role: SystemRole.ADMIN,
     passwordHash: adminPassword,
@@ -115,7 +115,7 @@ export async function runDatabaseSeed() {
   });
 
   const headUser = new User({
-    email: "head@spendflow.com",
+    email: "head@mailinator.com",
     name: "Helen Head (Global)",
     role: SystemRole.FINANCE_HEAD,
     passwordHash: headPassword,
@@ -123,7 +123,7 @@ export async function runDatabaseSeed() {
   });
 
   const officerUser = new User({
-    email: "officer@spendflow.com",
+    email: "officer@mailinator.com",
     name: "Jane Doe (Global Officer)",
     role: SystemRole.FINANCE_OFFICER,
     passwordHash: officerPassword,
@@ -131,7 +131,7 @@ export async function runDatabaseSeed() {
   });
 
   const managerUser = new User({
-    email: "manager@spendflow.com",
+    email: "manager@mailinator.com",
     name: "Jerry Doe (Global Manager)",
     role: SystemRole.FINANCE_MANAGER,
     passwordHash: managerPassword,
@@ -140,7 +140,7 @@ export async function runDatabaseSeed() {
 
   // Default Engineering Initiator & Approver for demo requests backwards-compatibility
   const initiatorUser = new User({
-    email: "initiator@spendflow.com",
+    email: "initiator@mailinator.com",
     name: "Ian Initiator",
     role: SystemRole.INITIATOR,
     departmentId: engDept._id,
@@ -149,7 +149,7 @@ export async function runDatabaseSeed() {
   });
 
   const approverUser = new User({
-    email: "approver@spendflow.com",
+    email: "approver@mailinator.com",
     name: "Audrey Approver",
     role: SystemRole.APPROVER,
     departmentId: engDept._id,
@@ -172,7 +172,7 @@ export async function runDatabaseSeed() {
   for (const { key, dept, name } of deptList) {
     // 1. Department Admin (Admin assigned to a specific department)
     userDocs.push(new User({
-      email: `admin.${key}@spendflow.com`,
+      email: `admin.${key}@mailinator.com`,
       name: `${name} Admin`,
       role: SystemRole.ADMIN,
       departmentId: dept._id,
@@ -182,7 +182,7 @@ export async function runDatabaseSeed() {
 
     // 2. Department Initiator
     userDocs.push(new User({
-      email: `initiator.${key}@spendflow.com`,
+      email: `initiator.${key}@mailinator.com`,
       name: `${name} Initiator`,
       role: SystemRole.INITIATOR,
       departmentId: dept._id,
@@ -192,7 +192,7 @@ export async function runDatabaseSeed() {
 
     // 3. Department Approver
     userDocs.push(new User({
-      email: `approver.${key}@spendflow.com`,
+      email: `approver.${key}@mailinator.com`,
       name: `${name} Approver`,
       role: SystemRole.APPROVER,
       departmentId: dept._id,
@@ -202,7 +202,7 @@ export async function runDatabaseSeed() {
 
     // 4. Department Finance Officer
     userDocs.push(new User({
-      email: `officer.${key}@spendflow.com`,
+      email: `officer.${key}@mailinator.com`,
       name: `${name} Finance Officer`,
       role: SystemRole.FINANCE_OFFICER,
       departmentId: dept._id,
@@ -212,7 +212,7 @@ export async function runDatabaseSeed() {
 
     // 5. Department Finance Manager
     userDocs.push(new User({
-      email: `manager.${key}@spendflow.com`,
+      email: `manager.${key}@mailinator.com`,
       name: `${name} Finance Manager`,
       role: SystemRole.FINANCE_MANAGER,
       departmentId: dept._id,
@@ -222,7 +222,7 @@ export async function runDatabaseSeed() {
 
     // 6. Department Finance Head
     userDocs.push(new User({
-      email: `head.${key}@spendflow.com`,
+      email: `head.${key}@mailinator.com`,
       name: `${name} Finance Head`,
       role: SystemRole.FINANCE_HEAD,
       departmentId: dept._id,
