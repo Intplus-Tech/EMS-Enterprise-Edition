@@ -67,6 +67,7 @@ export default function DepartmentalSpendPage() {
     <DepartmentalSpendTab
       currentUser={currentUser}
       expenses={expenses}
+      budgets={budgets}
       setSelectedExpense={setSelectedExpense}
     />
   );

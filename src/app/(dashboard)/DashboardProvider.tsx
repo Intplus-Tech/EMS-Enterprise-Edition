@@ -7,11 +7,14 @@ import { getAllowedRoutesForRole, getDefaultRouteForRole } from "./roleRoutes";
 import { buildNotifications, formatRelativeTime } from "../../domains/notifications/notification.builder";
 import { useAdminAdministration } from "./hooks/useAdminAdministration";
 import { useExpenseActions } from "./hooks/useExpenseActions";
+import { useAttachments } from "./hooks/useAttachments";
 import { ExpenseClient } from "../../services/expense.client";
 import { AdminClient } from "../../services/admin.client";
 import { AuthClient } from "../../services/auth.client";
 import { ApiRequestError, toErrorMessage } from "../../services/http";
 import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
+import { AttachmentInput } from "../../types/api";
+import type { AttachmentTarget } from "../../components/modals/AttachmentViewModal";
 import { WorkflowActionType } from "../../enums/workflowActions";
 
 const DISMISSED_NOTIFICATIONS_KEY = "ems.notifications.dismissed";
@@ -35,8 +38,7 @@ function emptyRequestForm() {
     currency: "NGN",
     description: "",
     amount: "",
-    supportingDocument: "",
-    supportingDocuments: [] as string[],
+    supportingDocuments: [] as AttachmentInput[],
     vendorName: "",
     accountNumber: "",
     bankName: "",
@@ -138,54 +140,101 @@ function useDashboardState() {
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
   const [uploadDocError, setUploadDocError] = useState("");
 
+  /**
+   * Uploads files for a form that has no request id yet (New Request, Resubmit).
+   * Descriptors are held locally and sent with the request on submit.
+   */
   const handleFileUpload = async (files: FileList | File[] | null, isResubmit: boolean = false) => {
     if (!files || files.length === 0) return;
     setIsUploadingDoc(true);
     setUploadDocError("");
 
-    // Uploads run in parallel; ExpenseClient falls back to the local filename
-    // so a storage outage does not block the form.
-    const newDocs = await Promise.all(
-      Array.from(files).map(async (file) => {
-        try {
-          return await ExpenseClient.uploadDocument(file);
-        } catch (err) {
-          console.warn("Background upload error, falling back to filename", err);
-          return file.name;
-        }
-      })
-    );
+    const list = Array.from(files);
+    const results = await Promise.allSettled(list.map((file) => ExpenseClient.uploadDocument(file)));
 
-    if (isResubmit) {
-      if (newDocs.length > 0) {
+    const uploaded = results
+      .filter((r): r is PromiseFulfilledResult<AttachmentInput> => r.status === "fulfilled")
+      .map((r) => r.value);
+
+    // Name the files that failed rather than silently attaching a filename that
+    // points at nothing — a document that cannot be opened is worse than none.
+    const failures = results
+      .map((r, i) => (r.status === "rejected" ? list[i].name : null))
+      .filter(Boolean);
+    if (failures.length > 0) {
+      setUploadDocError(
+        `Could not upload: ${failures.join(", ")}. ${
+          results[0].status === "rejected" && results[0].reason instanceof Error
+            ? results[0].reason.message
+            : "Please try again."
+        }`
+      );
+    }
+
+    if (uploaded.length > 0) {
+      const merge = (prev: AttachmentInput[]) => {
+        const seen = new Set(prev.map((a) => a.url));
+        return [...prev, ...uploaded.filter((a) => !seen.has(a.url))];
+      };
+
+      if (isResubmit) {
         setResubmitForm((prev: any) => ({
           ...prev,
-          supportingDocument: newDocs[0],
+          supportingDocuments: merge(prev.supportingDocuments ?? []),
         }));
+      } else {
+        setNewRequest((prev) => ({ ...prev, supportingDocuments: merge(prev.supportingDocuments) }));
       }
-    } else {
-      setNewRequest((prev) => {
-        const updatedDocs = [...prev.supportingDocuments, ...newDocs];
-        return {
-          ...prev,
-          supportingDocuments: updatedDocs,
-          supportingDocument: updatedDocs[0] || "",
-        };
-      });
     }
 
     setIsUploadingDoc(false);
   };
 
-  // Notifications are derived from real expense workflow history. Read/dismissed
-  // state is per-browser because there is no notification collection server-side.
+  /** Drops a not-yet-submitted upload from the New Request / Resubmit form. */
+  const removeDraftAttachment = useCallback((url: string, isResubmit = false) => {
+    const filter = (prev: AttachmentInput[]) => prev.filter((a) => a.url !== url);
+    if (isResubmit) {
+      setResubmitForm((prev: any) => ({
+        ...prev,
+        supportingDocuments: filter(prev.supportingDocuments ?? []),
+      }));
+    } else {
+      setNewRequest((prev) => ({ ...prev, supportingDocuments: filter(prev.supportingDocuments) }));
+    }
+  }, []);
+
+  // Notifications are derived from real expense workflow history; only the
+  // read/dismissed state is stored, and it now lives on the user record so it
+  // is shared across devices rather than trapped in one browser.
   const [dismissedNotificationIds, setDismissedNotificationIds] = useState<string[]>([]);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
 
+  // Seed from local storage for an instant paint, then reconcile with the
+  // server so the state follows the user to another device.
   useEffect(() => {
     setDismissedNotificationIds(readStoredIds(DISMISSED_NOTIFICATIONS_KEY));
     setReadNotificationIds(readStoredIds(READ_NOTIFICATIONS_KEY));
   }, []);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let cancelled = false;
+
+    AuthClient.notificationState()
+      .then(({ readIds, dismissedIds }) => {
+        if (cancelled) return;
+        // Union, so ids marked locally before the fetch resolved are not lost.
+        setReadNotificationIds((prev) => Array.from(new Set([...prev, ...readIds])));
+        setDismissedNotificationIds((prev) => Array.from(new Set([...prev, ...dismissedIds])));
+      })
+      .catch(() => {
+        // Offline or unauthorised — local storage remains the source of truth.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser]);
 
   const notifications = useMemo(() => {
     return buildNotifications(expenses, currentUser)
@@ -204,16 +253,23 @@ function useDashboardState() {
       if (prev.includes(id)) return prev;
       const next = [...prev, id];
       writeStoredIds(DISMISSED_NOTIFICATIONS_KEY, next);
+      // Fire-and-forget: the local write already keeps this device correct, so
+      // a failed sync must not block dismissing the notification.
+      AuthClient.saveNotificationState({ dismissedIds: [id] }).catch(() => {});
       return next;
     });
   }, []);
 
   const markAllNotificationsRead = useCallback(() => {
+    const ids = notifications.map((n) => n.id);
     setReadNotificationIds((prev) => {
-      const next = Array.from(new Set([...prev, ...notifications.map((n) => n.id)]));
+      const next = Array.from(new Set([...prev, ...ids]));
       writeStoredIds(READ_NOTIFICATIONS_KEY, next);
       return next;
     });
+    if (ids.length > 0) {
+      AuthClient.saveNotificationState({ readIds: ids }).catch(() => {});
+    }
   }, [notifications]);
 
   const [showNotifications, setShowNotifications] = useState(false);
@@ -221,9 +277,11 @@ function useDashboardState() {
   const [selectedResubmitExpense, setSelectedResubmitExpense] = useState<any>(null);
   const [resubmitForm, setResubmitForm] = useState({
     justification: "",
-    supportingDocument: "hotel_invoice_final_paid.pdf",
+    supportingDocuments: [] as AttachmentInput[],
     notifyAuditor: true
   });
+  // Attachment currently open in the document viewer (designs/initiator/Attachment View - Modal).
+  const [viewedAttachment, setViewedAttachment] = useState<AttachmentTarget | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedReceiptData, setSelectedReceiptData] = useState<any>(null);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
@@ -414,8 +472,8 @@ function useDashboardState() {
       return;
     }
 
-    if (!newRequest.supportingDocument) {
-      setFormError("Supporting document attachment is mandatory. Please select or upload a file.");
+    if (newRequest.supportingDocuments.length === 0) {
+      setFormError("At least one supporting document is mandatory. Please upload a file.");
       return;
     }
 
@@ -432,7 +490,7 @@ function useDashboardState() {
         category: newRequest.category,
         description: newRequest.description,
         amount: Number(newRequest.amount),
-        supportingDocument: newRequest.supportingDocument,
+        supportingDocuments: newRequest.supportingDocuments,
         vendorName: newRequest.vendorName,
         vendorBankDetails: {
           accountNumber: newRequest.accountNumber,
@@ -487,7 +545,18 @@ function useDashboardState() {
         category: selectedResubmitExpense.category,
         description: resubmitForm.justification || selectedResubmitExpense.description,
         amount: Number(selectedResubmitExpense.amount),
-        supportingDocument: resubmitForm.supportingDocument,
+        // Only send documents when the initiator actually attached new ones;
+        // an empty array leaves the existing set untouched.
+        supportingDocuments:
+          resubmitForm.supportingDocuments.length > 0
+            ? resubmitForm.supportingDocuments
+            : (selectedResubmitExpense.attachments ?? []).map((a: AttachmentInput) => ({
+                name: a.name,
+                url: a.url,
+                publicId: a.publicId,
+                size: a.size,
+                mimeType: a.mimeType,
+              })),
         vendorName: selectedResubmitExpense.vendorName,
         vendorBankDetails: selectedResubmitExpense.vendorBankDetails,
         requiredPaymentDate: selectedResubmitExpense.requiredPaymentDate,
@@ -496,7 +565,7 @@ function useDashboardState() {
 
       setShowResubmitModal(false);
       setSelectedResubmitExpense(null);
-      setResubmitForm({ justification: "", supportingDocument: "", notifyAuditor: true });
+      setResubmitForm({ justification: "", supportingDocuments: [], notifyAuditor: true });
       loadDashboardData(currentUser);
       notifySuccess("Request updated and resubmitted.");
     } catch (err) {
@@ -652,6 +721,23 @@ function useDashboardState() {
     setWorkflowSteps(steps);
   };
 
+  // Add/remove documents on a saved request. Refreshes the dashboard so the
+  // open detail panel reflects the new document set immediately.
+  const attachments = useAttachments({
+    onChanged: () => loadDashboardData(currentUser),
+    onSuccess: notifySuccess,
+    onError: notifyError,
+  });
+
+  const addAttachments = useCallback(
+    (requestId: string, files: FileList | File[]) => attachments.addFiles(requestId, files),
+    [attachments]
+  );
+  const removeAttachment = useCallback(
+    (requestId: string, attachmentId: string) => attachments.removeAttachment(requestId, attachmentId),
+    [attachments]
+  );
+
   // Workflow actions shared by every approval surface. Injected into the tabs as
   // props so those components stay presentational (engineering rule 1-D).
   const expenseActions = useExpenseActions({
@@ -706,6 +792,7 @@ function useDashboardState() {
     isUploadingDoc, setIsUploadingDoc,
     uploadDocError, setUploadDocError,
     handleFileUpload,
+    removeDraftAttachment,
     notifications,
     unreadNotificationCount,
     dismissNotification,
@@ -714,6 +801,7 @@ function useDashboardState() {
     showResubmitModal, setShowResubmitModal,
     selectedResubmitExpense, setSelectedResubmitExpense,
     resubmitForm, setResubmitForm,
+    viewedAttachment, setViewedAttachment,
     showReceiptModal, setShowReceiptModal,
     selectedReceiptData, setSelectedReceiptData,
     showPolicyModal, setShowPolicyModal,
@@ -743,6 +831,9 @@ function useDashboardState() {
     showPasswordNewToggle, setShowPasswordNewToggle,
     theme, setTheme, toggleTheme,
     alertDialog, setAlertDialog,
+    addAttachments,
+    removeAttachment,
+    attachmentsUploading: attachments.uploading,
     expenseActions,
     fetchSession,
     loadDashboardData,

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { SystemRole } from "../enums/roles";
 import { PermissionAction, PermissionResource } from "../enums/permissions";
 import { WorkflowActionType } from "../enums/workflowActions";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_REQUEST } from "../domains/attachments/attachment.rules";
 
 export const LoginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -14,17 +15,43 @@ export const VendorBankDetailsSchema = z.object({
   accountName: z.string().min(2, "Account name is required"),
 });
 
+/** One already-uploaded file, as returned by `POST /api/upload`. */
+export const AttachmentInputSchema = z.object({
+  name: z.string().trim().min(1, "A document name is required").max(255),
+  url: z.string().trim().min(1, "A document reference is required").max(1000),
+  publicId: z.string().max(255).optional(),
+  size: z.number().nonnegative().max(MAX_ATTACHMENT_BYTES, "Files may be at most 5MB").optional(),
+  mimeType: z.string().max(150).optional(),
+});
+
+export const AttachmentAddSchema = z.object({
+  attachments: z
+    .array(AttachmentInputSchema)
+    .min(1, "Select at least one file to attach")
+    .max(MAX_ATTACHMENTS_PER_REQUEST),
+});
+
 export const ExpenseInitiateSchema = z.object({
   category: z.string().min(2, "Category is required"),
   description: z.string().min(3, "Description is required"),
   amount: z.number().positive("Amount must be greater than zero"),
-  supportingDocument: z.string().min(1, "Supporting invoice or document is mandatory"),
+  // At least one supporting document is mandatory. `supportingDocument` is still
+  // accepted so an older client (or a caller following the previous contract)
+  // keeps working; the service normalises whichever form arrives.
+  supportingDocuments: z
+    .array(AttachmentInputSchema)
+    .max(MAX_ATTACHMENTS_PER_REQUEST)
+    .optional(),
+  supportingDocument: z.string().min(1).optional(),
   vendorName: z.string().min(2, "Vendor name is required"),
   vendorBankDetails: VendorBankDetailsSchema,
   requiredPaymentDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Invalid required payment date format",
   }),
-});
+}).refine(
+  (data) => (data.supportingDocuments?.length ?? 0) > 0 || Boolean(data.supportingDocument),
+  { message: "At least one supporting invoice or document is mandatory", path: ["supportingDocuments"] }
+);
 
 export const ExceptionalBudgetSchema = z.object({
   action: z.nativeEnum(WorkflowActionType),
@@ -52,6 +79,17 @@ export const WorkflowStepConfigSchema = z.object({
 
 export const WorkflowConfigUpdateSchema = z.object({
   steps: z.array(WorkflowStepConfigSchema),
+});
+
+export const RequestCommentCreateSchema = z.object({
+  message: z.string().trim().min(1, "A comment cannot be empty").max(2000),
+  /** Internal notes are withheld from the initiator. */
+  isInternal: z.boolean().optional().default(false),
+});
+
+export const NotificationStateSchema = z.object({
+  readIds: z.array(z.string().max(200)).max(500).optional(),
+  dismissedIds: z.array(z.string().max(200)).max(500).optional(),
 });
 
 /* ------------------------------------------------------------------------- *

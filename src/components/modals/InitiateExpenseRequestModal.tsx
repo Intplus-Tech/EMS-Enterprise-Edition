@@ -2,6 +2,8 @@
 
 import React, { RefObject } from "react";
 import * as Icons from "lucide-react";
+import { AttachmentInput } from "../../types/api";
+import { formatFileSize, MAX_ATTACHMENTS_PER_REQUEST } from "../../domains/attachments/attachment.rules";
 
 interface InitiateExpenseRequestModalProps {
   isOpen: boolean;
@@ -13,6 +15,8 @@ interface InitiateExpenseRequestModalProps {
   handleFileUpload: (files: FileList | File[] | null, isResubmit?: boolean) => Promise<void>;
   isUploadingDoc: boolean;
   uploadDocError: string;
+  /** Drops a not-yet-submitted upload from the form. */
+  removeDraftAttachment: (url: string, isResubmit?: boolean) => void;
   handleCreateRequest: (e: React.FormEvent, shouldSubmit?: boolean) => Promise<void>;
 }
 
@@ -26,6 +30,7 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
   handleFileUpload,
   isUploadingDoc,
   uploadDocError,
+  removeDraftAttachment,
   handleCreateRequest,
 }) => {
   if (!isOpen) return null;
@@ -119,7 +124,7 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
           <div className="form-group" style={{ margin: 0 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
               <label className="form-label" style={{ margin: 0 }}>
-                Supporting Documents ({newRequest.supportingDocuments.length}) <span style={{ color: "#EF4444" }}>*</span>
+                Supporting Documents ({newRequest.supportingDocuments.length}/{MAX_ATTACHMENTS_PER_REQUEST}) <span style={{ color: "#EF4444" }}>*</span>
               </label>
               <button
                 type="button"
@@ -171,10 +176,12 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
               <p style={{ color: "#EF4444", fontSize: "0.75rem", margin: "0 0 0.5rem 0" }}>{uploadDocError}</p>
             )}
 
+            {/* Attached files. Each carries its real size and can be removed
+                before the request is created. */}
             <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
-              {newRequest.supportingDocuments.map((docName: string, idx: number) => (
+              {newRequest.supportingDocuments.map((doc: AttachmentInput) => (
                 <div
-                  key={idx}
+                  key={doc.url}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
@@ -189,21 +196,22 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
                 >
                   <Icons.Paperclip size={12} style={{ color: "rgb(var(--color-primary))" }} />
                   <span style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {docName}
+                    {doc.name}
                   </span>
-                  <Icons.X
-                    size={12}
-                    style={{ cursor: "pointer", color: "#EF4444", marginLeft: "0.2rem" }}
+                  {doc.size ? (
+                    <span style={{ color: "rgb(var(--color-text-dim))" }}>{formatFileSize(doc.size)}</span>
+                  ) : null}
+                  <button
+                    type="button"
+                    aria-label={`Remove ${doc.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      const updated = newRequest.supportingDocuments.filter((_: any, i: number) => i !== idx);
-                      setNewRequest({
-                        ...newRequest,
-                        supportingDocuments: updated,
-                        supportingDocument: updated[0] || ""
-                      });
+                      removeDraftAttachment(doc.url, false);
                     }}
-                  />
+                    style={{ background: "none", border: "none", padding: 0, marginLeft: "0.2rem", cursor: "pointer", color: "#EF4444", lineHeight: 0 }}
+                  >
+                    <Icons.X size={12} />
+                  </button>
                 </div>
               ))}
             </div>

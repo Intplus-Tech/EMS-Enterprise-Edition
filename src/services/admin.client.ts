@@ -86,6 +86,10 @@ export const AdminClient = {
 
   deleteUser: (id: string) => http.delete<{ id: string }>(`/api/admin/users/${id}`),
 
+  /** Force Log Out — ends every active session for the user. */
+  revokeUserSessions: (id: string) =>
+    http.delete<{ id: string; name: string }>(`/api/admin/users/${id}/sessions`),
+
   /* ----- Budgets ----- */
 
   listBudgets: () =>

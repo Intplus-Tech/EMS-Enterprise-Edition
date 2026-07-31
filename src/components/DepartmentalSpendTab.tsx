@@ -1,68 +1,57 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { DepartmentSpendDto } from "../types/api";
+import { formatNaira } from "./ui/format";
+
+// Row accent colours, cycled in the order the design shows them.
+const ROW_COLORS = ["#2563EB", "#475569", "#DC2626", "#0EA5E9", "#94A3B8"];
+
+// Rows revealed per "Load More" press.
+const ROWS_PER_PAGE = 8;
 
 interface DepartmentalSpendTabProps {
   currentUser?: any;
   expenses?: any[];
+  /** Server-computed departmental spend summaries. */
+  budgets: DepartmentSpendDto[];
   setSelectedExpense?: (expense: any) => void;
 }
 
 export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
   currentUser,
   expenses = [],
+  budgets,
   setSelectedExpense
 }) => {
   const [periodFilter, setPeriodFilter] = useState("FY 2026");
   const [deptFilter, setDeptFilter] = useState("All Departments");
   const [searchQuery, setSearchQuery] = useState("");
   const [isReloading, setIsReloading] = useState(false);
+  // Local paging over the full response; "Load More" reveals the next slice.
+  const [visibleCount, setVisibleCount] = useState(ROWS_PER_PAGE);
 
-  // Dynamic departmental spend calculation from DB expenses
-  const liveDeptMap: Record<string, { totalBudget: number; utilized: number; topRequester: string; overBudgetCount: number; requesters: Record<string, number> }> = {};
-  
-  if (expenses && expenses.length > 0) {
-    expenses.forEach(e => {
-      const deptName = (e.departmentId as any)?.name || e.departmentName || "IT";
-      if (!liveDeptMap[deptName]) {
-        liveDeptMap[deptName] = { totalBudget: 250000, utilized: 0, topRequester: "N/A", overBudgetCount: 0, requesters: {} };
-      }
-      if (e.status === "PAID" || e.status === "CLOSED" || e.status === "APPROVED") {
-        liveDeptMap[deptName].utilized += e.amount;
-      }
-      if (e.status === "INSUFFICIENT_BUDGET" || e.status === "PENDING_EXCEPTIONAL" || e.exceptionalBudgetApproved) {
-        liveDeptMap[deptName].overBudgetCount++;
-      }
-      const reqName = (e.initiatorId as any)?.name || "Team Member";
-      liveDeptMap[deptName].requesters[reqName] = (liveDeptMap[deptName].requesters[reqName] || 0) + e.amount;
-    });
-
-    Object.keys(liveDeptMap).forEach(d => {
-      const sorted = Object.entries(liveDeptMap[d].requesters).sort((a, b) => b[1] - a[1]);
-      if (sorted[0]) liveDeptMap[d].topRequester = sorted[0][0];
-    });
-  }
-
-  const liveDeptSpendList = Object.keys(liveDeptMap).map((dName, idx) => {
-    const item = liveDeptMap[dName];
-    const remaining = Math.max(0, item.totalBudget - item.utilized);
-    const percentUsed = Math.min(100, Math.round((item.utilized / item.totalBudget) * 100));
-    const colors = ["#2563EB", "#475569", "#DC2626", "rgb(var(--color-card-border))", "#94A3B8"];
-    const color = colors[idx % colors.length];
+  /**
+   * Rows come straight from `/api/admin/budgets`, which is the same aggregation
+   * the admin oversight screen uses. This component previously re-derived the
+   * figures from the client's expense list and assigned every department a flat
+   * ₦250,000 allocation, so "Remaining" and "% used" were fiction.
+   */
+  const currentDeptSpendData = budgets.map((d, idx) => {
+    const color = ROW_COLORS[idx % ROW_COLORS.length];
     return {
-      id: `dept-${idx}`,
-      dept: dName,
+      id: d.id,
+      dept: d.name,
       dotColor: color,
-      totalBudget: item.totalBudget,
-      utilized: item.utilized,
-      remaining,
-      percentUsed,
-      barColor: color,
-      topRequester: item.topRequester,
-      overBudgetCount: item.overBudgetCount
+      barColor: d.pctUsed > 85 ? "#DC2626" : color,
+      totalBudget: d.totalBudget,
+      utilized: d.utilised,
+      remaining: d.remaining,
+      percentUsed: d.pctUsed,
+      topRequester: d.topRequester,
+      overBudgetCount: d.overBudgetCount,
+      hasBudget: d.hasBudget,
     };
   });
-
-  const currentDeptSpendData = liveDeptSpendList;
 
   // Filtering logic
   const filteredDeptSpend = currentDeptSpendData.filter(row => {
@@ -414,7 +403,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
             </thead>
             <tbody>
               {filteredDeptSpend.length > 0 ? (
-                filteredDeptSpend.map((row) => (
+                filteredDeptSpend.slice(0, visibleCount).map((row) => (
                   <tr
                     key={row.id}
                     style={{
@@ -432,17 +421,17 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
 
                     {/* TOTAL BUDGET */}
                     <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.875rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-                      ₦{row.totalBudget.toLocaleString()}
+                      {row.hasBudget ? formatNaira(row.totalBudget) : "Not set"}
                     </td>
 
                     {/* UTILIZED */}
                     <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.875rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-                      ₦{row.utilized.toLocaleString()}
+                      {formatNaira(row.utilized)}
                     </td>
 
                     {/* REMAINING */}
                     <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.875rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-                      ₦{row.remaining.toLocaleString()}
+                      {row.hasBudget ? formatNaira(row.remaining) : "—"}
                     </td>
 
                     {/* % USED with Progress Bar */}
@@ -507,7 +496,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
             color: "rgb(var(--color-text-muted))"
           }}
         >
-          <span>Showing {filteredDeptSpend.length} of {currentDeptSpendData.length} department records</span>
+          <span>Showing {Math.min(visibleCount, filteredDeptSpend.length)} of {filteredDeptSpend.length} department records</span>
 
           <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
             <button
@@ -527,8 +516,11 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
               <Icons.RefreshCw size={15} className={isReloading ? "animate-spin" : ""} /> Reload Data
             </button>
 
+            {/* The endpoint returns every department in one response, so this
+                reveals the next slice locally rather than fetching a page. */}
             <button
-              onClick={() => alert("All department records are currently loaded.")}
+              onClick={() => setVisibleCount((n) => n + ROWS_PER_PAGE)}
+              disabled={visibleCount >= filteredDeptSpend.length}
               className="btn btn-primary"
               style={{
                 background: "#DBEAFE",
@@ -537,10 +529,12 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
                 fontSize: "0.85rem",
                 borderRadius: "8px",
                 fontWeight: "600",
-                border: "none"
+                border: "none",
+                opacity: visibleCount >= filteredDeptSpend.length ? 0.5 : 1,
+                cursor: visibleCount >= filteredDeptSpend.length ? "not-allowed" : "pointer"
               }}
             >
-              Load More
+              {visibleCount >= filteredDeptSpend.length ? "All Loaded" : "Load More"}
             </button>
           </div>
         </div>

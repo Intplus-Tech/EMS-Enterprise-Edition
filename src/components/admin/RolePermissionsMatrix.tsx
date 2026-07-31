@@ -9,7 +9,7 @@
  * resource, so adding a resource meant copying 15 lines of JSX and the grid
  * could silently drift from what the server actually enforces.
  */
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { EmptyState } from "../ui/EmptyState";
 import { humanizeStatus } from "../ui/format";
@@ -97,13 +97,16 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({
 
   const activeRole = roles.find((r) => r.role === selectedRole) ?? roles[0];
 
-  // Reload the grid whenever the selected role (or the server data) changes.
-  useEffect(() => {
-    if (!activeRole) return;
+  // Re-seed the grid when the selected role changes, adjusting state during
+  // render rather than in an effect — the effect form fires a second render
+  // pass in which the grid still holds the previous role's checkboxes.
+  const [loadedRole, setLoadedRole] = useState<SystemRole | null>(null);
+  if (activeRole && activeRole.role !== loadedRole) {
+    setLoadedRole(activeRole.role);
     setSelectedRole(activeRole.role);
     setGrid(hydrateGrid(activeRole.grants));
     setIsDirty(false);
-  }, [activeRole]);
+  }
 
   if (roles.length === 0) {
     return (

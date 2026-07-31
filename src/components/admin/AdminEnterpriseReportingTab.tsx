@@ -1,13 +1,18 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { DepartmentSpendDto } from "../../types/api";
+import { datedFilename, downloadCsv } from "../ui/exportCsv";
 
 interface AdminEnterpriseReportingTabProps {
+  /** Server-computed departmental budget summaries. */
+  budgets: DepartmentSpendDto[];
   departments: any[];
   expenses?: any[];
   metrics?: any;
 }
 
 export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabProps> = ({
+  budgets,
   departments,
   expenses = [],
   metrics
@@ -22,13 +27,27 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
   const paidCount = metrics?.paidCount ?? expenses.filter(e => e.status === "PAID" || e.status === "CLOSED").length;
   const uploadedCount = metrics?.uploadedCount ?? expenses.filter(e => Boolean(e.supportingDocument)).length;
 
-  const deptUtilization = departments.map((d: any) => {
-    const deptExpenses = expenses.filter(e => (e.departmentId?._id || e.departmentId) === (d._id || d.id));
-    const spent = deptExpenses.filter(e => ["PAID", "CLOSED", "APPROVED"].includes(e.status)).reduce((sum, e) => sum + (e.amount || 0), 0);
-    const budget = d.totalBudget || 250000;
-    const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
-    return { name: d.name, spent, budget, pct };
-  });
+  // Utilisation reads the server-computed budget summaries rather than assuming
+  // a ₦250,000 allocation for any department without one — an unbudgeted
+  // department now reports 0% instead of a percentage of an invented ceiling.
+  const deptUtilization = budgets.map((d) => ({
+    name: d.name,
+    spent: d.utilised,
+    budget: d.totalBudget,
+    pct: d.pctUsed,
+    hasBudget: d.hasBudget,
+  }));
+
+  // Departmental utilisation is the substance of this dashboard, so that is
+  // what the export carries.
+  const handleExportReport = () => {
+    downloadCsv(datedFilename("enterprise-report"), deptUtilization, [
+      { header: "Department", value: (d) => d.name },
+      { header: "Allocated", value: (d) => (d.hasBudget ? d.budget : "Not set") },
+      { header: "Spent", value: (d) => d.spent },
+      { header: "Utilisation %", value: (d) => d.pct },
+    ]);
+  };
 
   return (
     <div>
@@ -85,7 +104,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
         </div>
 
         <button
-          onClick={() => alert("Exporting Enterprise Report CSV/PDF...")}
+          onClick={handleExportReport}
           style={{
             padding: "0.55rem 1.15rem",
             borderRadius: "0.375rem",

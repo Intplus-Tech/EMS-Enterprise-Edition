@@ -4,16 +4,46 @@ import { User } from "../../models/User";
 import { BudgetService } from "../budget/budget.service";
 import { WorkflowService } from "../workflow/workflow.service";
 import { LoggerService } from "../logs/logger.service";
-import { EmailService } from "../email/email.service";
+import { RequestNotifier } from "../notifications/request-notifier";
 import { RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
 import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
-import { IUser } from "../../types";
+import { IAttachment, IUser } from "../../types";
 
 const getActorId = (actor: any): string => {
   return (actor?._id || actor?.id)?.toString() || "";
 };
+
+/**
+ * Accepts either shape of supporting-document payload.
+ *
+ * Requests carry a list of attachments, but the previous contract sent a single
+ * `supportingDocument` string. Both are normalised here so an older client — or
+ * the seed script — keeps working without a separate code path.
+ */
+function normaliseAttachments(data: any, actor: any): IAttachment[] {
+  const stamp = (attachment: Partial<IAttachment>): IAttachment => ({
+    name: attachment.name || "",
+    url: attachment.url || attachment.name || "",
+    publicId: attachment.publicId,
+    size: attachment.size,
+    mimeType: attachment.mimeType,
+    uploadedById: getActorId(actor) || undefined,
+    uploadedByName: actor?.name,
+    uploadedAt: new Date(),
+  });
+
+  if (Array.isArray(data.supportingDocuments) && data.supportingDocuments.length > 0) {
+    return data.supportingDocuments.map(stamp);
+  }
+
+  if (data.supportingDocument) {
+    return [stamp({ name: data.supportingDocument, url: data.supportingDocument })];
+  }
+
+  return [];
+}
 
 export class ExpenseService {
   /**
@@ -57,7 +87,8 @@ export class ExpenseService {
   public static async createRequest(actor: IUser | any, data: any) {
     await connectToDatabase();
     
-    if (!data.supportingDocument) {
+    const supportingDocuments = normaliseAttachments(data, actor);
+    if (supportingDocuments.length === 0) {
       throw new Error("Supporting documentation / invoice is mandatory.");
     }
     
@@ -96,7 +127,7 @@ export class ExpenseService {
       category: data.category,
       description: data.description,
       amount: Number(data.amount),
-      supportingDocument: data.supportingDocument,
+      supportingDocuments,
       vendorName: data.vendorName,
       vendorBankDetails: {
         accountNumber: data.vendorBankDetails.accountNumber,
@@ -216,6 +247,9 @@ export class ExpenseService {
       );
     }
 
+    // Tell the initiator their request moved. Non-blocking by design.
+    await RequestNotifier.notifyInitiator(request);
+
     return request;
   }
 
@@ -314,6 +348,9 @@ export class ExpenseService {
         logActor
       );
     }
+
+    // Tell the initiator their request moved. Non-blocking by design.
+    await RequestNotifier.notifyInitiator(request);
 
     return request;
   }
@@ -442,6 +479,9 @@ export class ExpenseService {
       );
     }
 
+    // Tell the initiator their request moved. Non-blocking by design.
+    await RequestNotifier.notifyInitiator(request);
+
     return request;
   }
 
@@ -483,6 +523,9 @@ export class ExpenseService {
       undefined,
       logActor
     );
+
+    // Tell the initiator their request moved. Non-blocking by design.
+    await RequestNotifier.notifyInitiator(request);
 
     return request;
   }
@@ -558,6 +601,9 @@ export class ExpenseService {
       AuditAction.EXPENSE_CLOSED,
       `Request ${request.requestNumber} transitioned to CLOSED. Ledger and audits locked.`
     );
+
+    // Tell the initiator their request moved. Non-blocking by design.
+    await RequestNotifier.notifyInitiator(request);
 
     return request;
   }

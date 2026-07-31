@@ -207,6 +207,14 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     [run, loadUsers]
   );
 
+  const revokeUserSessions = useCallback(
+    (id: string, name: string) =>
+      run(async () => {
+        await AdminClient.revokeUserSessions(id);
+      }, `${name} has been signed out of all devices.`),
+    [run]
+  );
+
   const deleteUser = useCallback(
     (id: string) =>
       run(async () => {
@@ -269,6 +277,7 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     inviteUser,
     updateUser,
     setUserActive,
+    revokeUserSessions,
     deleteUser,
     saveBudgetPeriod,
     saveRolePermissions,

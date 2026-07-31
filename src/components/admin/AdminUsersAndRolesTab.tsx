@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { Pagination } from "../ui/Pagination";
 import { StatCard } from "../ui/StatCard";
+import { datedFilename, downloadCsv } from "../ui/exportCsv";
 import { RolePermissionsMatrix } from "./RolePermissionsMatrix";
 import { SystemRole } from "../../enums/roles";
 import { PermissionAction, PermissionResource } from "../../enums/permissions";
@@ -45,6 +46,18 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
   const [selectedRoleFilter, setSelectedRoleFilter] = useState("ALL");
   const [selectedDeptFilter, setSelectedDeptFilter] = useState("ALL");
   const [page, setPage] = useState(1);
+
+  // Exports exactly what the filters currently show, not the whole directory.
+  const handleExportDirectory = () => {
+    downloadCsv(datedFilename("user-directory"), filteredUsers, [
+      { header: "Name", value: (u) => u.name },
+      { header: "Email", value: (u) => u.email },
+      { header: "Role", value: (u) => u.role },
+      { header: "Department", value: (u) => deptNameOf(u) },
+      { header: "Status", value: (u) => (u.isActive ? "Active" : "Suspended") },
+      { header: "Invite Pending", value: (u) => (u.isInvited ? "Yes" : "No") },
+    ]);
+  };
 
   // Reads the department name from either shape the row can arrive in.
   const deptNameOf = (u: AdminUserDto) => u.departmentName || u.department?.name || "";
@@ -216,7 +229,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
         </div>
 
         <button
-          onClick={() => alert("Exporting user directory to CSV...")}
+          onClick={handleExportDirectory}
           style={{
             padding: "0.5rem 1rem",
             borderRadius: "0.375rem",

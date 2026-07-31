@@ -9,6 +9,7 @@ import "../models/ExpenseRequest";
 import "../models/Log";
 import "../models/WorkflowConfig";
 import "../models/RolePermission";
+import "../models/RequestComment";
 
 const MONGODB_URI = ENV.MONGODB_URI;
 

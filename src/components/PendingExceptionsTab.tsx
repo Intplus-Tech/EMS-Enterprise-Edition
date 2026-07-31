@@ -4,6 +4,9 @@ import { RequestJustificationModal } from "./RequestJustificationModal";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
 import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
+import { AttachmentDto, BudgetContextDto } from "../types/api";
+import { AttachmentTarget } from "./modals/AttachmentViewModal";
+import { formatNaira, formatNairaPrecise } from "./ui/format";
 
 interface PendingExceptionsTabProps {
   currentUser?: any;
@@ -11,6 +14,10 @@ interface PendingExceptionsTabProps {
   setSelectedExpense?: (expense: any) => void;
   /** Budget-expansion operations injected by the page; no I/O happens here. */
   actions: ExpenseActions;
+  /** Real budget position for the selected request; null while loading. */
+  budgetContext: BudgetContextDto | null;
+  /** Opens a supporting document in the shared attachment viewer. */
+  onViewAttachment: (attachment: AttachmentTarget) => void;
   onBackToDashboard?: () => void;
 }
 
@@ -19,6 +26,8 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   expenses = [],
   setSelectedExpense,
   actions,
+  budgetContext,
+  onViewAttachment,
   onBackToDashboard
 }) => {
   const [showJustificationModal, setShowJustificationModal] = useState(false);
@@ -40,7 +49,8 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
     requiredDate: targetExp.requiredPaymentDate ? new Date(targetExp.requiredPaymentDate).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
     createdDate: targetExp.createdAt ? new Date(targetExp.createdAt).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
     daysWaiting: Math.max(1, Math.floor((Date.now() - new Date(targetExp.createdAt || Date.now()).getTime()) / (1000 * 60 * 60 * 24))),
-    supportingDocuments: targetExp.supportingDocument ? [{ name: targetExp.supportingDocument, size: "Attachment" }] : []
+    // Real document set, back-filled from the legacy field for older records.
+    supportingDocuments: (targetExp.attachments ?? []) as AttachmentDto[]
   } : {
     requestNumber: "#----",
     department: "N/A",
@@ -52,19 +62,14 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
     requiredDate: "-",
     createdDate: "-",
     daysWaiting: 0,
-    supportingDocuments: []
+    supportingDocuments: [] as AttachmentDto[]
   };
 
-  const budgetContext = {
-    deptCode: `${requestDetails.departmentFull} - FY 2026`,
-    totalAnnualBudget: 250000,
-    utilizedYTD: Math.round(requestDetails.amount * 0.8),
-    remaining: Math.max(0, 250000 - Math.round(requestDetails.amount * 0.8)),
-    criticalGap: Math.round(requestDetails.amount * 0.3),
-    budgetItems: [
-      { category: requestDetails.category, allocated: 50000, rem: Math.max(0, 50000 - requestDetails.amount), isZero: false, isNegative: requestDetails.amount > 50000 }
-    ]
-  };
+  // Budget figures come from the server (see useBudgetContext). They were
+  // previously derived from the request amount itself — a hardcoded ₦250,000
+  // ceiling with `amount * 0.8` "utilised" — so the numbers a Finance Head read
+  // while authorising an over-budget request were unrelated to the department.
+  const hasBudget = Boolean(budgetContext?.hasBudget);
 
   const historyTimeline: any[] = targetExp?.history && targetExp.history.length > 0 ? targetExp.history.map((h: any, idx: number) => ({
     id: `hist-${idx}`,
@@ -272,7 +277,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                 {requestDetails.supportingDocuments.map((doc, idx) => (
                   <button
                     key={idx}
-                    onClick={() => alert(`Simulated preview/download for ${doc.name}`)}
+                    onClick={() => onViewAttachment({ ...doc, requestNumber: requestDetails.requestNumber })}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -399,7 +404,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                 BUDGET CONTEXT
               </h3>
               <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", padding: "0.2rem 0.6rem", borderRadius: "4px", background: "rgba(var(--color-surface-secondary), 0.6)" }}>
-                {budgetContext.deptCode}
+                {budgetContext?.periodLabel || requestDetails.departmentFull}
               </span>
             </div>
 
@@ -409,7 +414,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                 TOTAL ANNUAL BUDGET
               </span>
               <span style={{ fontSize: "1.45rem", fontWeight: "800", color: "#0F172A" }}>
-                ₦{budgetContext.totalAnnualBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {hasBudget ? formatNairaPrecise(budgetContext?.totalBudget) : "Not configured"}
               </span>
             </div>
 
@@ -420,7 +425,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   UTILIZED YTD
                 </span>
                 <span style={{ fontSize: "1.05rem", fontWeight: "800", color: "#0F172A" }}>
-                  ₦{budgetContext.utilizedYTD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatNairaPrecise(budgetContext?.utilisedYTD)}
                 </span>
               </div>
 
@@ -429,7 +434,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   REMAINING
                 </span>
                 <span style={{ fontSize: "1.05rem", fontWeight: "800", color: "#2563EB" }}>
-                  ₦{budgetContext.remaining.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatNairaPrecise(budgetContext?.remaining)}
                 </span>
               </div>
             </div>
@@ -451,7 +456,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   CRITICAL BUDGET GAP
                 </span>
                 <span style={{ fontSize: "1.75rem", fontWeight: "800", color: "#DC2626", letterSpacing: "-0.02em" }}>
-                  -₦{budgetContext.criticalGap.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {`-${formatNairaPrecise(budgetContext?.criticalGap)}`}
                 </span>
               </div>
 
@@ -474,15 +479,23 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {budgetContext.budgetItems.map((item, idx) => (
-                      <tr key={idx} style={{ borderBottom: idx < budgetContext.budgetItems.length - 1 ? "1px solid rgba(var(--color-card-border), 0.3)" : "none" }}>
-                        <td style={{ padding: "0.6rem 0.75rem", fontWeight: "600", color: item.isNegative ? "#2563EB" : "rgb(var(--color-text))" }}>{item.category}</td>
-                        <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", color: "rgb(var(--color-text-muted))" }}>₦{item.allocated.toLocaleString()}</td>
-                        <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", fontWeight: "700", color: item.isZero ? "#DC2626" : item.isNegative ? "#DC2626" : "#2563EB" }}>
-                          {item.isZero ? "₦0" : `₦${item.rem.toLocaleString()}`}
+                    {(budgetContext?.lineItems ?? []).map((item, idx, all) => (
+                      <tr key={item.category} style={{ borderBottom: idx < all.length - 1 ? "1px solid rgba(var(--color-card-border), 0.3)" : "none" }}>
+                        <td style={{ padding: "0.6rem 0.75rem", fontWeight: "600", color: item.isRequestCategory ? "#2563EB" : "rgb(var(--color-text))" }}>{item.category}</td>
+                        <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", color: "rgb(var(--color-text-muted))" }}>{formatNaira(item.allocated)}</td>
+                        <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", fontWeight: "700", color: item.remaining <= 0 ? "#DC2626" : "#2563EB" }}>
+                          {formatNaira(item.remaining)}
                         </td>
                       </tr>
                     ))}
+                    {/* No allocation lines configured for this period. */}
+                    {(budgetContext?.lineItems ?? []).length === 0 && (
+                      <tr>
+                        <td colSpan={3} style={{ padding: "0.85rem 0.75rem", textAlign: "center", color: "rgb(var(--color-text-dim))" }}>
+                          No budget line items configured for this period.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -592,8 +605,8 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         onClose={() => setShowApproveModal(false)}
         requestNumber={requestDetails.requestNumber}
         requestAmount={requestDetails.amount}
-        remainingBudget={budgetContext.remaining}
-        deficitAmount={budgetContext.criticalGap}
+        remainingBudget={budgetContext?.remaining ?? 0}
+        deficitAmount={budgetContext?.criticalGap ?? 0}
         onConfirm={async (notes) => {
           if (!targetExp?._id) return;
           // Only close on a confirmed save — the previous version reported
@@ -609,8 +622,8 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         onClose={() => setShowRejectModal(false)}
         requestNumber={requestDetails.requestNumber}
         requestAmount={requestDetails.amount}
-        remainingBudget={budgetContext.remaining}
-        deficitAmount={budgetContext.criticalGap}
+        remainingBudget={budgetContext?.remaining ?? 0}
+        deficitAmount={budgetContext?.criticalGap ?? 0}
         onConfirm={async (reason) => {
           if (!targetExp?._id) return;
           if (await actions.rejectExpansion(targetExp._id, reason)) {

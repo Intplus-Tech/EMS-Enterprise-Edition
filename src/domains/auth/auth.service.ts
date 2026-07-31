@@ -91,6 +91,8 @@ export class AuthService {
         name: string;
         role: any;
         departmentId: string | null;
+        /** Issued-at, in seconds; compared against `sessionsValidFrom`. */
+        iat?: number;
       };
     } catch (e) {
       return null;

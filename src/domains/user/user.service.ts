@@ -124,10 +124,12 @@ export class UserService {
 
     user.isActive = isActive;
     // Suspension must also void any outstanding invitation, otherwise a
-    // suspended invitee could still complete setup and reactivate themselves.
+    // suspended invitee could still complete setup and reactivate themselves,
+    // and must end any session already in flight.
     if (!isActive) {
       user.inviteToken = undefined;
       user.inviteExpires = undefined;
+      user.sessionsValidFrom = new Date();
     }
     await user.save();
 
@@ -171,6 +173,31 @@ export class UserService {
       AuditAction.USER_DELETED,
       `User '${user.name}' (${user.email}) deleted`,
       { userId: id, email: user.email, role: user.role },
+      actor
+    );
+
+    return { id, name: user.name };
+  }
+
+  /**
+   * Ends every active session for a user ("Force Log Out" in the admin profile
+   * modal). Works by moving the account's revocation watermark forward, which
+   * `authenticate()` checks on each request — previously this was an `alert()`
+   * and the user's token stayed valid for its full 8 hours.
+   */
+  public static async revokeSessions(id: string, actor: ILogActor) {
+    await connectToDatabase();
+
+    const user = await User.findById(id);
+    if (!user) throw new Error("User not found");
+
+    user.sessionsValidFrom = new Date();
+    await user.save();
+
+    await LoggerService.logAudit(
+      AuditAction.USER_SESSIONS_REVOKED,
+      `All active sessions ended for '${user.name}' (${user.email})`,
+      { userId: id },
       actor
     );
 

@@ -6,7 +6,16 @@ import { LoggerService, ILogActor } from "../logs/logger.service";
 import { AuditAction } from "../../enums/auditActions";
 import { RequestStatus } from "../../enums/statuses";
 import { IBudgetLineItem } from "../../types/domain";
-import { BudgetPeriodDto, DepartmentSpendDto } from "../../types/api";
+import { BudgetContextDto, BudgetPeriodDto, DepartmentSpendDto } from "../../types/api";
+
+/** Statuses whose amount is already counted inside `pendingBudget`. */
+const LOCKED_STATUSES: RequestStatus[] = [
+  RequestStatus.PENDING_APPROVAL,
+  RequestStatus.APPROVED,
+  RequestStatus.SENT_TO_FINANCE,
+  RequestStatus.UPLOADED_TO_BANK,
+  RequestStatus.AWAITING_RELEASE,
+];
 
 /** Amounts in log lines and validation messages are Naira, matching the UI. */
 const NAIRA = "₦";
@@ -194,6 +203,77 @@ export class BudgetService {
         };
       })
     );
+  }
+
+  /**
+   * Resolves the budget picture behind a single request, for the approval and
+   * exceptional-approval screens.
+   *
+   * These screens previously computed their own figures from the request amount
+   * (a hardcoded ₦250,000 ceiling and a `amount * 0.8` "utilised" line), so the
+   * numbers an approver read while authorising an over-budget request bore no
+   * relation to the department's actual position.
+   */
+  public static async getBudgetContextForRequest(requestId: string): Promise<BudgetContextDto> {
+    await connectToDatabase();
+
+    const request = await ExpenseRequest.findById(requestId).populate("departmentId", "name");
+    if (!request) throw new Error("Request not found");
+
+    const departmentName = (request.departmentId as { name?: string } | null)?.name ?? "Unknown";
+    const departmentId = request.departmentId?._id?.toString() ?? String(request.departmentId);
+    const period = await this.getBudgetPeriodForDate(departmentId, request.requiredPaymentDate);
+
+    // No configured period — report the absence rather than inventing a ceiling.
+    if (!period) {
+      return {
+        requestId,
+        requestAmount: request.amount,
+        departmentName,
+        periodLabel: "",
+        hasBudget: false,
+        totalBudget: 0,
+        utilisedYTD: 0,
+        pending: 0,
+        remaining: 0,
+        criticalGap: request.amount,
+        lineItems: [],
+      };
+    }
+
+    const available = period.totalBudget - period.utilisedBudget - period.pendingBudget;
+
+    // The request's own pending amount is already inside `pendingBudget` once it
+    // has been locked, so exclude it when measuring the shortfall it creates.
+    const isLocked = LOCKED_STATUSES.includes(request.status as RequestStatus);
+    const availableBeforeThisRequest = isLocked ? available + request.amount : available;
+    const criticalGap = Math.max(0, request.amount - availableBeforeThisRequest);
+
+    const lineItems = (period.lineItems ?? []).map((item: IBudgetLineItem) => ({
+      category: item.name,
+      allocated: item.amount,
+      // Spend is tracked at period level, not per line, so a line's remaining
+      // figure is its allocation less this request when the categories match.
+      remaining:
+        item.name.toLowerCase() === String(request.category).toLowerCase()
+          ? item.amount - request.amount
+          : item.amount,
+      isRequestCategory: item.name.toLowerCase() === String(request.category).toLowerCase(),
+    }));
+
+    return {
+      requestId,
+      requestAmount: request.amount,
+      departmentName,
+      periodLabel: `${departmentName} - ${period.periodName}`,
+      hasBudget: true,
+      totalBudget: period.totalBudget,
+      utilisedYTD: period.utilisedBudget,
+      pending: period.pendingBudget,
+      remaining: availableBeforeThisRequest,
+      criticalGap,
+      lineItems,
+    };
   }
 
   /** Every configured budget period, for the Admin budget management screens. */

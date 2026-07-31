@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Pagination } from "../ui/Pagination";
 import { formatNaira } from "../ui/format";
+import { datedFilename, downloadCsv } from "../ui/exportCsv";
 import { DepartmentDto, DepartmentSpendDto } from "../../types/api";
 
 // Matches the row density shown in designs/system-admin/Admin_ Department Management.png
@@ -24,6 +25,21 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
   onOpenDeleteDept
 }) => {
   const [selectedAnalyticsDept, setSelectedAnalyticsDept] = useState<AdminDepartmentRow | null>(null);
+
+  // CSV rather than PDF: the project carries no PDF renderer, and a spreadsheet
+  // is the more useful artefact for budget figures anyway.
+  const handleExportSummary = () => {
+    downloadCsv(datedFilename("departmental-spend"), departments, [
+      { header: "Department", value: (d) => d.name },
+      { header: "Allocated", value: (d) => (d.hasBudget ? d.totalBudget : "Not set") },
+      { header: "Utilised", value: (d) => d.utilised },
+      { header: "Pending", value: (d) => d.pending },
+      { header: "Remaining", value: (d) => (d.hasBudget ? d.remaining : "") },
+      { header: "Utilisation %", value: (d) => d.pctUsed },
+      { header: "Users", value: (d) => d.usersCount },
+      { header: "Over-budget Requests", value: (d) => d.overBudgetCount },
+    ]);
+  };
   const [page, setPage] = useState(1);
 
   const deptList = departments;
@@ -67,7 +83,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
               <Icons.Calendar size={14} /> Last 30 Days
             </div>
             <button
-              onClick={() => alert("Downloading PDF summary report...")}
+              onClick={handleExportSummary}
               style={{
                 padding: "0.5rem 1rem",
                 borderRadius: "0.5rem",

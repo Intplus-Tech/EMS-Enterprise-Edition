@@ -7,10 +7,16 @@
 import { ApprovalsTab } from "../../../components/ApprovalsTab";
 import { useDashboard } from "../DashboardProvider";
 import { SystemRole } from "../../../enums/roles";
+import { useBudgetContext } from "../hooks/useBudgetContext";
+import { useRequestThread } from "../hooks/useRequestThread";
 
 export default function ApprovalsPage() {
   const {
     currentUser,
+    setViewedAttachment,
+    addAttachments,
+    removeAttachment,
+    attachmentsUploading,
     expenses,
     approvalDateFilter, setApprovalDateFilter,
     approvalDatePicker, setApprovalDatePicker,
@@ -19,6 +25,16 @@ export default function ApprovalsPage() {
     expenseActions,
     setAdminNotice,
   } = useDashboard();
+
+  // Real budget position for whichever request is open, so the approval and
+  // expansion dialogs show the department's actual figures.
+  const { budgetContext } = useBudgetContext(selectedExpense?._id);
+
+  // Persisted communication thread for the open request.
+  const { thread, threadSending, addComment } = useRequestThread(
+    selectedExpense?._id,
+    (message) => setAdminNotice({ tone: "error", message })
+  );
 
   // Finance Head reviews exceptions on its own route, not the approvals queue.
   if (currentUser?.role === SystemRole.FINANCE_HEAD) return null;
@@ -36,6 +52,14 @@ export default function ApprovalsPage() {
       setSelectedExpense={setSelectedExpense}
       selectedExpense={selectedExpense}
       actions={expenseActions}
+      budgetContext={budgetContext}
+      thread={thread}
+      threadSending={threadSending}
+      onAddComment={addComment}
+      onViewAttachment={setViewedAttachment}
+      onAddAttachments={addAttachments}
+      onRemoveAttachment={removeAttachment}
+      attachmentsUploading={attachmentsUploading}
       onNotify={setAdminNotice}
     />
   );

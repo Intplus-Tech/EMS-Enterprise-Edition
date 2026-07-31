@@ -416,7 +416,17 @@ export async function runDatabaseSeed() {
     }
   ];
 
-  await ExpenseRequest.insertMany(requests);
+  // Seed rows declare a single `supportingDocument` for readability; expand it
+  // into the attachment list the app actually uses so a fresh install starts on
+  // the current shape rather than relying on the legacy read-through.
+  const requestsWithAttachments = requests.map((r) => ({
+    ...r,
+    supportingDocuments: r.supportingDocument
+      ? [{ name: r.supportingDocument, url: r.supportingDocument, uploadedById: r.initiatorId, uploadedAt: new Date() }]
+      : [],
+  }));
+
+  await ExpenseRequest.insertMany(requestsWithAttachments);
   console.log("Mock requests seeded.");
 
   await LoggerService.logAudit(

@@ -3,6 +3,8 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { WorkflowActionType } from "../../enums/workflowActions";
+import { AttachmentTarget } from "./AttachmentViewModal";
+import { AttachmentList } from "../ui/AttachmentList";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
@@ -17,6 +19,11 @@ interface ExpenseDetailModalProps {
   handleCancelRequest: (id: string) => Promise<void>;
   handleExceptionalBudgetAction: (id: string, action: WorkflowActionType) => Promise<void>;
   handleWorkflowAction: (id: string, action: WorkflowActionType) => Promise<void>;
+  /** Opens the supporting document in the shared attachment viewer. */
+  onViewAttachment: (attachment: AttachmentTarget) => void;
+  onAddAttachments: (requestId: string, files: FileList | File[]) => void;
+  onRemoveAttachment: (requestId: string, attachmentId: string) => void;
+  attachmentsUploading?: boolean;
   handleFinanceUpload: (id: string) => Promise<void>;
   handlePaymentRelease: (id: string) => Promise<void>;
 }
@@ -36,8 +43,17 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   handleWorkflowAction,
   handleFinanceUpload,
   handlePaymentRelease,
+  onViewAttachment,
+  onAddAttachments,
+  onRemoveAttachment,
+  attachmentsUploading = false,
 }) => {
   if (!selectedExpense) return null;
+
+  // The initiator owns the document set only while the request is still theirs
+  // to edit; the server enforces the same rule.
+  const canEditDocuments =
+    currentUser?.role === "INITIATOR" && ["DRAFT", "RETURNED"].includes(selectedExpense.status);
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
@@ -115,42 +131,19 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
               {/* Right Column: Attachments */}
               <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)", display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <h4 style={{ fontSize: "0.85rem", fontWeight: "bold", textTransform: "uppercase", color: "rgb(var(--color-text-dim))" }}>Attachments (1)</h4>
-                
-                {/* Attachment Item */}
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.75rem", background: "rgba(var(--color-card-border), 0.1)", borderRadius: "8px", border: "1px solid rgba(var(--color-card-border), 0.2)" }}>
-                  <Icons.FileText size={28} style={{ color: "rgb(var(--color-primary))", flexShrink: 0 }} />
-                  <div style={{ flexGrow: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text))", fontWeight: "600", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap", margin: 0 }}>
-                      {selectedExpense.supportingDocument || "invoice_receipt.pdf"}
-                    </p>
-                    <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))" }}>1.2 MB • Oct 14, 2023</span>
-                  </div>
-                  <div style={{ display: "flex", gap: "0.25rem" }}>
-                    <button onClick={() => alert("Simulated view for: " + selectedExpense.supportingDocument)} className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}>
-                      View
-                    </button>
-                    <button onClick={() => alert("Simulated download for: " + selectedExpense.supportingDocument)} className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem", fontSize: "0.75rem" }}>
-                      Download
-                    </button>
-                  </div>
-                </div>
-
-                {/* Dropzone */}
-                <div style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "2px dashed rgba(var(--color-card-border), 0.35)",
-                  borderRadius: "8px",
-                  padding: "1.5rem",
-                  textAlign: "center",
-                  background: "rgba(var(--color-card-border), 0.05)"
-                }}>
-                  <Icons.Upload size={24} style={{ color: "rgb(var(--color-text-dim))", marginBottom: "0.5rem" }} />
-                  <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text))", fontWeight: "600" }}>Drop more files to attach</span>
-                </div>
+                {/* Real document set with a working upload. The count was
+                    hardcoded to (1) and the size to "1.2 MB • Oct 14, 2023". */}
+                <AttachmentList
+                  attachments={selectedExpense.attachments ?? []}
+                  onView={(a) => onViewAttachment({ ...a, requestNumber: selectedExpense.requestNumber })}
+                  onAdd={canEditDocuments ? (files) => onAddAttachments(selectedExpense._id, files) : undefined}
+                  onRemove={
+                    canEditDocuments
+                      ? (a) => a._id && onRemoveAttachment(selectedExpense._id, a._id)
+                      : undefined
+                  }
+                  uploading={attachmentsUploading}
+                />
               </div>
             </div>
 
@@ -193,7 +186,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   <span>Bank: <strong>{selectedExpense.vendorBankDetails?.bankName}</strong></span>
                   <span>Account: <strong>{selectedExpense.vendorBankDetails?.accountNumber}</strong></span>
                   <span>Name: <strong>{selectedExpense.vendorBankDetails?.accountName}</strong></span>
-                  <span>Invoice Document: <a href="#" onClick={(e) => { e.preventDefault(); alert("Mock attachment download: " + selectedExpense.supportingDocument); }} style={{ color: "rgb(var(--color-primary))", textDecoration: "underline" }}>{selectedExpense.supportingDocument}</a></span>
+                  <span>Invoice Document: <a href="#" onClick={(e) => { e.preventDefault(); onViewAttachment({ url: selectedExpense.supportingDocument, requestNumber: selectedExpense.requestNumber }); }} style={{ color: "rgb(var(--color-primary))", textDecoration: "underline", cursor: "pointer" }}>{selectedExpense.supportingDocument}</a></span>
                 </div>
               </div>
             </div>

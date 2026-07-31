@@ -26,4 +26,11 @@ export const AuthClient = {
   logout: () => http.post<Record<string, never>>("/api/auth/logout"),
 
   stats: () => http.get<{ stats: unknown }>("/api/admin/stats").then((r) => r.stats),
+
+  /** Per-user notification read/dismissed state, shared across devices. */
+  notificationState: () =>
+    http.get<{ readIds: string[]; dismissedIds: string[] }>("/api/notifications"),
+
+  saveNotificationState: (input: { readIds?: string[]; dismissedIds?: string[] }) =>
+    http.post<{ readIds: string[]; dismissedIds: string[] }>("/api/notifications", { ...input }),
 };

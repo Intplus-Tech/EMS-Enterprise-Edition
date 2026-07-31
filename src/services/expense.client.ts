@@ -7,13 +7,15 @@
  */
 import { http } from "./http";
 import { WorkflowActionType } from "../enums/workflowActions";
-import { ExpenseRequestDto } from "../types/api";
+import { AttachmentDto, AttachmentInput, BudgetContextDto, ExpenseRequestDto, ThreadEntryDto } from "../types/api";
+import { MAX_ATTACHMENT_BYTES } from "../domains/attachments/attachment.rules";
 
 export interface ExpenseInput {
   category: string;
   description: string;
   amount: number;
-  supportingDocument: string;
+  /** At least one is required; the server rejects an empty set. */
+  supportingDocuments: AttachmentInput[];
   vendorName: string;
   vendorBankDetails: { accountNumber: string; bankName: string; accountName: string };
   requiredPaymentDate: string;
@@ -25,6 +27,21 @@ export const ExpenseClient = {
 
   get: (id: string) =>
     http.get<{ expense: ExpenseRequestDto }>(`/api/expenses/${id}`).then((r) => r.expense),
+
+  /** Communication thread: workflow transitions merged with free-text comments. */
+  thread: (id: string) =>
+    http.get<{ thread: ThreadEntryDto[] }>(`/api/expenses/${id}/comments`).then((r) => r.thread),
+
+  addComment: (id: string, message: string, isInternal = false) =>
+    http
+      .post<{ thread: ThreadEntryDto[] }>(`/api/expenses/${id}/comments`, { message, isInternal })
+      .then((r) => r.thread),
+
+  /** Real budget position behind a request, for the approval screens. */
+  budgetContext: (id: string) =>
+    http
+      .get<{ context: BudgetContextDto }>(`/api/expenses/${id}/budget-context`)
+      .then((r) => r.context),
 
   create: (input: ExpenseInput) =>
     http.post<{ request: ExpenseRequestDto }>("/api/expenses", { ...input }).then((r) => r.request),
@@ -62,19 +79,47 @@ export const ExpenseClient = {
   releasePayment: (id: string, reference: string, receipt?: string) =>
     http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/release`, { reference, receipt }),
 
-  /** Uploads a supporting document, returning the stored URL or filename. */
-  uploadDocument: async (file: File): Promise<string> => {
+  /**
+   * Uploads one file and returns a ready-to-attach descriptor.
+   *
+   * Throws on rejection (oversized file, storage outage) so the caller can
+   * report which file failed rather than silently attaching a filename that
+   * points at nothing.
+   */
+  uploadDocument: async (file: File): Promise<AttachmentInput> => {
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      throw new Error(
+        `"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)}MB. The maximum file size is 5MB.`
+      );
+    }
+
     const formData = new FormData();
     formData.append("file", file);
 
     const res = await fetch("/api/upload", { method: "POST", body: formData });
-    if (!res.ok) {
-      // Fall back to the local filename so the form still carries a reference
-      // and the user is not blocked by a transient storage outage.
-      return file.name;
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.success === false) {
+      throw new Error(data.error || `"${file.name}" could not be uploaded.`);
     }
 
-    const data = await res.json();
-    return data.url || data.publicId || data.name || file.name;
+    return {
+      name: data.name || file.name,
+      url: data.url,
+      publicId: data.publicId,
+      size: data.size ?? file.size,
+      mimeType: data.mimeType || file.type,
+    };
   },
+
+  /** Records already-uploaded files against a request. */
+  addAttachments: (id: string, attachments: AttachmentInput[]) =>
+    http
+      .post<{ attachments: AttachmentDto[] }>(`/api/expenses/${id}/attachments`, { attachments })
+      .then((r) => r.attachments),
+
+  removeAttachment: (id: string, attachmentId: string) =>
+    http
+      .delete<{ attachments: AttachmentDto[] }>(`/api/expenses/${id}/attachments/${attachmentId}`)
+      .then((r) => r.attachments),
 };

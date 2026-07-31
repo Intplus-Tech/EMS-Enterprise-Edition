@@ -14,10 +14,13 @@ interface RejectExpansionModalProps {
 export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
   isOpen,
   onClose,
-  requestNumber = "#0044",
-  requestAmount = 47200,
-  remainingBudget = 26200,
-  deficitAmount = 21000,
+  // No mockup defaults: these are financial figures the approver acts on, so an
+  // absent value must read as zero rather than silently borrow the design's
+  // sample numbers (₦47,200 / ₦26,200 / ₦21,000).
+  requestNumber = "—",
+  requestAmount = 0,
+  remainingBudget = 0,
+  deficitAmount = 0,
   onConfirm
 }) => {
   const [rejectionReason, setRejectionReason] = useState(

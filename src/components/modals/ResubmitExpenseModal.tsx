@@ -2,6 +2,8 @@
 
 import React, { RefObject } from "react";
 import * as Icons from "lucide-react";
+import { AttachmentList } from "../ui/AttachmentList";
+import { AttachmentDto, AttachmentInput } from "../../types/api";
 
 interface ResubmitExpenseModalProps {
   isOpen: boolean;
@@ -12,6 +14,9 @@ interface ResubmitExpenseModalProps {
   setResubmitForm: React.Dispatch<React.SetStateAction<any>>;
   resubmitFileInputRef: RefObject<HTMLInputElement | null>;
   handleFileUpload: (files: FileList | File[] | null, isResubmit?: boolean) => Promise<void>;
+  /** Drops a not-yet-submitted upload. */
+  removeDraftAttachment: (url: string, isResubmit?: boolean) => void;
+  onViewAttachment: (attachment: AttachmentDto) => void;
   isUploadingDoc: boolean;
   handleResubmitRequest: (e: React.FormEvent) => Promise<void>;
 }
@@ -25,10 +30,16 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
   setResubmitForm,
   resubmitFileInputRef,
   handleFileUpload,
+  removeDraftAttachment,
+  onViewAttachment,
   isUploadingDoc,
   handleResubmitRequest,
 }) => {
   if (!isOpen || !selectedResubmitExpense) return null;
+
+  // The request's current documents, shown so the initiator knows what is
+  // already attached before deciding whether to replace anything.
+  const existingAttachments: AttachmentDto[] = selectedResubmitExpense.attachments ?? [];
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 105, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -146,10 +157,37 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
               >
                 <Icons.UploadCloud size={30} style={{ color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }} />
                 <p style={{ margin: 0, fontSize: "0.85rem", fontWeight: "600", color: "rgb(var(--color-text))" }}>
-                  {isUploadingDoc ? "Uploading updated receipt file..." : (resubmitForm.supportingDocument || "Click or drag & drop to upload merchant receipt file")}
+                  {isUploadingDoc
+                    ? "Uploading…"
+                    : "Click or drag & drop to upload replacement documents"}
                 </p>
-                <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>Supports PDF, PNG, JPG, DOCX up to 10MB</span>
+                <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>Supports PDF, PNG, JPG, DOCX up to 5MB</span>
               </div>
+
+              {/* Newly attached files replace the request's existing set on
+                  resubmission; leaving this empty keeps the originals. */}
+              {resubmitForm.supportingDocuments.length > 0 ? (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <AttachmentList
+                    label="Replacement Documents"
+                    compact
+                    attachments={resubmitForm.supportingDocuments.map((d: AttachmentInput) => ({ ...d }))}
+                    onView={onViewAttachment}
+                    onRemove={(a) => removeDraftAttachment(a.url, true)}
+                  />
+                </div>
+              ) : (
+                existingAttachments.length > 0 && (
+                  <div style={{ marginTop: "0.75rem" }}>
+                    <AttachmentList
+                      label="Current Documents (kept unless replaced)"
+                      compact
+                      attachments={existingAttachments}
+                      onView={onViewAttachment}
+                    />
+                  </div>
+                )
+              )}
             </div>
 
             <div className="form-group" style={{ margin: 0 }}>

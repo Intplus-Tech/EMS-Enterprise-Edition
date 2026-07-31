@@ -7,7 +7,8 @@ interface AdminEditUserProfileModalProps {
   user: any;
   departments: any[];
   onUpdateUser: (userData: any) => void;
-  onForceLogOut?: (userId: string) => void;
+  /** Ends every active session for this user. */
+  onForceLogOut?: (userId: string, name: string) => void;
 }
 
 export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps> = ({
@@ -274,10 +275,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
             </div>
             <button
               type="button"
-              onClick={() => {
-                if (onForceLogOut) onForceLogOut(user.id || user._id);
-                alert(`User ${fullName} has been forced out of active sessions.`);
-              }}
+              onClick={() => onForceLogOut?.(user.id || user._id, fullName)}
               style={{
                 padding: "0.45rem 0.85rem",
                 borderRadius: "0.375rem",

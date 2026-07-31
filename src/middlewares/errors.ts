@@ -35,7 +35,13 @@ export function withErrorHandling(handler: ApiHandler): ApiHandler {
       let statusCode = 500;
 
       // Determine status code based on common error patterns
-      if (errorMessage.includes("Unauthorized")) {
+      if (
+        errorMessage.includes("Unauthorized") ||
+        // Failed sign-in attempts are authentication failures, not server
+        // faults; these previously fell through to a 500.
+        errorMessage.includes("Invalid email or password") ||
+        errorMessage.includes("Account is inactive")
+      ) {
         statusCode = 401;
       } else if (errorMessage.includes("Forbidden") || errorMessage.includes("Unauthorized role")) {
         statusCode = 403;

@@ -61,7 +61,30 @@ export const PUT = withErrorHandling(async (req: NextRequest, { params }: { para
   expense.category = validatedData.category;
   expense.description = validatedData.description;
   expense.amount = validatedData.amount;
-  expense.supportingDocument = validatedData.supportingDocument;
+
+  // Only replace the document set when the caller sent one. A resubmission that
+  // just revises the justification must not silently drop the existing files,
+  // and attachments added by reviewers are managed via /attachments.
+  if (validatedData.supportingDocuments && validatedData.supportingDocuments.length > 0) {
+    expense.supportingDocuments = validatedData.supportingDocuments.map((doc) => ({
+      ...doc,
+      uploadedById: user.id,
+      uploadedByName: user.name,
+      uploadedAt: new Date(),
+    }));
+  } else if (validatedData.supportingDocument && expense.supportingDocuments.length === 0) {
+    // Legacy single-document payload against a record with no attachment list.
+    expense.supportingDocuments = [
+      {
+        name: validatedData.supportingDocument,
+        url: validatedData.supportingDocument,
+        uploadedById: user.id,
+        uploadedByName: user.name,
+        uploadedAt: new Date(),
+      },
+    ];
+  }
+
   expense.vendorName = validatedData.vendorName;
   expense.vendorBankDetails = {
     accountNumber: validatedData.vendorBankDetails.accountNumber,

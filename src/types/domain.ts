@@ -83,6 +83,28 @@ export interface IVendorBankDetails {
   accountName: string;
 }
 
+/**
+ * A file attached to an expense request.
+ *
+ * Requests carry a list of these rather than the single `supportingDocument`
+ * string they used to: the designs show several documents per request
+ * ("Invoice.pdf", "Quote.pdf") and reviewers can attach their own during the
+ * workflow. `publicId` is retained so the file can be removed from Cloudinary
+ * when the attachment is deleted.
+ */
+export interface IAttachment {
+  _id?: string;
+  name: string;
+  /** Cloudinary secure URL, or a bare filename on records predating uploads. */
+  url: string;
+  publicId?: string;
+  size?: number;
+  mimeType?: string;
+  uploadedById?: string;
+  uploadedByName?: string;
+  uploadedAt?: Date;
+}
+
 export interface IExpenseRequest {
   _id?: string;
   requestNumber: string; // e.g. "EXP-2026-0001"
@@ -91,7 +113,10 @@ export interface IExpenseRequest {
   category: string;
   description: string;
   amount: number;
-  supportingDocument: string; // File name or URL (mandatory)
+  /** At least one is mandatory. */
+  supportingDocuments: IAttachment[];
+  /** @deprecated Mirrors `supportingDocuments[0]` for pre-multi-attachment readers. */
+  supportingDocument?: string;
   vendorName: string;
   vendorBankDetails: IVendorBankDetails;
   requiredPaymentDate: Date;

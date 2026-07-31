@@ -20,6 +20,7 @@ import { UpdatePhotoModal } from "../../components/modals/UpdatePhotoModal";
 import { ChangePasswordModal } from "../../components/modals/ChangePasswordModal";
 import { GlobalAlertDialogModal } from "../../components/modals/GlobalAlertDialogModal";
 import { NoticeBanner } from "../../components/ui/NoticeBanner";
+import { AttachmentViewModal } from "../../components/modals/AttachmentViewModal";
 
 // System Admin Modals
 import { AdminAddUserModal } from "../../components/admin/modals/AdminAddUserModal";
@@ -60,6 +61,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     newRequest, setNewRequest,
     fileInputRef,
     handleFileUpload,
+    removeDraftAttachment,
     isUploadingDoc,
     uploadDocError,
     handleCreateRequest,
@@ -77,6 +79,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     resubmitForm, setResubmitForm,
     resubmitFileInputRef,
     handleResubmitRequest,
+    viewedAttachment, setViewedAttachment,
+    addAttachments, removeAttachment, attachmentsUploading,
     showReceiptModal, setShowReceiptModal,
     selectedReceiptData, setSelectedReceiptData,
     showPolicyModal, setShowPolicyModal,
@@ -101,7 +105,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     systemUsers,
     // Persisted admin mutations from useAdminAdministration.
     createDepartment, updateDepartment, deleteDepartment,
-    inviteUser, updateUser, setUserActive, deleteUser,
+    inviteUser, updateUser, setUserActive, deleteUser, revokeUserSessions,
     saveBudgetPeriod, saveRolePermissions,
     adminNotice, setAdminNotice, adminBusy,
     showAdminAddUserModal, setShowAdminAddUserModal,
@@ -130,9 +134,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
     if (notification.type === "RETURNED") {
       setSelectedResubmitExpense(expense);
+      // Start with no new uploads; the request keeps its existing documents
+      // unless the initiator attaches replacements.
       setResubmitForm({
         justification: "",
-        supportingDocument: expense.supportingDocument || "",
+        supportingDocuments: [],
         notifyAuditor: true,
       });
       setShowResubmitModal(true);
@@ -705,6 +711,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         handleFileUpload={handleFileUpload}
         isUploadingDoc={isUploadingDoc}
         uploadDocError={uploadDocError}
+        removeDraftAttachment={removeDraftAttachment}
         handleCreateRequest={handleCreateRequest}
       />
 
@@ -723,6 +730,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         handleWorkflowAction={handleWorkflowAction}
         handleFinanceUpload={handleFinanceUpload}
         handlePaymentRelease={handlePaymentRelease}
+        onViewAttachment={setViewedAttachment}
+        onAddAttachments={addAttachments}
+        onRemoveAttachment={removeAttachment}
+        attachmentsUploading={attachmentsUploading}
       />
 
       <ResubmitExpenseModal
@@ -734,8 +745,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         setResubmitForm={setResubmitForm}
         resubmitFileInputRef={resubmitFileInputRef}
         handleFileUpload={handleFileUpload}
+        removeDraftAttachment={removeDraftAttachment}
+        onViewAttachment={setViewedAttachment}
         isUploadingDoc={isUploadingDoc}
         handleResubmitRequest={handleResubmitRequest}
+      />
+
+      <AttachmentViewModal
+        isOpen={Boolean(viewedAttachment)}
+        onClose={() => setViewedAttachment(null)}
+        attachment={viewedAttachment}
       />
 
       <ViewReceiptModal
@@ -833,6 +852,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             officialContact: updatedUser.contactNumber,
           })
         }
+        onForceLogOut={(userId: string, name: string) => revokeUserSessions(userId, name)}
       />
 
       <AdminCreateDepartmentModal

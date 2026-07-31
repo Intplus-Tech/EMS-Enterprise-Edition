@@ -5,6 +5,12 @@ import { RejectExpansionModal } from "./RejectExpansionModal";
 import { ApproveRequestModal, ApproveRequestPayload } from "./modals/ApproveRequestModal";
 import { RejectOrClarifyModal, RejectOrClarifyPayload } from "./modals/RejectOrClarifyModal";
 import { Notice } from "./ui/NoticeBanner";
+import { AttachmentDto, BudgetContextDto, ThreadEntryDto } from "../types/api";
+import { AttachmentTarget } from "./modals/AttachmentViewModal";
+import { AttachmentList } from "./ui/AttachmentList";
+import { formatFileSize } from "../domains/attachments/attachment.rules";
+import { formatNaira, formatDate, formatDateTime, humanizeStatus } from "./ui/format";
+import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
 
 interface ApprovalsTabProps {
@@ -20,6 +26,19 @@ interface ApprovalsTabProps {
   selectedExpense?: any;
   /** Workflow operations injected by the page; this component performs no I/O. */
   actions: ExpenseActions;
+  /** Real budget position for the selected request; null while loading. */
+  budgetContext?: BudgetContextDto | null;
+  /** Persisted communication thread for the selected request. */
+  thread: ThreadEntryDto[];
+  threadSending?: boolean;
+  /** Posts a comment; resolves false when the save was rejected. */
+  onAddComment: (message: string, isInternal?: boolean) => Promise<boolean>;
+  /** Opens a stored document in the shared attachment viewer. */
+  onViewAttachment: (attachment: AttachmentTarget) => void;
+  /** Attaches reviewer evidence to the open request. */
+  onAddAttachments: (requestId: string, files: FileList | File[]) => void;
+  onRemoveAttachment: (requestId: string, attachmentId: string) => void;
+  attachmentsUploading?: boolean;
   /** Surfaces validation feedback through the shell's notice banner. */
   onNotify?: (notice: Notice) => void;
 }
@@ -41,6 +60,14 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   setSelectedExpense,
   selectedExpense,
   actions,
+  budgetContext,
+  thread,
+  threadSending = false,
+  onAddComment,
+  onViewAttachment,
+  onAddAttachments,
+  onRemoveAttachment,
+  attachmentsUploading = false,
   onNotify
 }) => {
   // Bulk selection state
@@ -51,7 +78,6 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [directedTo, setDirectedTo] = useState("Initiator");
   const [markAsUrgent, setMarkAsUrgent] = useState(false);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
-  const [timelineMessages, setTimelineMessages] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
   // Submission state now lives in useExpenseActions, alongside the I/O it guards.
 
@@ -80,29 +106,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [dateRangeFilter, setDateRangeFilter] = useState("30DAYS");
 
   // Initialize mockup conversation timeline or load from history when selectedExpense changes
-  useEffect(() => {
-    if (selectedExpense) {
-      const dbHistory = selectedExpense.history || [];
-      if (dbHistory.length > 0) {
-        const mapped = dbHistory.map((h: any) => ({
-          sender: h.actorRole === "INITIATOR" ? "Initiator" : "Dept Head",
-          senderName: h.actorName || "Staff Member",
-          time: h.timestamp ? new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A",
-          message: h.comment || h.action
-        }));
-        setTimelineMessages(mapped);
-      } else {
-        setTimelineMessages([
-          {
-            sender: "Initiator",
-            senderName: (selectedExpense.initiatorId as any)?.name || selectedExpense.initiatorName || "Initiator",
-            time: selectedExpense.createdAt ? new Date(selectedExpense.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "09:00 AM",
-            message: selectedExpense.description || "Request submitted for approval."
-          }
-        ]);
-      }
-    }
-  }, [selectedExpense]);
+  // The communication thread (history + comments, merged and access-filtered)
+  // is served by /api/expenses/[id]/comments via the `thread` prop.
 
   // Handler for the primary decision buttons. All I/O and role→endpoint routing
   // is delegated to `actions` (useExpenseActions); this only decides which
@@ -263,21 +268,44 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   };
 
   // Timeline comment sender
+  // Posts to the thread; the parent refreshes it from the server response so
+  // the comment survives a reload and is visible to the other participants.
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim() || !selectedExpense) return;
-
-    try {
-      const mappedMsg = {
-        sender: currentUser.role === "INITIATOR" ? "Initiator" : "Dept Head",
-        senderName: currentUser.name,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        message: newComment
-      };
-      setTimelineMessages(prev => [...prev, mappedMsg]);
+    // Comments from this screen are internal audit notes, matching the field's
+    // own label ("Add an internal comment to this audit trail").
+    if (await onAddComment(newComment, true)) {
       setNewComment("");
-    } catch (err) {
-      console.error(err);
+    }
+  };
+
+  // Exports the pipeline slice currently on screen, filters included.
+  const handleExportPipeline = () => {
+    if (!downloadCsv(datedFilename("processing-pipeline"), filteredList, [
+      { header: "Request", value: (e: any) => e.requestNumber },
+      { header: "Department", value: (e: any) => e.departmentId?.name ?? "" },
+      { header: "Initiator", value: (e: any) => e.initiatorId?.name ?? "" },
+      { header: "Category", value: (e: any) => e.category },
+      { header: "Amount", value: (e: any) => e.amount },
+      { header: "Status", value: (e: any) => e.status },
+      { header: "Required Date", value: (e: any) => formatDate(e.requiredPaymentDate) },
+      { header: "Payment Reference", value: (e: any) => e.paymentReference ?? "" },
+    ])) {
+      onNotify?.({ tone: "error", message: "There is nothing to export in this view." });
+    }
+  };
+
+  // Exports the persisted communication thread for the open request.
+  const handleExportThread = () => {
+    if (!downloadCsv(datedFilename(`thread-${selectedExpense?.requestNumber ?? "request"}`), thread, [
+      { header: "Timestamp", value: (t) => formatDateTime(t.timestamp) },
+      { header: "Author", value: (t) => t.authorName },
+      { header: "Role", value: (t) => t.authorRole },
+      { header: "Type", value: (t) => t.kind },
+      { header: "Message", value: (t) => t.message },
+    ])) {
+      onNotify?.({ tone: "error", message: "This request has no thread entries yet." });
     }
   };
 
@@ -527,7 +555,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   <Icons.MessageSquare size={20} />
                   <h3 style={{ fontSize: "1.05rem", fontWeight: "700", margin: 0 }}>Message History</h3>
                   <span style={{ fontSize: "0.8rem", background: "rgba(255,255,255,0.08)", padding: "0.15rem 0.5rem", borderRadius: "999px", color: "rgb(var(--color-text-muted))" }}>
-                    {timelineMessages.length} Total Messages
+                    {thread.length} Total Messages
                   </span>
                 </div>
                 <button 
@@ -543,10 +571,10 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   
                   {/* Message Items Timeline */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                    {timelineMessages.map((msg, index) => {
-                      const isDept = msg.sender === "Dept Head";
+                    {thread.map((entry) => {
+                      const isDept = entry.authorRole !== "INITIATOR";
                       return (
-                        <div key={index} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
+                        <div key={entry.id} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
                           <div style={{
                             width: "2.25rem",
                             height: "2.25rem",
@@ -562,11 +590,17 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                           </div>
 
                           <div style={{ flexGrow: 1, background: "rgba(255,255,255,0.03)", padding: "0.85rem 1rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                              <span style={{ fontSize: "0.85rem", fontWeight: "700" }}>{msg.senderName} ({msg.sender})</span>
-                              <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>{msg.time}</span>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", gap: "0.5rem" }}>
+                              <span style={{ fontSize: "0.85rem", fontWeight: "700" }}>
+                                {entry.authorName} ({humanizeStatus(entry.authorRole)})
+                                {/* Internal notes are never shown to the initiator */}
+                                {entry.isInternal && (
+                                  <span className="badge badge-draft" style={{ marginLeft: "0.4rem", fontSize: "0.65rem" }}>INTERNAL</span>
+                                )}
+                              </span>
+                              <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", whiteSpace: "nowrap" }}>{formatDateTime(entry.timestamp)}</span>
                             </div>
-                            <p style={{ margin: 0, fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", lineHeight: "1.4" }}>{msg.message}</p>
+                            <p style={{ margin: 0, fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", lineHeight: "1.4" }}>{entry.message}</p>
                           </div>
                         </div>
                       );
@@ -583,8 +617,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       className="form-input"
                       style={{ flexGrow: 1, padding: "0.6rem 0.75rem", fontSize: "0.85rem" }}
                     />
-                    <button type="submit" className="btn btn-primary" style={{ padding: "0.6rem 1.2rem", background: "#2563EB", border: "none" }}>
-                      Send
+                    <button type="submit" disabled={threadSending || !newComment.trim()} className="btn btn-primary" style={{ padding: "0.6rem 1.2rem", background: "#2563EB", border: "none", opacity: threadSending || !newComment.trim() ? 0.6 : 1 }}>
+                      {threadSending ? "Sending…" : "Send"}
                     </button>
                   </form>
                 </div>
@@ -703,12 +737,16 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
                 {/* Dept Budget Card */}
                 <div className="glass-panel" style={{ padding: "1.25rem" }}>
-                  <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "700", color: "rgb(var(--color-text-muted))", display: "block", marginBottom: "0.25rem" }}>DEPT BUDGET (Q3)</span>
+                  {/* Allocation comes from the request's own budget period; the
+                      badge previously showed a hardcoded ₦12,545,000. */}
+                  <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "700", color: "rgb(var(--color-text-muted))", display: "block", marginBottom: "0.25rem" }}>
+                    DEPT BUDGET{budgetContext?.periodLabel ? ` (${budgetContext.periodLabel.split(" - ").pop()})` : ""}
+                  </span>
                   <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>Department Spend</span>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: "0.2rem" }}>
-                    <strong style={{ fontSize: "1.25rem" }}>₦{totalDeptSpend.toLocaleString()}</strong>
+                    <strong style={{ fontSize: "1.25rem" }}>{formatNaira(totalDeptSpend)}</strong>
                     <span className="badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10B981", fontWeight: "700", fontSize: "0.75rem", padding: "0.15rem 0.5rem", borderRadius: "4px" }}>
-                      ₦{(12545000).toLocaleString()}
+                      {budgetContext?.hasBudget ? formatNaira(budgetContext.totalBudget) : "Not set"}
                     </span>
                   </div>
                 </div>
@@ -720,52 +758,23 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     <h4 style={{ margin: 0, fontSize: "0.85rem", fontWeight: "700" }}>Documentation</h4>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    {/* Invoice */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem", background: "rgba(255,255,255,0.02)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <Icons.FileText size={16} style={{ color: "#EF4444" }} />
-                      <div style={{ flexGrow: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: "600", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                          {selectedExpense.supportingDocument || "Invoice_Q3.pdf"}
-                        </p>
-                        <span style={{ fontSize: "0.65rem", color: "rgb(var(--color-text-muted))" }}>1.2 MB • PDF Document</span>
-                      </div>
-                    </div>
-                    {/* Justification Word Doc */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem", background: "rgba(255,255,255,0.02)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                      <Icons.FileText size={16} style={{ color: "#3B82F6" }} />
-                      <div style={{ flexGrow: 1, minWidth: 0 }}>
-                        <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: "600", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                          Maintenance_Justification.docx
-                        </p>
-                        <span style={{ fontSize: "0.65rem", color: "rgb(var(--color-text-muted))" }}>846 KB • Word Doc</span>
-                      </div>
-                    </div>
-
-                    {/* Show Paid gtbank_receipt.pdf document (Image 3) */}
-                    {isSelectedCompleted && (
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem", background: "rgba(255,255,255,0.02)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                        <Icons.FileText size={16} style={{ color: "#EF4444" }} />
-                        <div style={{ flexGrow: 1, minWidth: 0 }}>
-                          <p style={{ margin: 0, fontSize: "0.75rem", fontWeight: "600", textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                            gtbank_receipt.pdf
-                          </p>
-                          <span style={{ fontSize: "0.65rem", color: "rgb(var(--color-text-muted))" }}>845 KB • PDF Document</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Hide upload button for Completed paid requests */}
-                    {!isSelectedCompleted && (
-                      <button 
-                        onClick={() => alert("File upload screen opened")}
-                        className="btn" 
-                        style={{ border: "1px dashed rgba(255,255,255,0.15)", background: "transparent", fontSize: "0.75rem", padding: "0.4rem", display: "flex", justifyContent: "center", gap: "0.25rem", color: "rgb(var(--color-text-muted))" }}
-                      >
-                        <Icons.Plus size={14} /> Upload Additional Files
-                      </button>
-                    )}
-                  </div>
+                  {/* Real document set. Previously this listed the request's
+                      single filename plus two invented files with made-up sizes
+                      ("Maintenance_Justification.docx • 846 KB"). Reviewers can
+                      now attach their own evidence here. */}
+                  <AttachmentList
+                    label=""
+                    compact
+                    attachments={selectedExpense.attachments ?? []}
+                    onView={(a) => onViewAttachment({ ...a, requestNumber: selectedExpense.requestNumber })}
+                    onAdd={isSelectedCompleted ? undefined : (files) => onAddAttachments(selectedExpense._id, files)}
+                    onRemove={
+                      isSelectedCompleted
+                        ? undefined
+                        : (a) => a._id && onRemoveAttachment(selectedExpense._id, a._id)
+                    }
+                    uploading={attachmentsUploading}
+                  />
                 </div>
               </>
             )}
@@ -1145,7 +1154,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
         {/* Export button */}
         <button 
-          onClick={() => alert("Exporting pipeline release report...")}
+          onClick={handleExportPipeline}
           className="btn btn-secondary" 
           style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.35rem" }}
         >
@@ -1447,21 +1456,28 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     <Icons.Paperclip size={16} />
                     <strong style={{ fontSize: "0.85rem" }}>Documentation</strong>
                   </div>
+                  {/* The request's actual documents. These were two invented
+                      files with fixed sizes regardless of the request. */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
-                      <Icons.FileText size={18} style={{ color: "#EF4444" }} />
-                      <div>
-                        <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B" }}>Invoice_Q3.pdf</div>
-                        <span style={{ fontSize: "0.7rem", color: "#64748B" }}>1.2 MB &bull; PDF Document</span>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
-                      <Icons.FileText size={18} style={{ color: "#2563EB" }} />
-                      <div>
-                        <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B" }}>Maintenance_Justification.docx</div>
-                        <span style={{ fontSize: "0.7rem", color: "#64748B" }}>845 KB &bull; Word Doc</span>
-                      </div>
-                    </div>
+                    {((selectedExpense?.attachments ?? []) as AttachmentDto[]).map((doc, idx) => (
+                      <button
+                        key={doc._id || `${doc.url}-${idx}`}
+                        type="button"
+                        onClick={() => onViewAttachment({ ...doc, requestNumber: selectedExpense?.requestNumber })}
+                        style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem", cursor: "pointer", textAlign: "left", width: "100%" }}
+                      >
+                        <Icons.FileText size={18} style={{ color: "#2563EB", flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</div>
+                          <span style={{ fontSize: "0.7rem", color: "#64748B" }}>
+                            {[formatFileSize(doc.size), doc.uploadedByName].filter(Boolean).join(" • ") || "Supporting document"}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                    {(selectedExpense?.attachments ?? []).length === 0 && (
+                      <span style={{ fontSize: "0.78rem", color: "#64748B" }}>No documents attached.</span>
+                    )}
                   </div>
                 </div>
 
@@ -1651,15 +1667,24 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
                     <Icons.FileText size={20} style={{ color: "#2563EB" }} />
                     <div>
-                      <div style={{ fontSize: "0.8rem", fontWeight: "700", color: "#1E293B" }}>payment_receipt_2101.pdf</div>
-                      <span style={{ fontSize: "0.65rem", color: "#64748B" }}>245 KB &bull; Generated System Receipt</span>
+                      <div style={{ fontSize: "0.8rem", fontWeight: "700", color: "#1E293B" }}>
+                        {selectedExpense?.paymentReceipt || "No receipt attached"}
+                      </div>
+                      <span style={{ fontSize: "0.65rem", color: "#64748B" }}>Bank payment confirmation</span>
                     </div>
                   </div>
-                  <button 
-                    onClick={() => alert("Downloading payment_receipt_2101.pdf...")}
-                    style={{ background: "none", border: "none", color: "#2563EB", cursor: "pointer", fontWeight: "700", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
+                  <button
+                    onClick={() =>
+                      selectedExpense?.paymentReceipt &&
+                      onViewAttachment({
+                        url: selectedExpense.paymentReceipt,
+                        requestNumber: selectedExpense.requestNumber,
+                      })
+                    }
+                    disabled={!selectedExpense?.paymentReceipt}
+                    style={{ background: "none", border: "none", color: "#2563EB", cursor: selectedExpense?.paymentReceipt ? "pointer" : "not-allowed", opacity: selectedExpense?.paymentReceipt ? 1 : 0.5, fontWeight: "700", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
                   >
-                    <Icons.Download size={14} /> Download
+                    <Icons.Download size={14} /> View
                   </button>
                 </div>
               </div>
@@ -1694,21 +1719,27 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     <Icons.Paperclip size={16} />
                     <strong style={{ fontSize: "0.85rem" }}>Documentation</strong>
                   </div>
+                  {/* The request's actual documents (was two invented files). */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
-                      <Icons.FileText size={18} style={{ color: "#EF4444" }} />
-                      <div>
-                        <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B" }}>Invoice_Q3.pdf</div>
-                        <span style={{ fontSize: "0.7rem", color: "#64748B" }}>1.2 MB &bull; PDF Document</span>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
-                      <Icons.FileText size={18} style={{ color: "#2563EB" }} />
-                      <div>
-                        <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B" }}>Maintenance_Justification.docx</div>
-                        <span style={{ fontSize: "0.7rem", color: "#64748B" }}>845 KB &bull; Word Doc</span>
-                      </div>
-                    </div>
+                    {((selectedExpense?.attachments ?? []) as AttachmentDto[]).map((doc, idx) => (
+                      <button
+                        key={doc._id || `${doc.url}-${idx}`}
+                        type="button"
+                        onClick={() => onViewAttachment({ ...doc, requestNumber: selectedExpense?.requestNumber })}
+                        style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem", cursor: "pointer", textAlign: "left", width: "100%" }}
+                      >
+                        <Icons.FileText size={18} style={{ color: "#2563EB", flexShrink: 0 }} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</div>
+                          <span style={{ fontSize: "0.7rem", color: "#64748B" }}>
+                            {[formatFileSize(doc.size), doc.uploadedByName].filter(Boolean).join(" • ") || "Supporting document"}
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                    {(selectedExpense?.attachments ?? []).length === 0 && (
+                      <span style={{ fontSize: "0.78rem", color: "#64748B" }}>No documents attached.</span>
+                    )}
                   </div>
                 </div>
 
@@ -1861,7 +1892,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #E2E8F0", paddingTop: "1rem" }}>
               <button 
-                onClick={() => alert("Thread exported successfully.")}
+                onClick={handleExportThread}
                 className="btn btn-secondary" 
                 style={{ border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#475569", fontSize: "0.8rem" }}
               >
@@ -1902,9 +1933,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         isOpen={showApproveExpansionModal}
         onClose={() => setShowApproveExpansionModal(false)}
         requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : "#0044"}
-        requestAmount={selectedExpense?.amount || 47200}
-        remainingBudget={26200}
-        deficitAmount={selectedExpense?.amount ? (selectedExpense.amount > 26200 ? selectedExpense.amount - 26200 : 21000) : 21000}
+        requestAmount={selectedExpense?.amount ?? 0}
+        remainingBudget={budgetContext?.remaining ?? 0}
+        deficitAmount={budgetContext?.criticalGap ?? 0}
         onConfirm={async (notes) => {
           if (!selectedExpense) return;
           if (await actions.approveExpansion(selectedExpense._id, notes)) {
@@ -1919,9 +1950,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         isOpen={showRejectExpansionModal}
         onClose={() => setShowRejectExpansionModal(false)}
         requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : "#0044"}
-        requestAmount={selectedExpense?.amount || 47200}
-        remainingBudget={26200}
-        deficitAmount={selectedExpense?.amount ? (selectedExpense.amount > 26200 ? selectedExpense.amount - 26200 : 21000) : 21000}
+        requestAmount={selectedExpense?.amount ?? 0}
+        remainingBudget={budgetContext?.remaining ?? 0}
+        deficitAmount={budgetContext?.criticalGap ?? 0}
         onConfirm={async (reason) => {
           if (!selectedExpense) return;
           if (await actions.rejectExpansion(selectedExpense._id, reason)) {

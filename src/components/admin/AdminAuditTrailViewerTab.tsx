@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { datedFilename, downloadCsv } from "../ui/exportCsv";
 
 interface AdminAuditTrailViewerTabProps {
   logs?: any[];
@@ -16,6 +17,9 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
 
   const formattedLiveLogs = logs.map((l: any) => ({
     id: l._id || l.id,
+    // Kept alongside the formatted string so filtering can compare real dates.
+    rawTimestamp: l.timestamp ? new Date(l.timestamp) : null,
+    requestRef: l.details?.requestNumber || l.details?.requestId || "",
     timestamp: l.timestamp ? new Date(l.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
     userBadge: l.actorName ? l.actorName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "SYS",
     userName: l.actorName || "System Engine",
@@ -28,7 +32,51 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
     attachmentsCount: l.details?.attachmentsCount || 0
   }));
 
-  const displayLogs = formattedLiveLogs;
+  /**
+   * Applies the filter bar. These four controls previously updated state that
+   * nothing read, so the table always showed every log and "Apply Filters" was
+   * an alert. Filtering is live — the button now just scrolls intent, matching
+   * how the other tables in the app behave.
+   */
+  const displayLogs = formattedLiveLogs.filter((log) => {
+    if (userNameFilter.trim()) {
+      if (!log.userName.toLowerCase().includes(userNameFilter.trim().toLowerCase())) return false;
+    }
+
+    if (reqIdFilter.trim()) {
+      const needle = reqIdFilter.trim().toLowerCase();
+      const haystack = `${log.requestRef} ${log.verbatimFeedback}`.toLowerCase();
+      if (!haystack.includes(needle)) return false;
+    }
+
+    if (actionTypeFilter !== "All Actions") {
+      // Filter labels are prose; log actions are SCREAMING_SNAKE codes.
+      const normalised = actionTypeFilter.replace(/\s+/g, "_").toUpperCase();
+      if (!log.action.toUpperCase().includes(normalised)) return false;
+    }
+
+    if (log.rawTimestamp) {
+      const days = dateRange === "Today" ? 1 : dateRange === "Last 30 Days" ? 30 : 7;
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      if (log.rawTimestamp.getTime() < cutoff) return false;
+    }
+
+    return true;
+  });
+
+  // Filters apply as you type, so the primary action here is taking the
+  // filtered slice away with you.
+  const handleExportLogs = () => {
+    downloadCsv(datedFilename("audit-trail"), displayLogs, [
+      { header: "Timestamp", value: (l) => l.timestamp },
+      { header: "User", value: (l) => l.userName },
+      { header: "Role", value: (l) => l.userRole },
+      { header: "Action", value: (l) => l.action },
+      { header: "Request", value: (l) => l.requestRef },
+      { header: "Detail", value: (l) => l.verbatimFeedback },
+      { header: "IP Address", value: (l) => l.ipAddress },
+    ]);
+  };
 
   return (
     <div>
@@ -148,7 +196,7 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
           </div>
 
           <button
-            onClick={() => alert("Applying audit trail log filters...")}
+            onClick={handleExportLogs}
             style={{
               padding: "0.6rem 1.25rem",
               borderRadius: "0.375rem",
@@ -164,7 +212,7 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
               boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
             }}
           >
-            <Icons.Filter size={15} /> Apply Filters
+            <Icons.Download size={15} /> Export Logs
           </button>
         </div>
       </div>

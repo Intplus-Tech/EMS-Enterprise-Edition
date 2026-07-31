@@ -40,6 +40,30 @@ export interface WorkflowHistoryDto {
   timestamp: string;
 }
 
+/** A file attached to a request, as returned by the API. */
+export interface AttachmentDto {
+  _id?: string | null;
+  name: string;
+  url: string;
+  publicId?: string;
+  size?: number;
+  mimeType?: string;
+  uploadedById?: string;
+  uploadedByName?: string;
+  uploadedAt?: string;
+  /** True for records whose file predates the upload integration. */
+  isLegacy?: boolean;
+}
+
+/** What the client sends when attaching an already-uploaded file. */
+export interface AttachmentInput {
+  name: string;
+  url: string;
+  publicId?: string;
+  size?: number;
+  mimeType?: string;
+}
+
 export interface ExpenseRequestDto {
   _id: string;
   requestNumber: string;
@@ -48,7 +72,11 @@ export interface ExpenseRequestDto {
   category: string;
   description: string;
   amount: number;
-  supportingDocument: string;
+  /** Canonical list; back-filled from the legacy field for older records. */
+  attachments: AttachmentDto[];
+  supportingDocuments: AttachmentDto[];
+  /** @deprecated Read `attachments` instead. */
+  supportingDocument?: string;
   vendorName: string;
   vendorBankDetails: IVendorBankDetails;
   requiredPaymentDate: string;
@@ -136,6 +164,63 @@ export interface BudgetPeriodDto {
   lineItems: { name: string; description?: string; amount: number }[];
   startDate: string;
   endDate: string;
+}
+
+export interface RequestCommentDto {
+  id: string;
+  requestId: string;
+  authorName: string;
+  authorRole: SystemRole;
+  message: string;
+  isInternal: boolean;
+  timestamp: string;
+}
+
+/**
+ * One row of a request's communication thread. `TRANSITION` entries come from
+ * the workflow history, `COMMENT` entries from the comment collection; the
+ * designs interleave both in a single chronological timeline.
+ */
+export interface ThreadEntryDto {
+  id: string;
+  kind: "TRANSITION" | "COMMENT";
+  authorName: string;
+  authorRole: SystemRole;
+  message: string;
+  /** Present on transitions, e.g. "Approve Step: Departmental Approval". */
+  action?: string;
+  isInternal: boolean;
+  timestamp: string;
+}
+
+/** One allocation line within the deciding department's period. */
+export interface BudgetLineContextDto {
+  category: string;
+  allocated: number;
+  remaining: number;
+  /** True when this line is the request's own category — highlighted in the design. */
+  isRequestCategory: boolean;
+}
+
+/**
+ * The budget picture an approver needs to decide an over-budget request
+ * (designs/finance-head/Request Detail with Budget & Communication Thread).
+ * Resolved from the request's department and required payment date.
+ */
+export interface BudgetContextDto {
+  requestId: string;
+  requestAmount: number;
+  departmentName: string;
+  /** e.g. "IT Dept - FY 2026"; empty when no period covers the payment date. */
+  periodLabel: string;
+  hasBudget: boolean;
+  totalBudget: number;
+  utilisedYTD: number;
+  pending: number;
+  remaining: number;
+  /** Shortfall this request would create; 0 when it fits inside the budget. */
+  criticalGap: number;
+  lineItems: BudgetLineContextDto[];
 }
 
 export interface LogDto {

@@ -174,8 +174,8 @@ function buildOwnRequestNotifications(expenses: any[], userId: string): AppNotif
           accountName: expense.vendorBankDetails?.accountName,
           reference: expense.paymentReference,
           receipt: expense.paymentReceipt,
-          attachments: expense.supportingDocument
-            ? [{ name: "Supporting Document", url: expense.supportingDocument }]
+          attachments: expense.attachments?.length
+            ? expense.attachments.map((a: any) => ({ name: a.name, url: a.url }))
             : [],
         },
       });
