@@ -2,6 +2,7 @@ import { z } from "zod";
 import { SystemRole } from "../enums/roles";
 import { PermissionAction, PermissionResource } from "../enums/permissions";
 import { WorkflowActionType } from "../enums/workflowActions";
+import { LogType } from "../enums/logTypes";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_REQUEST } from "../domains/attachments/attachment.rules";
 
 export const LoginSchema = z.object({
@@ -175,4 +176,31 @@ export const RolePermissionUpdateSchema = z.object({
     z.enum(PermissionResource),
     z.array(z.enum(PermissionAction))
   ),
+});
+
+/** Blank query params are dropped so `?user=` behaves the same as omitting it. */
+const OptionalSearchTerm = z
+  .string()
+  .trim()
+  .max(120)
+  .optional()
+  .transform((value) => value || undefined);
+
+/**
+ * Query string for `GET /api/admin/logs` (Audit Trail filter bar + pager).
+ *
+ * `limit` is capped so a crafted `?limit=100000` cannot ask the database for the
+ * whole collection; the export path uses the ceiling deliberately.
+ */
+export const LogQuerySchema = z.object({
+  type: z.enum(LogType).optional(),
+  action: OptionalSearchTerm,
+  user: OptionalSearchTerm,
+  reference: OptionalSearchTerm,
+  from: z
+    .string()
+    .refine((v) => !isNaN(Date.parse(v)), "Invalid from date")
+    .optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(1000).default(100),
 });

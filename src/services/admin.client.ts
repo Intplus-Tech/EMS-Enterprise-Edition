@@ -13,7 +13,7 @@ import {
   BudgetPeriodDto,
   DepartmentDto,
   DepartmentSpendDto,
-  LogDto,
+  LogPageDto,
   RolePermissionDto,
   WorkflowStepDto,
 } from "../types/api";
@@ -33,6 +33,18 @@ export interface UserProfileInput {
   officialContact?: string;
   personalContact?: string;
   avatar?: string;
+}
+
+/** Audit Trail filter bar + pager, serialised onto `GET /api/admin/logs`. */
+export interface LogQueryParams {
+  type?: string;
+  action?: string;
+  user?: string;
+  reference?: string;
+  /** ISO timestamp lower bound; computed client-side so it honours the local clock. */
+  from?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface BudgetPeriodInput {
@@ -121,10 +133,22 @@ export const AdminClient = {
   saveWorkflow: (steps: WorkflowStepDto[]) =>
     http.post<{ steps: WorkflowStepDto[] }>("/api/admin/workflow", { steps }).then((r) => r.steps),
 
-  listLogs: (type?: string) =>
-    http
-      .get<{ logs: LogDto[] }>(
-        type && type !== "ALL" ? `/api/admin/logs?type=${encodeURIComponent(type)}` : "/api/admin/logs"
-      )
-      .then((r) => r.logs),
+  /**
+   * One page of audit logs. Filtering and paging are done by the database, so
+   * callers must pass their filters here rather than slicing the result.
+   */
+  listLogs: (params: LogQueryParams = {}) => {
+    const query = new URLSearchParams();
+    // "ALL" is the UI's no-filter sentinel, not a stored log type.
+    if (params.type && params.type !== "ALL") query.set("type", params.type);
+    if (params.action) query.set("action", params.action);
+    if (params.user) query.set("user", params.user);
+    if (params.reference) query.set("reference", params.reference);
+    if (params.from) query.set("from", params.from);
+    if (params.page) query.set("page", String(params.page));
+    if (params.limit) query.set("limit", String(params.limit));
+
+    const suffix = query.toString();
+    return http.get<LogPageDto>(`/api/admin/logs${suffix ? `?${suffix}` : ""}`);
+  },
 };

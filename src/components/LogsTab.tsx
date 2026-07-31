@@ -34,7 +34,7 @@ export const LogsTab: React.FC<LogsTabProps> = ({
                 padding: "0.4rem 0.8rem",
                 fontSize: "0.8rem",
                 background: logFilter === f ? "rgb(var(--color-primary))" : "rgba(255,255,255,0.05)",
-                color: "#fff"
+                color: logFilter === f ? "#fff" : "rgb(var(--color-text-muted))"
               }}
             >
               {f}

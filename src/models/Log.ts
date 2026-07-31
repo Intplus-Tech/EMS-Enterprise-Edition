@@ -17,4 +17,8 @@ const LogSchema = new Schema(
   { timestamps: true }
 );
 
+// Every audit query sorts newest-first and pages with skip/limit; without this
+// index each page would collection-scan and sort in memory.
+LogSchema.index({ timestamp: -1 });
+
 export const Log = mongoose.models.Log || mongoose.model("Log", LogSchema);

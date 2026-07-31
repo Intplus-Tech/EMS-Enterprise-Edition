@@ -251,6 +251,17 @@ export interface LogDto {
   timestamp: string;
 }
 
+/** One page of the audit log feed, as returned by `GET /api/admin/logs`. */
+export interface LogPageDto {
+  logs: LogDto[];
+  /** Rows matching the filters across the whole collection, not just this page. */
+  total: number;
+  /** Echoed back clamped to the available range. */
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface RolePermissionDto {
   role: SystemRole;
   description: string;

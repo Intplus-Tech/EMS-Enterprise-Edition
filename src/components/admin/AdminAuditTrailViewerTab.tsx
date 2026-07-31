@@ -1,86 +1,71 @@
+/**
+ * Audit Trail Viewer (Admin) — filter bar, log table and pager.
+ *
+ * Presentational only: rows arrive already filtered and paged by the database
+ * (see `useAuditTrailLogs`), so this file never fetches or slices. Consumed by
+ * `src/app/(dashboard)/audit-trail/page.tsx`.
+ */
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
-import { datedFilename, downloadCsv } from "../ui/exportCsv";
+import { Pagination } from "../ui/Pagination";
+import { EmptyState } from "../ui/EmptyState";
+import { formatAuditLog } from "./auditTrailRow";
+import { LogDto } from "../../types/api";
+import { AUDIT_ACTION_OPTIONS, AuditTrailFilters } from "../../app/(dashboard)/hooks/useAuditTrailLogs";
 
 interface AdminAuditTrailViewerTabProps {
-  logs?: any[];
+  /** The current page of logs, newest first. */
+  logs: LogDto[];
+  loading: boolean;
+  error?: string;
+  filters: AuditTrailFilters;
+  onFilterChange: (patch: Partial<AuditTrailFilters>) => void;
+  page: number;
+  rowsPerPage: number;
+  /** Rows matching the filters across the whole collection, for the footer. */
+  totalCount: number;
+  onPageChange: (page: number) => void;
+  onExport: () => void;
+  exporting?: boolean;
 }
 
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "0.55rem 0.85rem",
+  backgroundColor: "rgb(var(--color-background))",
+  border: "1px solid rgb(var(--color-card-border))",
+  borderRadius: "0.375rem",
+  color: "rgb(var(--color-text))",
+  fontSize: "0.85rem",
+  outline: "none",
+};
+
+const labelStyle: React.CSSProperties = {
+  display: "block",
+  fontSize: "0.75rem",
+  color: "rgb(var(--color-text-muted))",
+  fontWeight: 600,
+  marginBottom: "0.35rem",
+};
+
 export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> = ({
-  logs = []
+  logs,
+  loading,
+  error,
+  filters,
+  onFilterChange,
+  page,
+  rowsPerPage,
+  totalCount,
+  onPageChange,
+  onExport,
+  exporting = false,
 }) => {
-  const [dateRange, setDateRange] = useState("Last 7 Days");
-  const [userNameFilter, setUserNameFilter] = useState("");
-  const [reqIdFilter, setReqIdFilter] = useState("");
-  const [actionTypeFilter, setActionTypeFilter] = useState("All Actions");
-  // No row is expanded until one is clicked; the previous default id
-  // ("log-1") never matched a real log, so it expanded nothing.
+  // No row is expanded until one is clicked; the previous default id ("log-1")
+  // never matched a real log, so it expanded nothing.
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
-  const formattedLiveLogs = logs.map((l: any) => ({
-    id: l._id || l.id,
-    // Kept alongside the formatted string so filtering can compare real dates.
-    rawTimestamp: l.timestamp ? new Date(l.timestamp) : null,
-    requestRef: l.details?.requestNumber || l.details?.requestId || "",
-    timestamp: l.timestamp ? new Date(l.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
-    userBadge: l.actorName ? l.actorName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) : "SYS",
-    userName: l.actorName || "System Engine",
-    userRole: l.actorRole || "System",
-    action: l.action || "Log Event",
-    statusFrom: l.details?.statusBefore || "System Event",
-    statusTo: l.details?.statusAfter || l.action || "Completed",
-    // Never fabricated: an audit trail that invents an IP is worse than one
-    // that admits it does not have it, and this value is exported to CSV.
-    ipAddress: l.ipAddress || "",
-    verbatimFeedback: l.message ? `"${l.message}"` : '"No comment recorded."',
-    attachmentsCount: l.details?.attachmentsCount || 0
-  }));
-
-  /**
-   * Applies the filter bar. These four controls previously updated state that
-   * nothing read, so the table always showed every log and "Apply Filters" was
-   * an alert. Filtering is live — the button now just scrolls intent, matching
-   * how the other tables in the app behave.
-   */
-  const displayLogs = formattedLiveLogs.filter((log) => {
-    if (userNameFilter.trim()) {
-      if (!log.userName.toLowerCase().includes(userNameFilter.trim().toLowerCase())) return false;
-    }
-
-    if (reqIdFilter.trim()) {
-      const needle = reqIdFilter.trim().toLowerCase();
-      const haystack = `${log.requestRef} ${log.verbatimFeedback}`.toLowerCase();
-      if (!haystack.includes(needle)) return false;
-    }
-
-    if (actionTypeFilter !== "All Actions") {
-      // Filter labels are prose; log actions are SCREAMING_SNAKE codes.
-      const normalised = actionTypeFilter.replace(/\s+/g, "_").toUpperCase();
-      if (!log.action.toUpperCase().includes(normalised)) return false;
-    }
-
-    if (log.rawTimestamp) {
-      const days = dateRange === "Today" ? 1 : dateRange === "Last 30 Days" ? 30 : 7;
-      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-      if (log.rawTimestamp.getTime() < cutoff) return false;
-    }
-
-    return true;
-  });
-
-  // Filters apply as you type, so the primary action here is taking the
-  // filtered slice away with you.
-  const handleExportLogs = () => {
-    downloadCsv(datedFilename("audit-trail"), displayLogs, [
-      { header: "Timestamp", value: (l) => l.timestamp },
-      { header: "User", value: (l) => l.userName },
-      { header: "Role", value: (l) => l.userRole },
-      { header: "Action", value: (l) => l.action },
-      { header: "Request", value: (l) => l.requestRef },
-      { header: "Detail", value: (l) => l.verbatimFeedback },
-      { header: "IP Address", value: (l) => l.ipAddress },
-    ]);
-  };
+  const rows = logs.map(formatAuditLog);
 
   return (
     <div>
@@ -101,7 +86,7 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
               <Icons.Eye size={20} />
             </div>
             <div>
-              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase" }}>TODAY'S LOGS</div>
+              <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase" }}>TODAY&apos;S LOGS</div>
               <div style={{ fontSize: "1.5rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>142</div>
             </div>
           </div>
@@ -147,15 +132,15 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
         </div>
       </div>
 
-      {/* Advanced Filter Section */}
+      {/* Advanced Filter Section — every control re-queries the database */}
       <div className="glass-panel" style={{ padding: "1.25rem 1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem", marginBottom: "2rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: "1rem", alignItems: "end" }}>
           <div>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600", marginBottom: "0.35rem" }}>Date Range</label>
+            <label style={labelStyle}>Date Range</label>
             <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              style={{ width: "100%", padding: "0.55rem 0.85rem", backgroundColor: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}
+              value={filters.dateRange}
+              onChange={(e) => onFilterChange({ dateRange: e.target.value as AuditTrailFilters["dateRange"] })}
+              style={inputStyle}
             >
               <option value="Last 7 Days">Last 7 Days</option>
               <option value="Today">Today</option>
@@ -164,43 +149,46 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600", marginBottom: "0.35rem" }}>User Name</label>
+            <label style={labelStyle}>User Name</label>
             <input
               type="text"
               placeholder="e.g. David Marsh"
-              value={userNameFilter}
-              onChange={(e) => setUserNameFilter(e.target.value)}
-              style={{ width: "100%", padding: "0.55rem 0.85rem", backgroundColor: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem", outline: "none" }}
+              value={filters.userName}
+              onChange={(e) => onFilterChange({ userName: e.target.value })}
+              style={inputStyle}
             />
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600", marginBottom: "0.35rem" }}>Request ID</label>
+            <label style={labelStyle}>Request ID</label>
             <input
               type="text"
               placeholder="REQ-0000"
-              value={reqIdFilter}
-              onChange={(e) => setReqIdFilter(e.target.value)}
-              style={{ width: "100%", padding: "0.55rem 0.85rem", backgroundColor: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem", outline: "none" }}
+              value={filters.reference}
+              onChange={(e) => onFilterChange({ reference: e.target.value })}
+              style={inputStyle}
             />
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600", marginBottom: "0.35rem" }}>Action Type</label>
+            <label style={labelStyle}>Action Type</label>
             <select
-              value={actionTypeFilter}
-              onChange={(e) => setActionTypeFilter(e.target.value)}
-              style={{ width: "100%", padding: "0.55rem 0.85rem", backgroundColor: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}
+              value={filters.actionType}
+              onChange={(e) => onFilterChange({ actionType: e.target.value })}
+              style={inputStyle}
             >
-              <option value="All Actions">All Actions</option>
-              <option value="Exceptional Approval">Exceptional Approval</option>
-              <option value="Generate Payment Instruction">Generate Payment Instruction</option>
-              <option value="Approve">Approve</option>
+              {AUDIT_ACTION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
 
+          {/* Exports every log matching the filters, not just the visible page. */}
           <button
-            onClick={handleExportLogs}
+            onClick={onExport}
+            disabled={exporting}
             style={{
               padding: "0.6rem 1.25rem",
               borderRadius: "0.375rem",
@@ -212,20 +200,27 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
               display: "flex",
               alignItems: "center",
               gap: "0.4rem",
-              cursor: "pointer",
+              cursor: exporting ? "wait" : "pointer",
+              opacity: exporting ? 0.7 : 1,
               boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
             }}
           >
-            <Icons.Download size={15} /> Export Logs
+            <Icons.Download size={15} /> {exporting ? "Exporting…" : "Export Logs"}
           </button>
         </div>
       </div>
 
       {/* Logs Table Card */}
       <div className="glass-panel" style={{ padding: "1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem" }}>
+        {error && (
+          <div style={{ marginBottom: "1rem", padding: "0.75rem 1rem", borderRadius: "0.5rem", backgroundColor: "rgba(239, 68, 68, 0.12)", color: "#ef4444", fontSize: "0.85rem" }}>
+            {error}
+          </div>
+        )}
+
         <table className="data-table" style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
+            <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border))" }}>
               <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", paddingBottom: "0.75rem" }}>TIMESTAMP</th>
               <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", paddingBottom: "0.75rem" }}>USER</th>
               <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", paddingBottom: "0.75rem" }}>ACTION</th>
@@ -234,13 +229,13 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
             </tr>
           </thead>
           <tbody>
-            {displayLogs.map((log) => {
+            {rows.map((log) => {
               const isExpanded = expandedLogId === log.id;
               return (
                 <React.Fragment key={log.id}>
-                  <tr 
+                  <tr
                     onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                    style={{ borderBottom: isExpanded ? "none" : "1px solid rgba(255, 255, 255, 0.05)", cursor: "pointer" }}
+                    style={{ borderBottom: isExpanded ? "none" : "1px solid rgb(var(--color-card-border))", cursor: "pointer" }}
                   >
                     <td style={{ padding: "1.1rem 0", color: "rgb(var(--color-text-muted))", fontSize: "0.85rem", width: "180px" }}>
                       {log.timestamp}
@@ -272,7 +267,7 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
                     <td>
                       <span style={{
                         backgroundColor: "rgba(59, 130, 246, 0.12)",
-                        color: "#93c5fd",
+                        color: "#3b82f6",
                         borderRadius: "0.375rem",
                         padding: "0.35rem 0.65rem",
                         fontSize: "0.78rem",
@@ -301,10 +296,10 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
 
                   {/* Expandable Details Row */}
                   {isExpanded && (
-                    <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)", backgroundColor: "rgba(15, 23, 42, 0.4)" }}>
+                    <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border))" }}>
                       <td colSpan={5} style={{ padding: "0.5rem 1.5rem 1.25rem 1.5rem" }}>
                         <div style={{
-                          backgroundColor: "rgba(15, 23, 42, 0.6)",
+                          backgroundColor: "rgb(var(--color-surface))",
                           borderLeft: "3px solid #2563eb",
                           borderRadius: "0 0.5rem 0.5rem 0",
                           padding: "1rem 1.25rem"
@@ -317,11 +312,13 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
                           </div>
                           <div style={{ display: "flex", gap: "1.25rem", fontSize: "0.8rem" }}>
                             {log.attachmentsCount > 0 && (
-                              <span style={{ color: "#60a5fa", fontWeight: "600", cursor: "pointer" }}>
-                                View Attachments ({log.attachmentsCount})
+                              <span style={{ color: "#60a5fa", fontWeight: "600" }}>
+                                Attachments: {log.attachmentsCount}
                               </span>
                             )}
-                            <span style={{ color: "rgb(var(--color-text-muted))", cursor: "pointer" }}>Download Log</span>
+                            {log.requestRef && (
+                              <span style={{ color: "rgb(var(--color-text-muted))" }}>Request: {log.requestRef}</span>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -333,18 +330,29 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
           </tbody>
         </table>
 
-        {/* Table Footer */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.25rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
-          <span>Showing 1-3 of 1,248 entries</span>
-          <div style={{ display: "flex", gap: "0.35rem" }}>
-            <button style={{ padding: "0.25rem 0.5rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "rgb(var(--color-text-muted))" }}>&lt;</button>
-            <button style={{ padding: "0.25rem 0.65rem", backgroundColor: "#2563eb", border: "none", borderRadius: "0.25rem", color: "#ffffff", fontWeight: "700" }}>1</button>
-            <button style={{ padding: "0.25rem 0.65rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "rgb(var(--color-text-muted))" }}>2</button>
-            <button style={{ padding: "0.25rem 0.65rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "rgb(var(--color-text-muted))" }}>3</button>
-            <span style={{ padding: "0.25rem 0.5rem" }}>... 42</span>
-            <button style={{ padding: "0.25rem 0.5rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.25rem", color: "rgb(var(--color-text-muted))" }}>&gt;</button>
+        {/* Loading / empty states — a bare tbody would read as "no activity". */}
+        {loading && rows.length === 0 && (
+          <div style={{ padding: "2.5rem", textAlign: "center", color: "rgb(var(--color-text-muted))", fontSize: "0.85rem" }}>
+            Loading audit logs…
           </div>
-        </div>
+        )}
+
+        {!loading && rows.length === 0 && (
+          <EmptyState
+            icon={<Icons.FileSearch size={20} />}
+            title="No matching log entries"
+            description="Nothing was recorded for these filters. Try widening the date range or clearing the user and request filters."
+          />
+        )}
+
+        {/* Footer pager — page changes refetch from the database */}
+        <Pagination
+          page={page}
+          rowsPerPage={rowsPerPage}
+          totalCount={totalCount}
+          onPageChange={onPageChange}
+          itemLabel="entries"
+        />
       </div>
     </div>
   );

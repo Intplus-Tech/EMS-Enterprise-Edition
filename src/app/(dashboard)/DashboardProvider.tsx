@@ -430,9 +430,12 @@ function useDashboardState() {
     }
   };
 
+  // Feeds the Logs tab's scrolling list. The Audit Trail screen does not read
+  // this — it pages against the database through `useAuditTrailLogs`.
   const loadLogs = async (filter: string) => {
     try {
-      setSystemLogs(await AdminClient.listLogs(filter));
+      const { logs } = await AdminClient.listLogs({ type: filter });
+      setSystemLogs(logs);
     } catch (e) {
       console.error("Error loading logs:", e);
     }

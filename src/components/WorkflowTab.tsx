@@ -36,7 +36,7 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "2rem" }}>
           {workflowSteps.map((step, idx) => (
-            <div key={step.stepIndex} className="glass-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(15,23,42,0.4)" }}>
+            <div key={step.stepIndex} className="glass-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgb(var(--color-background))" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                 <div style={{ background: "rgba(var(--color-primary), 0.2)", borderRadius: "50%", width: "2.5rem", height: "2.5rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <span style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", margin: "auto" }}>{idx + 1}</span>
