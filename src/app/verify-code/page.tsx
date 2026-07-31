@@ -9,7 +9,6 @@ function VerifyCodeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
-  const demoCode = searchParams.get("demo") || "";
 
   // 6 digit code inputs state
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
@@ -46,12 +45,8 @@ function VerifyCodeContent() {
     }
   }, []);
 
-  // Autofill code if passed via demo param
-  useEffect(() => {
-    if (demoCode && demoCode.length === 6) {
-      setDigits(demoCode.split(""));
-    }
-  }, [demoCode]);
+  // No autofill: the reset code is only ever delivered by email, never carried
+  // in the URL where it would land in history and server logs.
 
   // Handle inputs digit typing
   const handleChange = (index: number, value: string) => {
@@ -142,7 +137,8 @@ function VerifyCodeContent() {
       });
       const data = await res.json();
       if (data.success) {
-        setResendMessage(`New code generated: ${data.code}`);
+        // The endpoint deliberately never returns the code — it is emailed.
+        setResendMessage("A new verification code has been sent to your email.");
         setDigits(Array(6).fill(""));
         setResendTimer(60);
         if (inputRefs.current[0]) {
@@ -176,8 +172,8 @@ function VerifyCodeContent() {
           width: "72px", 
           height: "72px", 
           borderRadius: "50%", 
-          background: "#EEF2F6", 
-          color: "#0A52D6", 
+          background: "rgba(var(--color-primary), 0.12)", 
+          color: "#2563EB", 
           marginBottom: "1.5rem" 
         }}>
           <Icons.Mail size={32} />
@@ -194,11 +190,11 @@ function VerifyCodeContent() {
             display: "flex", 
             alignItems: "center", 
             gap: "0.75rem", 
-            background: "#FFF1F2", 
-            border: "1px solid #FCA5A5", 
+            background: "rgba(239, 68, 68, 0.08)", 
+            border: "1px solid rgba(239, 68, 68, 0.3)", 
             borderRadius: "8px", 
             padding: "0.75rem 1rem", 
-            color: "#B91C1C", 
+            color: "#EF4444", 
             fontSize: "0.875rem", 
             marginBottom: "1.5rem",
             textAlign: "left"
@@ -209,16 +205,16 @@ function VerifyCodeContent() {
         )}
 
         {resendMessage && (
-          <div style={{ 
-            background: "#ECFDF5", 
-            border: "1px solid #10B981", 
-            borderRadius: "8px", 
-            padding: "0.75rem 1rem", 
-            color: "#065F46", 
-            fontSize: "0.875rem", 
+          <div style={{
+            background: "rgba(16, 185, 129, 0.1)",
+            border: "1px solid rgba(16, 185, 129, 0.4)",
+            borderRadius: "8px",
+            padding: "0.75rem 1rem",
+            color: "#059669",
+            fontSize: "0.875rem",
             marginBottom: "1.5rem"
           }}>
-            <strong>[Demo Mode]</strong> {resendMessage}
+            {resendMessage}
           </div>
         )}
 
@@ -241,21 +237,21 @@ function VerifyCodeContent() {
                 style={{
                   width: "50px",
                   height: "56px",
-                  border: "1px solid #D1D5DB",
+                  border: "1px solid rgba(var(--color-card-border), 0.6)",
                   borderRadius: "8px",
                   fontSize: "1.5rem",
                   fontWeight: "600",
                   textAlign: "center",
                   outline: "none",
-                  color: "#1F2937",
-                  background: "#FFFFFF"
+                  color: "rgb(var(--color-text))",
+                  background: "rgb(var(--color-surface))"
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = "#0A52D6";
-                  e.currentTarget.style.boxShadow = "0 0 0 2px rgba(10, 82, 214, 0.15)";
+                  e.currentTarget.style.borderColor = "#2563EB";
+                  e.currentTarget.style.boxShadow = "0 0 0 2px rgba(37, 99, 235, 0.2)";
                 }}
                 onBlur={(e) => {
-                  e.currentTarget.style.borderColor = "#D1D5DB";
+                  e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
                   e.currentTarget.style.boxShadow = "none";
                 }}
               />
@@ -268,9 +264,9 @@ function VerifyCodeContent() {
             disabled={loading}
             style={{ 
               width: "100%", 
-              background: "#FFFFFF", 
-              color: "#0A52D6", 
-              border: "1px solid #D1D5DB", 
+              background: "rgb(var(--color-surface))", 
+              color: "#2563EB", 
+              border: "1px solid rgba(var(--color-card-border), 0.6)", 
               borderRadius: "8px", 
               padding: "0.875rem", 
               fontWeight: "600", 
@@ -278,15 +274,15 @@ function VerifyCodeContent() {
               cursor: loading ? "not-allowed" : "pointer",
               transition: "all 0.2s"
             }}
-            onMouseOver={(e) => !loading && (e.currentTarget.style.background = "#F8FAFC")}
-            onMouseOut={(e) => !loading && (e.currentTarget.style.background = "#FFFFFF")}
+            onMouseOver={(e) => !loading && (e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)")}
+            onMouseOut={(e) => !loading && (e.currentTarget.style.background = "rgb(var(--color-card))")}
           >
             {loading ? "Verifying..." : "Verify Code"}
           </button>
         </form>
 
         {/* Resend Link */}
-        <div style={{ marginTop: "1.75rem", fontSize: "0.85rem", color: "#64748B" }}>
+        <div style={{ marginTop: "1.75rem", fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>
           Didn't receive the code?{" "}
           <button 
             onClick={handleResend}
@@ -294,7 +290,7 @@ function VerifyCodeContent() {
             style={{ 
               background: "none", 
               border: "none", 
-              color: resendTimer > 0 ? "#94A3B8" : "#0A52D6", 
+              color: resendTimer > 0 ? "rgb(var(--color-text-dim))" : "#2563EB", 
               fontWeight: "700", 
               cursor: resendTimer > 0 ? "not-allowed" : "pointer", 
               padding: 0,
@@ -313,21 +309,21 @@ function VerifyCodeContent() {
         right: "2.5rem",
         maxWidth: "320px", 
         width: "100%", 
-        background: "#EFF6FF", 
-        border: "1px solid #BFDBFE", 
+        background: "rgba(37, 99, 235, 0.08)", 
+        border: "1px solid rgba(37, 99, 235, 0.25)", 
         borderRadius: "12px", 
         padding: "1rem", 
-        boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.05)",
+        boxShadow: "var(--shadow-lg)",
         display: "flex",
         gap: "0.75rem",
         textAlign: "left"
       }}>
-        <span style={{ color: "#3B82F6", flexShrink: 0, marginTop: "0.15rem" }}>
+        <span style={{ color: "#2563EB", flexShrink: 0, marginTop: "0.15rem" }}>
           <Icons.Info size={20} />
         </span>
         <div>
-          <h4 style={{ fontWeight: "700", color: "#1E3A8A", fontSize: "0.85rem", marginBottom: "0.25rem" }}>Having trouble?</h4>
-          <p style={{ color: "#1E40AF", fontSize: "0.75rem", lineHeight: "1.4" }}>
+          <h4 style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem", marginBottom: "0.25rem" }}>Having trouble?</h4>
+          <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.75rem", lineHeight: "1.4" }}>
             Verify that you are using your corporate email address and check your spam folder if the code doesn't arrive within 2 minutes.
           </p>
         </div>
@@ -338,22 +334,22 @@ function VerifyCodeContent() {
 
 export default function VerifyCodePage() {
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#F8FAFC", color: "#0F172A", fontFamily: "var(--font-sans)" }}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "rgb(var(--color-background))", color: "rgb(var(--color-text))", fontFamily: "var(--font-sans)" }}>
       {/* Header */}
       <header style={{ 
         padding: "1.25rem 2.5rem", 
         display: "flex", 
         justifyContent: "space-between", 
         alignItems: "center", 
-        background: "#FFFFFF",
-        borderBottom: "1px solid #E2E8F0"
+        background: "rgb(var(--color-surface))",
+        borderBottom: "1px solid rgba(var(--color-card-border), 0.5)"
       }}>
         {/* Brand logo & text */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ 
             padding: "0.4rem", 
             borderRadius: "50%", 
-            background: "rgba(10, 82, 214, 0.1)",
+            background: "rgba(var(--color-primary), 0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
@@ -362,19 +358,19 @@ export default function VerifyCodePage() {
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span style={{ fontWeight: "700", fontSize: "1rem", color: "#0F172A" }}>EMS</span>
+              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>EMS</span>
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 
-                background: "#E2E8F0", 
-                color: "#475569", 
+                background: "rgba(var(--color-card-border), 0.4)", 
+                color: "rgb(var(--color-text-muted))", 
                 padding: "0.15rem 0.35rem", 
                 borderRadius: "4px" 
               }}>
                 v1.0
               </span>
             </div>
-            <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block", marginTop: "1px" }}>Enterprise Edition</span>
+            <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block", marginTop: "1px" }}>Enterprise Edition</span>
           </div>
         </div>
 
@@ -388,21 +384,21 @@ export default function VerifyCodePage() {
             gap: "0.5rem", 
             padding: "0.5rem 1rem", 
             borderRadius: "8px", 
-            border: "1px solid #E2E8F0", 
-            background: "#FFFFFF",
-            color: "#475569",
+            border: "1px solid rgba(var(--color-card-border), 0.5)", 
+            background: "rgb(var(--color-surface))",
+            color: "rgb(var(--color-text-muted))",
             fontSize: "0.85rem",
             fontWeight: "500",
             textDecoration: "none",
             transition: "all 0.15s ease"
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.borderColor = "#CBD5E1";
-            e.currentTarget.style.background = "#F8FAFC";
+            e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
+            e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
           }}
           onMouseOut={(e) => {
-            e.currentTarget.style.borderColor = "#E2E8F0";
-            e.currentTarget.style.background = "#FFFFFF";
+            e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+            e.currentTarget.style.background = "rgb(var(--color-card))";
           }}
         >
           <Icons.HelpCircle size={16} /> Help
@@ -412,7 +408,7 @@ export default function VerifyCodePage() {
       {/* Main Content */}
       <Suspense fallback={
         <div style={{ display: "flex", flexGrow: 1, alignItems: "center", justifyContent: "center" }}>
-          <p style={{ color: "#64748B" }}>Loading code validator...</p>
+          <p style={{ color: "rgb(var(--color-text-muted))" }}>Loading code validator...</p>
         </div>
       }>
         <VerifyCodeContent />

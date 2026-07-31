@@ -10,7 +10,14 @@ import { formatNaira, formatNairaPrecise } from "./ui/format";
 
 interface PendingExceptionsTabProps {
   currentUser?: any;
-  expenses?: any[];
+  /**
+   * The exception the Finance Head opened from the queue.
+   *
+   * This screen used to ignore the selection and re-derive its own target with
+   * `expenses.find(first pending exceptional)`, so reviewing the third row in
+   * the list approved the budget expansion on the first.
+   */
+  request: any;
   setSelectedExpense?: (expense: any) => void;
   /** Budget-expansion operations injected by the page; no I/O happens here. */
   actions: ExpenseActions;
@@ -23,7 +30,7 @@ interface PendingExceptionsTabProps {
 
 export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   currentUser,
-  expenses = [],
+  request,
   setSelectedExpense,
   actions,
   budgetContext,
@@ -33,11 +40,11 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   const [showJustificationModal, setShowJustificationModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [glAccountCode, setGlAccountCode] = useState("GL-6120 Travel & Lodging");
 
-  // Dynamically derive requestDetails, budgetContext, and historyTimeline from actual DB expense
-  const targetExp = expenses?.find(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET") || expenses?.[0];
-  
+  // The request under review is whatever the queue handed over — never a
+  // re-derived "first pending exception".
+  const targetExp = request;
+
   const requestDetails = targetExp ? {
     requestNumber: targetExp.requestNumber ? `#${targetExp.requestNumber.replace(/^REQ-/, '')}` : `#${targetExp._id?.slice(-4)}`,
     department: (targetExp.departmentId as any)?.name || targetExp.departmentName || "General",
@@ -215,7 +222,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   AMOUNT
                 </span>
                 <strong style={{ fontSize: "1.25rem", fontWeight: "800", color: "#2563EB" }}>
-                  ₦{requestDetails.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatNairaPrecise(requestDetails.amount)}
                 </strong>
               </div>
 
@@ -226,30 +233,15 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                 <strong style={{ fontSize: "0.95rem", color: "rgb(var(--color-text))" }}>{requestDetails.employee}</strong>
               </div>
 
+              {/* The design shows the request's CATEGORY here. This was a
+                  "GL account code" select whose value was never read or sent —
+                  it looked like a posting decision the Finance Head could make
+                  and was not one. */}
               <div>
-                <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#2563EB", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.25rem" }}>
-                  GL ACCOUNT CODE
+                <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.25rem" }}>
+                  CATEGORY
                 </span>
-                <select
-                  value={glAccountCode}
-                  onChange={(e) => setGlAccountCode(e.target.value)}
-                  className="form-input"
-                  style={{
-                    padding: "0.4rem 0.6rem",
-                    fontSize: "0.85rem",
-                    fontWeight: "600",
-                    borderRadius: "6px",
-                    border: "1px solid rgba(37, 99, 235, 0.4)",
-                    background: "rgba(37, 99, 235, 0.05)",
-                    color: "rgb(var(--color-text))"
-                  }}
-                >
-                  <option value="GL-6120 Travel & Lodging">GL-6120 Travel & Lodging</option>
-                  <option value="GL-6130 Software & Cloud">GL-6130 Software & Cloud</option>
-                  <option value="GL-6140 Office Supplies">GL-6140 Office Supplies</option>
-                  <option value="GL-6150 Marketing & Events">GL-6150 Marketing & Events</option>
-                  <option value="GL-6160 Professional Fees">GL-6160 Professional Fees</option>
-                </select>
+                <strong style={{ fontSize: "0.95rem", color: "rgb(var(--color-text))" }}>{requestDetails.category}</strong>
               </div>
             </div>
 
@@ -607,11 +599,11 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         requestAmount={requestDetails.amount}
         remainingBudget={budgetContext?.remaining ?? 0}
         deficitAmount={budgetContext?.criticalGap ?? 0}
-        onConfirm={async (notes) => {
+        onConfirm={async (notes, signature) => {
           if (!targetExp?._id) return;
           // Only close on a confirmed save — the previous version reported
           // success even when the request had failed.
-          if (await actions.approveExpansion(targetExp._id, notes)) {
+          if (await actions.approveExpansion(targetExp._id, notes, signature)) {
             setShowApproveModal(false);
           }
         }}
@@ -624,9 +616,9 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         requestAmount={requestDetails.amount}
         remainingBudget={budgetContext?.remaining ?? 0}
         deficitAmount={budgetContext?.criticalGap ?? 0}
-        onConfirm={async (reason) => {
+        onConfirm={async (reason, signature) => {
           if (!targetExp?._id) return;
-          if (await actions.rejectExpansion(targetExp._id, reason)) {
+          if (await actions.rejectExpansion(targetExp._id, reason, signature)) {
             setShowRejectModal(false);
           }
         }}

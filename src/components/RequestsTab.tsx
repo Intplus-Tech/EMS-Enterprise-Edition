@@ -2,12 +2,21 @@ import React from "react";
 import * as Icons from "lucide-react";
 import { StatCard } from "./ui/StatCard";
 import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, statusBadgeClass } from "./ui/format";
+import { datedFilename, downloadCsv } from "./ui/exportCsv";
+import { ExpenseRequestDto } from "../types/api";
 
 interface RequestsTabProps {
   currentUser: any;
   expenses: any[];
   searchQuery: string;
   setSearchQuery: (q: string) => void;
+  /** Controls in the filter row above the lists (design: Today / date / amount). */
+  amountSearchQuery: string;
+  setAmountSearchQuery: (q: string) => void;
+  todayOnly: boolean;
+  setTodayOnly: (v: boolean) => void;
+  dateFilter: string;
+  setDateFilter: (v: string) => void;
   setSelectedResubmitExpense: (expense: any) => void;
   setResubmitForm: (form: any) => void;
   setShowResubmitModal: (show: boolean) => void;
@@ -33,6 +42,12 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
   expenses,
   searchQuery,
   setSearchQuery,
+  amountSearchQuery,
+  setAmountSearchQuery,
+  todayOnly,
+  setTodayOnly,
+  dateFilter,
+  setDateFilter,
   setSelectedResubmitExpense,
   setResubmitForm,
   setShowResubmitModal,
@@ -55,7 +70,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
   const currentMonth = now.getMonth();
   const currentYear = now.getFullYear();
   let totalSpent = 0;
-  let totalRequests = expenses.length;
+  const totalRequests = expenses.length;
   let myDrafts = 0;
 
   expenses.forEach(e => {
@@ -72,24 +87,76 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
   const returnedRequests = expenses.filter(e => e.status === "RETURNED");
   const awaitingUpdate = returnedRequests.length;
 
-  // Fallback demo figures keep the dashboard legible before the first seed runs.
-  if (totalSpent === 0) totalSpent = 4850200;
-  if (totalRequests === 0) totalRequests = 9;
-  if (myDrafts === 0) myDrafts = 14;
+  // No demo fallbacks: an empty account is a real zero. These used to report
+  // ₦4,850,200 / 9 / 14 — the design's sample figures — whenever the true value
+  // came to zero, which is exactly when the reader most needs the truth.
 
-  // Opens the resubmit flow pre-filled for a returned request.
+  /**
+   * Opens the resubmit flow for a returned request.
+   *
+   * The form reads `supportingDocuments` (a list). This wrote the singular
+   * `supportingDocument` — plus a hardcoded filename — so the modal then threw
+   * on `resubmitForm.supportingDocuments.length`. Starting empty keeps the
+   * request's existing documents unless the initiator attaches replacements.
+   */
   const openResubmit = (expense: any) => {
     setSelectedResubmitExpense(expense);
-    setResubmitForm({
-      justification: "",
-      supportingDocument: expense.supportingDocument || "hotel_invoice_final_paid.pdf",
-      notifyAuditor: true
-    });
+    setResubmitForm({ justification: "", supportingDocuments: [] });
     setShowResubmitModal(true);
+  };
+
+  // Requests matching the free-text search plus the amount and date controls.
+  const matchesControls = (e: ExpenseRequestDto) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (query && !(
+      e.description.toLowerCase().includes(query) ||
+      e.requestNumber.toLowerCase().includes(query)
+    )) return false;
+
+    const amountTerm = amountSearchQuery.trim();
+    if (amountTerm) {
+      const amount = Number(e.amount);
+      if (!String(amount).includes(amountTerm) && !amount.toLocaleString().includes(amountTerm)) return false;
+    }
+
+    if (dateFilter) {
+      if (new Date(e.createdAt).toDateString() !== new Date(dateFilter).toDateString()) return false;
+    } else if (todayOnly) {
+      if (new Date(e.createdAt).toDateString() !== new Date().toDateString()) return false;
+    }
+
+    return true;
+  };
+
+  /** Exports whatever the controls above currently show. */
+  const handleExport = () => {
+    const rows = expenses.filter(matchesControls);
+    if (!downloadCsv(datedFilename("my-requests"), rows, [
+      { header: "Request ID", value: (e: ExpenseRequestDto) => e.requestNumber },
+      { header: "Title", value: (e: ExpenseRequestDto) => e.description },
+      { header: "Category", value: (e: ExpenseRequestDto) => e.category },
+      { header: "Amount", value: (e: ExpenseRequestDto) => e.amount },
+      { header: "Date", value: (e: ExpenseRequestDto) => formatDate(e.createdAt) },
+      { header: "Status", value: (e: ExpenseRequestDto) => e.status },
+    ])) {
+      // Nothing to export is not an error worth a banner; the button simply
+      // does nothing when the filtered set is empty.
+    }
   };
 
   return (
     <div>
+      {/* Page heading. The design titles this screen "Inbox"; the implementation
+          rendered no heading at all. */}
+      <div style={{ marginBottom: "1.75rem" }}>
+        <h2 style={{ fontSize: "1.75rem", fontWeight: 700 }}>
+          {currentUser?.role === "INITIATOR" ? "Inbox" : "Requests"}
+        </h2>
+        <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.95rem", marginTop: "0.25rem" }}>
+          Review and manage your pending financial actions.
+        </p>
+      </div>
+
       {/* Awaiting-response banner — only rendered when an approver returned a request */}
       {returnedRequests.length > 0 && (
         <div style={{ marginBottom: "2rem" }}>
@@ -180,6 +247,59 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
         <StatCard label="Awaiting Update" hint="returned for clarification" value={awaitingUpdate} icon={<Icons.AlertCircle size={18} />} tone="danger" />
       </div>
 
+      {/* Today / date / amount-search / export row from the design. All four
+          controls were absent, while the state backing them sat unused in the
+          dashboard provider. */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1.75rem" }}>
+        <div style={{ display: "flex", alignItems: "center", borderRadius: "8px", overflow: "hidden", border: "1px solid rgb(var(--color-card-border))" }}>
+          <button
+            type="button"
+            onClick={() => { setTodayOnly(!todayOnly); setDateFilter(""); }}
+            style={{
+              padding: "0.55rem 1rem",
+              fontSize: "0.85rem",
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              background: todayOnly ? "#2563EB" : "transparent",
+              color: todayOnly ? "#FFFFFF" : "rgb(var(--color-text))",
+            }}
+          >
+            Today
+          </button>
+          <input
+            type="date"
+            aria-label="Filter by date"
+            value={dateFilter}
+            onChange={(e) => { setDateFilter(e.target.value); setTodayOnly(false); }}
+            className="form-input"
+            style={{ border: "none", borderRadius: 0, fontSize: "0.85rem", padding: "0.55rem 0.75rem", height: "auto" }}
+          />
+        </div>
+
+        <div style={{ position: "relative", minWidth: "220px" }}>
+          <Icons.Search size={15} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))" }} />
+          <input
+            type="text"
+            placeholder="Search amount..."
+            value={amountSearchQuery}
+            onChange={(e) => setAmountSearchQuery(e.target.value)}
+            className="form-input"
+            style={{ paddingLeft: "2.25rem", fontSize: "0.85rem", padding: "0.55rem 0.55rem 0.55rem 2.25rem", height: "auto", borderRadius: "8px" }}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleExport}
+          aria-label="Export requests"
+          className="btn btn-primary"
+          style={{ marginLeft: "auto", background: "#2563EB", border: "none", padding: "0.55rem 0.85rem", borderRadius: "8px" }}
+        >
+          <Icons.FileDown size={18} />
+        </button>
+      </div>
+
       {currentUser?.role === "INITIATOR" ? (
         // INITIATOR TWO-COLUMN VIEW
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem" }}>
@@ -188,10 +308,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
             <h3 style={{ fontSize: "1.1rem", fontWeight: "bold", marginBottom: "1rem", color: "rgb(var(--color-text))" }}>My Drafts</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               {(() => {
-                const drafts = expenses.filter(e => {
-                  const matchesSearch = e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.requestNumber.toLowerCase().includes(searchQuery.toLowerCase());
-                  return ["DRAFT", "RETURNED"].includes(e.status) && matchesSearch;
-                });
+                const drafts = expenses.filter(e => ["DRAFT", "RETURNED"].includes(e.status) && matchesControls(e));
 
                 return drafts.length > 0 ? drafts.map((draft) => (
                   <div key={draft._id} className="glass-card" style={{
@@ -204,12 +321,12 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                     <div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
                         <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))", fontWeight: "bold" }}>{draft.requestNumber}</span>
-                        <span className={`badge badge-${draft.status.toLowerCase()}`}>{draft.status}</span>
+                        <span className={`badge ${statusBadgeClass(draft.status)}`}>{humanizeStatus(draft.status)}</span>
                       </div>
                       <h4 style={{ fontSize: "0.95rem", fontWeight: "600", color: "rgb(var(--color-text))", marginBottom: "0.2" }}>{draft.description}</h4>
                       <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
-                        <span>₦{draft.amount.toLocaleString()}</span>
-                        <span>• Last edited {new Date(draft.updatedAt).toLocaleDateString()}</span>
+                        <span>{formatNaira(draft.amount)}</span>
+                        <span>• Last edited {formatDate(draft.updatedAt)}</span>
                       </div>
                     </div>
                     <button
@@ -250,10 +367,9 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                   </thead>
                   <tbody>
                     {(() => {
-                      const activeReqs = expenses.filter(e => {
-                        const matchesSearch = e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.requestNumber.toLowerCase().includes(searchQuery.toLowerCase());
-                        return !["DRAFT", "RETURNED", "PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(e.status) && matchesSearch;
-                      });
+                      const activeReqs = expenses.filter(e =>
+                        !["DRAFT", "RETURNED", "PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(e.status) && matchesControls(e)
+                      );
 
                       return activeReqs.length > 0 ? activeReqs.map((exp) => (
                         <tr key={exp._id} onClick={() => setSelectedExpense(exp)} style={{ cursor: "pointer" }}>
@@ -326,10 +442,9 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
               <h3 style={{ fontSize: "1.1rem", fontWeight: "bold", marginBottom: "1rem", color: "rgb(var(--color-text))" }}>My Drafts</h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 {(() => {
-                  const drafts = expenses.filter(e => {
-                    const matchesSearch = e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.requestNumber.toLowerCase().includes(searchQuery.toLowerCase());
-                    return ["DRAFT", "RETURNED"].includes(e.status) && matchesSearch && e.initiatorId?._id === currentUser?._id;
-                  });
+                  const drafts = expenses.filter(e =>
+                    ["DRAFT", "RETURNED"].includes(e.status) && matchesControls(e) && e.initiatorId?._id === currentUser?._id
+                  );
 
                   return drafts.length > 0 ? drafts.map((draft) => (
                     <div key={draft._id} className="glass-card" style={{
@@ -342,23 +457,17 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                       <div>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.4rem" }}>
                           <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))", fontWeight: "bold" }}>{draft.requestNumber}</span>
-                          <span className={`badge badge-${draft.status.toLowerCase()}`}>{draft.status}</span>
+                          <span className={`badge ${statusBadgeClass(draft.status)}`}>{humanizeStatus(draft.status)}</span>
                         </div>
                         <h4 style={{ fontSize: "0.95rem", fontWeight: "600", color: "rgb(var(--color-text))", marginBottom: "0.2rem" }}>{draft.description}</h4>
                         <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
-                          <span>₦{draft.amount.toLocaleString()}</span>
+                          <span>{formatNaira(draft.amount)}</span>
                         </div>
                       </div>
                       <button
                         onClick={() => {
                           if (draft.status === "RETURNED") {
-                            setSelectedResubmitExpense(draft);
-                            setResubmitForm({
-                              justification: "",
-                              supportingDocument: draft.supportingDocument || "hotel_invoice_final_paid.pdf",
-                              notifyAuditor: true
-                            });
-                            setShowResubmitModal(true);
+                            openResubmit(draft);
                           } else {
                             setSelectedExpense(draft);
                           }
@@ -394,18 +503,19 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                         </thead>
                         <tbody>
                           {(() => {
-                            const myActive = expenses.filter(e => {
-                              const matchesSearch = e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.requestNumber.toLowerCase().includes(searchQuery.toLowerCase());
-                              return e.initiatorId?._id === currentUser?._id && !["DRAFT", "RETURNED", "PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(e.status) && matchesSearch;
-                            });
+                            const myActive = expenses.filter(e =>
+                              e.initiatorId?._id === currentUser?._id &&
+                              !["DRAFT", "RETURNED", "PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(e.status) &&
+                              matchesControls(e)
+                            );
 
                             return myActive.length > 0 ? myActive.map((exp) => (
                               <tr key={exp._id} onClick={() => setSelectedExpense(exp)} style={{ cursor: "pointer" }}>
                                 <td><strong>{exp.requestNumber}</strong></td>
                                 <td>{exp.description}</td>
-                                <td>₦{exp.amount.toLocaleString()}</td>
+                                <td>{formatNaira(exp.amount)}</td>
                                 <td>
-                                  <span className={`badge badge-${exp.status.toLowerCase().replace(/_/g, '-')}`}>{exp.status}</span>
+                                  <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
                                 </td>
                               </tr>
                             )) : (
@@ -479,9 +589,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                               const inDept = currentUser?.role === "ADMIN" || e.departmentId === currentUser?.departmentId || e.initiatorId?.departmentId === currentUser?.departmentId || (e.departmentId as any)?.name === currentUser?.departmentName;
                               if (!inDept) return false;
 
-                              // Filter by search query
-                              const matchesSearch = e.description.toLowerCase().includes(searchQuery.toLowerCase()) || e.requestNumber.toLowerCase().includes(searchQuery.toLowerCase());
-                              if (!matchesSearch) return false;
+                              if (!matchesControls(e)) return false;
 
                               // Filter by Initiator
                               if (deptFilterInitiator !== "ALL" && e.initiatorId?.name !== deptFilterInitiator) return false;
@@ -508,8 +616,8 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                                     <td style={{ fontWeight: "600" }}>{exp.initiatorId?.name || "System"}</td>
                                     <td><strong>{exp.requestNumber}</strong></td>
                                     <td>{exp.category}</td>
-                                    <td>₦{exp.amount.toLocaleString()}</td>
-                                    <td>{new Date(exp.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
+                                    <td>{formatNaira(exp.amount)}</td>
+                                    <td>{formatDate(exp.createdAt)}</td>
                                     <td>
                                       {(() => {
                                         let label = exp.status;

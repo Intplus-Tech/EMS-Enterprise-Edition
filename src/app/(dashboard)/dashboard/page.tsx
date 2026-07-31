@@ -11,6 +11,7 @@ export default function DashboardPage() {
     chartViewMode, setChartViewMode,
     systemUsers,
     departments,
+    budgets,
     systemLogs,
     setShowAdminAddUserModal,
     setShowAdminCreateDeptModal,
@@ -23,6 +24,7 @@ export default function DashboardPage() {
         currentUser={currentUser}
         systemUsersCount={systemUsers.length}
         departmentsCount={departments.length}
+        budgets={budgets}
         systemLogs={systemLogs}
         onOpenAddUser={() => setShowAdminAddUserModal(true)}
         onOpenCreateDept={() => setShowAdminCreateDeptModal(true)}

@@ -1,50 +1,103 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import * as Icons from "lucide-react";
+import { Pagination } from "./ui/Pagination";
+import { EmptyState } from "./ui/EmptyState";
+import { formatNaira } from "./ui/format";
+import { datedFilename, downloadCsv } from "./ui/exportCsv";
+import { ExpenseClient } from "../services/expense.client";
+import { BudgetContextDto } from "../types/api";
+
+/** Rows shown per page in the exceptions queue. */
+const ROWS_PER_PAGE = 8;
 
 interface PendingExceptionsOverviewTabProps {
   currentUser?: any;
   expenses?: any[];
   onReviewRequest?: (req: any) => void;
+  /** Refetches the dashboard so "Reload Data" actually reloads. */
+  onReload?: () => void | Promise<void>;
 }
 
 export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTabProps> = ({
   currentUser,
   expenses = [],
-  onReviewRequest
+  onReviewRequest,
+  onReload
 }) => {
   const [sortFilter, setSortFilter] = useState("Deficit (Largest First)");
   const [deptFilter, setDeptFilter] = useState("All Departments");
   const [searchQuery, setSearchQuery] = useState("");
   const [isReloading, setIsReloading] = useState(false);
+  const [page, setPage] = useState(1);
 
-  // Map live pending exceptional expenses from API
-  const liveExceptionalRecords = expenses
-    .filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET")
-    .map(e => {
-      const createdDate = new Date(e.createdAt || Date.now());
-      const diffDays = Math.max(1, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
-      const deptName = (e.departmentId as any)?.name || e.departmentName || "IT";
-      return {
-        id: e._id || e.id,
-        deficit: -(e.amount * 0.4),
-        reqId: e.requestNumber ? `#${e.requestNumber.slice(-4)}` : `#${e._id?.slice(-4)}`,
-        title: e.description || e.category,
-        subtitle: e.category,
-        dept: deptName,
-        amount: e.amount,
-        budget: Math.round(e.amount * 0.6),
-        waitDays: diffDays,
-        isHighWait: diffDays >= 3,
-        rawExpense: e
-      };
+  /**
+   * Real budget position per open exception, keyed by request id.
+   *
+   * The DEFICIT and BUDGET columns used to be `amount * 0.4` and `amount * 0.6`
+   * — invented ratios with no relationship to any department's allocation — and
+   * the "Total Deficit Exposed" KPI was their sum. They are now the server's
+   * own figures, the same ones the review screen shows.
+   */
+  const [budgetByRequest, setBudgetByRequest] = useState<Record<string, BudgetContextDto>>({});
+
+  const openExceptions = useMemo(
+    () => expenses.filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET"),
+    [expenses]
+  );
+
+  // One fetch per request in the queue; results are cached by id so re-renders
+  // and unrelated dashboard refreshes do not re-request them.
+  React.useEffect(() => {
+    let cancelled = false;
+    const missing = openExceptions.filter(e => !budgetByRequest[String(e._id)]);
+    if (missing.length === 0) return;
+
+    Promise.all(
+      missing.map(e =>
+        ExpenseClient.budgetContext(String(e._id))
+          .then(context => [String(e._id), context] as const)
+          .catch(() => null)
+      )
+    ).then(results => {
+      if (cancelled) return;
+      const next: Record<string, BudgetContextDto> = {};
+      for (const entry of results) if (entry) next[entry[0]] = entry[1];
+      if (Object.keys(next).length > 0) setBudgetByRequest(prev => ({ ...prev, ...next }));
     });
 
-  const [records, setRecords] = useState(liveExceptionalRecords);
+    return () => { cancelled = true; };
+  }, [openExceptions, budgetByRequest]);
 
-  // Calculate dynamic KPIs
-  const totalDeficitExposed = records.reduce((sum, r) => sum + Math.abs(r.deficit), 0);
+  // Derived on every render from `expenses`, so a decision taken on the review
+  // screen removes the row. This was seeded once into `useState`, which left
+  // decided exceptions in the table until a full page reload.
+  const records = openExceptions.map(e => {
+    const createdDate = new Date(e.createdAt || Date.now());
+    const diffDays = Math.max(1, Math.floor((Date.now() - createdDate.getTime()) / (1000 * 60 * 60 * 24)));
+    const context = budgetByRequest[String(e._id)];
+    return {
+      id: String(e._id),
+      // `criticalGap` is the shortfall this request would create. Null until the
+      // figure has loaded, so the cell says "—" instead of guessing.
+      deficit: context?.hasBudget ? context.criticalGap : null,
+      reqId: e.requestNumber ? `#${e.requestNumber.replace(/^REQ-/, "")}` : `#${String(e._id).slice(-4)}`,
+      title: e.description || e.category,
+      subtitle: e.category,
+      dept: (e.departmentId as any)?.name || "Unassigned",
+      amount: e.amount,
+      budget: context?.hasBudget ? context.remaining : null,
+      waitDays: diffDays,
+      isHighWait: diffDays >= 3,
+      rawExpense: e
+    };
+  });
 
-  // Filter records
+  const totalDeficitExposed = records.reduce((sum, r) => sum + Math.abs(r.deficit ?? 0), 0);
+
+  // Department options come from the queue itself rather than a fixed list that
+  // could never match a newly created department.
+  const departmentOptions = Array.from(new Set(records.map(r => r.dept))).sort();
+
   const filteredRecords = records.filter(r => {
     if (deptFilter !== "All Departments" && r.dept !== deptFilter) return false;
     if (searchQuery.trim()) {
@@ -59,41 +112,38 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
     return true;
   });
 
-  // Sort records
   const sortedRecords = [...filteredRecords].sort((a, b) => {
-    if (sortFilter === "Deficit (Largest First)") return Math.abs(b.deficit) - Math.abs(a.deficit);
-    if (sortFilter === "Deficit (Smallest First)") return Math.abs(a.deficit) - Math.abs(b.deficit);
+    if (sortFilter === "Deficit (Largest First)") return Math.abs(b.deficit ?? 0) - Math.abs(a.deficit ?? 0);
+    if (sortFilter === "Deficit (Smallest First)") return Math.abs(a.deficit ?? 0) - Math.abs(b.deficit ?? 0);
     if (sortFilter === "Oldest First") return b.waitDays - a.waitDays;
     if (sortFilter === "Newest First") return a.waitDays - b.waitDays;
     return 0;
   });
 
-  const handleExportCSV = () => {
-    const headers = ["DEFICIT", "REQ ID", "REQUEST TITLE", "SUBTITLE", "DEPT", "AMOUNT", "BUDGET", "WAIT DAYS"];
-    const rows = sortedRecords.map(r => [
-      r.deficit,
-      r.reqId,
-      `"${r.title}"`,
-      `"${r.subtitle}"`,
-      r.dept,
-      r.amount,
-      r.budget,
-      `${r.waitDays} days`
-    ]);
+  const safePage = Math.min(page, Math.max(1, Math.ceil(sortedRecords.length / ROWS_PER_PAGE)));
+  const visibleRows = sortedRecords.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `pending_exceptional_approvals_${new Date().toISOString().split("T")[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleExportCSV = () => {
+    downloadCsv(datedFilename("pending-exceptional-approvals"), sortedRecords, [
+      { header: "Deficit", value: r => r.deficit ?? "" },
+      { header: "Req ID", value: r => r.reqId },
+      { header: "Request Title", value: r => r.title },
+      { header: "Category", value: r => r.subtitle },
+      { header: "Dept", value: r => r.dept },
+      { header: "Amount", value: r => r.amount },
+      { header: "Remaining Budget", value: r => r.budget ?? "" },
+      { header: "Wait Days", value: r => r.waitDays },
+    ]);
   };
 
-  const handleReload = () => {
+  /** Refetches the dashboard. This used to spin for 600ms and load nothing. */
+  const handleReload = async () => {
     setIsReloading(true);
-    setTimeout(() => setIsReloading(false), 600);
+    try {
+      await onReload?.();
+    } finally {
+      setIsReloading(false);
+    }
   };
 
   return (
@@ -125,11 +175,11 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#1E3A8A" }}>
+            <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#2563EB" }}>
               Total Deficit Exposed
             </span>
             <span style={{ fontSize: "2rem", fontWeight: "800", color: "#2563EB", letterSpacing: "-0.02em" }}>
-              ₦{totalDeficitExposed.toLocaleString()}
+              {formatNaira(totalDeficitExposed)}
             </span>
           </div>
 
@@ -164,11 +214,14 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#1E3A8A" }}>
-              Avg. Release Time
+            <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#2563EB" }}>
+              Longest Wait
             </span>
+            {/* Measured from the queue. This tile showed a fixed "1.4 Days". */}
             <span style={{ fontSize: "2rem", fontWeight: "800", color: "#2563EB", letterSpacing: "-0.02em" }}>
-              1.4 Days
+              {records.length === 0
+                ? "—"
+                : `${Math.max(...records.map(r => r.waitDays))} days`}
             </span>
           </div>
 
@@ -254,11 +307,9 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
               }}
             >
               <option value="All Departments">All Departments</option>
-              <option value="IT">IT</option>
-              <option value="Ops">Ops</option>
-              <option value="Legal">Legal</option>
-              <option value="Marketing">Marketing</option>
-              <option value="HR">HR</option>
+              {departmentOptions.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
           </div>
 
@@ -333,21 +384,21 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         <div className="table-container" style={{ overflowX: "auto" }}>
           <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
-              <tr style={{ background: "rgba(239, 246, 255, 0.6)", borderBottom: "1px solid rgba(var(--color-card-border), 0.6)" }}>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEFICIT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQ ID</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQUEST TITLE</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEPT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase" }}>AMOUNT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase" }}>BUDGET</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase" }}>WAIT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "#475569", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "right" }}>ACTION</th>
+              <tr style={{ background: "rgba(var(--color-surface-secondary), 0.5)", borderBottom: "1px solid rgba(var(--color-card-border), 0.6)" }}>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEFICIT</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQ ID</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQUEST TITLE</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEPT</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>AMOUNT</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>BUDGET</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>WAIT</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "right" }}>ACTION</th>
               </tr>
             </thead>
             <tbody>
-              {sortedRecords.length > 0 ? (
-                sortedRecords.map((r) => {
-                  const isHighDeficit = Math.abs(r.deficit) >= 20000;
+              {visibleRows.length > 0 ? (
+                visibleRows.map((r) => {
+                  const isHighDeficit = Math.abs(r.deficit ?? 0) >= 20000;
                   return (
                     <tr
                       key={r.id}
@@ -362,13 +413,13 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                           style={{
                             padding: "0.3rem 0.65rem",
                             borderRadius: "999px",
-                            background: isHighDeficit ? "#FEE2E2" : "#FFEDD5",
+                            background: isHighDeficit ? "rgba(220, 38, 38, 0.12)" : "rgba(234, 88, 12, 0.12)",
                             color: isHighDeficit ? "#DC2626" : "#EA580C",
                             fontWeight: "800",
                             fontSize: "0.8rem"
                           }}
                         >
-                          -₦{Math.abs(r.deficit).toLocaleString()}
+                          {r.deficit === null ? "—" : `-${formatNaira(Math.abs(r.deficit))}`}
                         </span>
                       </td>
 
@@ -395,8 +446,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                           style={{
                             padding: "0.25rem 0.75rem",
                             borderRadius: "8px",
-                            background: "#DBEAFE",
-                            color: "#1E40AF",
+                            background: "rgba(37, 99, 235, 0.12)",
+                            color: "#2563EB",
                             fontWeight: "700",
                             fontSize: "0.775rem"
                           }}
@@ -407,12 +458,12 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
 
                       {/* AMOUNT */}
                       <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.9rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
-                        ₦{r.amount.toLocaleString()}
+                        {formatNaira(r.amount)}
                       </td>
 
                       {/* BUDGET */}
                       <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.875rem", color: "rgb(var(--color-text-muted))" }}>
-                        ₦{r.budget.toLocaleString()}
+                        {r.budget === null ? "Not set" : formatNaira(r.budget)}
                       </td>
 
                       {/* WAIT */}
@@ -433,8 +484,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                             fontSize: "0.825rem",
                             fontWeight: "700",
                             borderRadius: "8px",
-                            border: "1px solid #BFDBFE",
-                            background: "#EFF6FF",
+                            border: "1px solid rgba(37, 99, 235, 0.3)",
+                            background: "rgba(37, 99, 235, 0.08)",
                             color: "#2563EB",
                             cursor: "pointer"
                           }}
@@ -447,8 +498,12 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} style={{ padding: "3rem", textAlign: "center", color: "rgb(var(--color-text-muted))" }}>
-                    No pending exceptional approvals found.
+                  <td colSpan={8} style={{ padding: 0 }}>
+                    <EmptyState
+                      icon={<Icons.ShieldCheck size={20} />}
+                      title="No pending exceptional approvals"
+                      description="Over-budget requests forwarded by a Finance Officer appear here for authorisation."
+                    />
                   </td>
                 </tr>
               )}
@@ -456,57 +511,46 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
           </table>
         </div>
 
-        {/* Table Footer Toolbar */}
+        {/* Table footer: real paging plus a Reload that refetches. "Load More"
+            used to have no handler at all, and the summary line counted the
+            whole list rather than the page on screen. */}
         <div
           style={{
-            padding: "1rem 1.5rem",
+            padding: "0.5rem 1.5rem 1rem",
             background: "rgba(var(--color-surface-secondary), 0.4)",
             borderTop: "1px solid rgba(var(--color-card-border), 0.4)",
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: "1rem"
+            flexDirection: "column",
+            gap: "0.5rem"
           }}
         >
-          <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>
-            Showing {sortedRecords.length} of {records.length} pending exceptions
-          </span>
+          <Pagination
+            page={safePage}
+            rowsPerPage={ROWS_PER_PAGE}
+            totalCount={sortedRecords.length}
+            onPageChange={setPage}
+            itemLabel="pending exceptions"
+          />
 
-          <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-            <button
-              onClick={handleReload}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                background: "none",
-                border: "none",
-                color: "rgb(var(--color-text-muted))",
-                fontSize: "0.85rem",
-                fontWeight: "600",
-                cursor: "pointer"
-              }}
-            >
-              <Icons.RefreshCw size={15} className={isReloading ? "spin" : ""} /> Reload Data
-            </button>
-
-            <button
-              className="btn btn-secondary"
-              style={{
-                padding: "0.45rem 1rem",
-                fontSize: "0.825rem",
-                fontWeight: "600",
-                borderRadius: "8px",
-                border: "1px solid #DBEAFE",
-                background: "#EFF6FF",
-                color: "#2563EB",
-                cursor: "pointer"
-              }}
-            >
-              Load More
-            </button>
-          </div>
+          <button
+            onClick={handleReload}
+            disabled={isReloading}
+            style={{
+              alignSelf: "flex-start",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              background: "none",
+              border: "none",
+              color: "rgb(var(--color-text-muted))",
+              fontSize: "0.85rem",
+              fontWeight: "600",
+              cursor: isReloading ? "wait" : "pointer"
+            }}
+          >
+            <Icons.RefreshCw size={15} className={isReloading ? "spin" : ""} />
+            {isReloading ? "Reloading…" : "Reload Data"}
+          </button>
         </div>
       </div>
     </div>

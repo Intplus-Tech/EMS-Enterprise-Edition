@@ -66,6 +66,13 @@ const ExpenseRequestSchema = new Schema(
     // Exceptional Approval parameters
     exceptionalBudgetApproved: { type: Boolean, default: false },
     exceptionalApprovedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    /**
+     * The shortfall the Finance Head covered, captured at the moment of
+     * approval. Without it the exception history has no way to report what was
+     * granted and was reporting the whole request amount instead.
+     */
+    exceptionalBudgetAmount: { type: Number },
+    exceptionalApprovedAt: { type: Date },
     originalAmount: { type: Number },
 
     // Payment release logs

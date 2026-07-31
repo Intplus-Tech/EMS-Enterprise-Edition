@@ -20,6 +20,7 @@ export default function DepartmentalSpendPage() {
     departments,
     budgets,
     setSelectedExpense,
+    loadDashboardData,
     setSelectedAdminDept,
     setShowAdminCreateDeptModal,
     setShowAdminEditDeptModal,
@@ -50,6 +51,7 @@ export default function DepartmentalSpendPage() {
     return (
       <AdminDepartmentalSpendTab
         departments={departmentRows}
+        expenses={expenses}
         onOpenCreateDept={() => setShowAdminCreateDeptModal(true)}
         onOpenEditDept={(dept) => {
           setSelectedAdminDept(dept);
@@ -69,6 +71,7 @@ export default function DepartmentalSpendPage() {
       expenses={expenses}
       budgets={budgets}
       setSelectedExpense={setSelectedExpense}
+      onReload={() => loadDashboardData(currentUser)}
     />
   );
 }

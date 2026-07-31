@@ -54,20 +54,26 @@ export const ExpenseClient = {
 
   cancel: (id: string) => http.post<{ expense: ExpenseRequestDto }>(`/api/expenses/${id}/cancel`),
 
-  /** Standard approver decision on the current workflow step. */
-  workflowAction: (id: string, action: WorkflowActionType, comment?: string) =>
-    http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/workflow`, { action, comment }),
+  /**
+   * Standard approver decision on the current workflow step.
+   * `signature` is the approver's account password, re-confirmed in the dialog
+   * and verified server-side before the transition is applied.
+   */
+  workflowAction: (id: string, action: WorkflowActionType, comment: string | undefined, signature: string) =>
+    http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/workflow`, { action, comment, signature }),
 
   /** Finance Head decision on an over-budget request. */
   exceptionalAction: (
     id: string,
     action: WorkflowActionType,
-    comment?: string,
+    comment: string | undefined,
+    signature: string,
     adjustedAmount?: number
   ) =>
     http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/exceptional`, {
       action,
       comment,
+      signature,
       adjustedAmount: adjustedAmount && adjustedAmount > 0 ? adjustedAmount : undefined,
     }),
 
@@ -75,9 +81,16 @@ export const ExpenseClient = {
   financeUpload: (id: string) =>
     http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/upload`),
 
-  /** Finance Manager releases the payment and closes the request. */
-  releasePayment: (id: string, reference: string, receipt?: string) =>
-    http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/release`, { reference, receipt }),
+  /**
+   * Finance Manager releases the payment and closes the request.
+   * `receipt` is the stored URL of the uploaded transfer evidence.
+   */
+  releasePayment: (id: string, reference: string, signature: string, receipt?: string) =>
+    http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/release`, {
+      reference,
+      receipt,
+      signature,
+    }),
 
   /**
    * Uploads one file and returns a ready-to-attach descriptor.

@@ -29,7 +29,9 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
     if (user) {
       setFullName(user.name || user.fullName || "");
       setEmail(user.email || "");
-      setContactNumber(user.contactNumber || "0801-234-5678");
+      // Empty when the account has no number on file. This prefilled a
+      // sample number, so saving the form wrote it to the real record.
+      setContactNumber(user.contactNumber || "");
       setDepartmentId(user.departmentId?._id || user.departmentId || user.department?.id || departments[0]?._id || "");
       setRole(user.role || "INITIATOR");
     }

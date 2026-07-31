@@ -1,9 +1,22 @@
 "use client";
 
+/**
+ * InitiateExpenseRequestModal — "Expense Request Details" from
+ * `designs/initiator/New Request.png`.
+ *
+ * Field order follows the design: department (read-only), payee and bank
+ * details, business purpose, amount and required date, then the document
+ * dropzone. The category select the previous version led with is kept because
+ * the API requires a category, but it now reads from the shared enum rather
+ * than a hand-written option list, and the currency select has been removed —
+ * it was collected and never sent, and every amount in the system is Naira.
+ */
+
 import React, { RefObject } from "react";
 import * as Icons from "lucide-react";
 import { AttachmentInput } from "../../types/api";
 import { formatFileSize, MAX_ATTACHMENTS_PER_REQUEST } from "../../domains/attachments/attachment.rules";
+import { EXPENSE_CATEGORIES } from "../../enums/expenseCategories";
 
 interface InitiateExpenseRequestModalProps {
   isOpen: boolean;
@@ -11,6 +24,8 @@ interface InitiateExpenseRequestModalProps {
   formError: string;
   newRequest: any;
   setNewRequest: React.Dispatch<React.SetStateAction<any>>;
+  /** Read-only department shown at the top of the form, per the design. */
+  departmentName?: string;
   fileInputRef: RefObject<HTMLInputElement | null>;
   handleFileUpload: (files: FileList | File[] | null, isResubmit?: boolean) => Promise<void>;
   isUploadingDoc: boolean;
@@ -26,6 +41,7 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
   formError,
   newRequest,
   setNewRequest,
+  departmentName,
   fileInputRef,
   handleFileUpload,
   isUploadingDoc,
@@ -35,79 +51,160 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
 }) => {
   if (!isOpen) return null;
 
+  const set = (patch: Record<string, unknown>) => setNewRequest({ ...newRequest, ...patch });
+
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
-      <div className="glass-panel" style={{ width: "100%", maxWidth: "600px", maxHeight: "88vh", overflowY: "auto", padding: "2rem", margin: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ fontWeight: "bold" }}>Initiate Expense Request</h3>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer" }}>
-            <Icons.X size={24} />
+      <div className="glass-panel" style={{ width: "100%", maxWidth: "640px", maxHeight: "88vh", overflowY: "auto", padding: 0, margin: "auto", display: "flex", flexDirection: "column" }}>
+
+        {/* Header band, matching the tinted header in the design */}
+        <div style={{ padding: "1.75rem 2rem 1.25rem", background: "rgba(37, 99, 235, 0.06)", borderBottom: "1px solid rgba(var(--color-card-border), 0.5)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+          <div>
+            <h3 style={{ fontWeight: 700, fontSize: "1.25rem", margin: 0 }}>Expense Request Details</h3>
+            <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.85rem", margin: "0.25rem 0 0" }}>
+              Submit your financial request for departmental approval and budget verification.
+            </p>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer", flexShrink: 0 }}>
+            <Icons.X size={22} />
           </button>
         </div>
 
-        {formError && (
-          <div className="glass-card" style={{ borderLeft: "4px solid rgb(var(--color-danger))", padding: "0.75rem", background: "rgba(239,68,68,0.05)" }}>
-            <p style={{ color: "rgb(var(--color-danger))", fontSize: "0.85rem" }}>{formError}</p>
-          </div>
-        )}
-
-        <form onSubmit={(e) => handleCreateRequest(e, true)} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr 0.8fr", gap: "0.75rem" }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Expense Category</label>
-              <select
-                value={newRequest.category}
-                onChange={(e) => setNewRequest({ ...newRequest, category: e.target.value })}
-                className="form-select"
-              >
-                <option value="Travel">Travel & Lodging</option>
-                <option value="Equipment">Office Equipment</option>
-                <option value="Software">Software & Services</option>
-                <option value="Marketing">Marketing Expense</option>
-                <option value="Other">Other Expenses</option>
-              </select>
+        <form
+          onSubmit={(e) => handleCreateRequest(e, true)}
+          style={{ display: "flex", flexDirection: "column", gap: "1.15rem", padding: "1.75rem 2rem" }}
+        >
+          {formError && (
+            <div className="glass-card" style={{ borderLeft: "4px solid rgb(var(--color-danger))", padding: "0.75rem", background: "rgba(239,68,68,0.05)" }}>
+              <p style={{ color: "rgb(var(--color-danger))", fontSize: "0.85rem", margin: 0 }}>{formError}</p>
             </div>
+          )}
 
+          {/* Department — derived from the session, not chosen. The server
+              re-derives it too, so this is display only. */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Department</label>
+            <input
+              type="text"
+              value={departmentName || "Not assigned"}
+              readOnly
+              disabled
+              className="form-input"
+              style={{ background: "rgba(37, 99, 235, 0.06)", cursor: "not-allowed" }}
+            />
+          </div>
+
+          {/* Vendor / payee */}
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Vendor/Payee Details</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Acme Corp Int, AWS, Staples"
+              value={newRequest.vendorName}
+              onChange={(e) => set({ vendorName: e.target.value })}
+              className="form-input"
+            />
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem" }}>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Requested Amount</label>
+              <label className="form-label">Bank Name</label>
               <input
-                type="number"
+                type="text"
                 required
-                value={newRequest.amount}
-                onChange={(e) => setNewRequest({ ...newRequest, amount: e.target.value })}
-                placeholder="e.g. 3200"
+                placeholder="e.g. Zenith Bank"
+                value={newRequest.bankName}
+                onChange={(e) => set({ bankName: e.target.value })}
                 className="form-input"
               />
             </div>
-
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Currency</label>
-              <select
-                value={newRequest.currency}
-                onChange={(e) => setNewRequest({ ...newRequest, currency: e.target.value })}
-                className="form-select"
-              >
-                <option value="NGN">NGN (₦)</option>
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="GBP">GBP (£)</option>
-              </select>
+              <label className="form-label">Account Number</label>
+              <input
+                type="text"
+                required
+                inputMode="numeric"
+                placeholder="10-digit number"
+                value={newRequest.accountNumber}
+                onChange={(e) => set({ accountNumber: e.target.value })}
+                className="form-input"
+              />
+            </div>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Account Name</label>
+              <input
+                type="text"
+                required
+                placeholder="Full name on account"
+                value={newRequest.accountName}
+                onChange={(e) => set({ accountName: e.target.value })}
+                className="form-input"
+              />
             </div>
           </div>
 
+          {/* Category is required by the API; options come from the enum so the
+              form can never offer a value the server rejects (rule 2). */}
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Description / Purpose</label>
+            <label className="form-label">Expense Category</label>
+            <select
+              value={newRequest.category}
+              onChange={(e) => set({ category: e.target.value })}
+              className="form-select"
+            >
+              {EXPENSE_CATEGORIES.map((category) => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Description / Business Purpose</label>
             <textarea
               required
-              rows={2}
+              rows={4}
               value={newRequest.description}
-              onChange={(e) => setNewRequest({ ...newRequest, description: e.target.value })}
-              placeholder="Justify context for departmental budget validation"
+              onChange={(e) => set({ description: e.target.value })}
+              placeholder="Please provide a detailed explanation for this expense request..."
               className="form-textarea"
             />
           </div>
 
-          {/* Hidden File Input for Initiate Request */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Amount Requested</label>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))", fontWeight: 600 }}>
+                  ₦
+                </span>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  step="0.01"
+                  value={newRequest.amount}
+                  onChange={(e) => set({ amount: e.target.value })}
+                  placeholder="0.00"
+                  className="form-input"
+                  style={{ paddingLeft: "2rem" }}
+                />
+              </div>
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Required Payment Date</label>
+              <input
+                type="date"
+                required
+                value={newRequest.requiredPaymentDate}
+                onChange={(e) => set({ requiredPaymentDate: e.target.value })}
+                className="form-input"
+              />
+            </div>
+          </div>
+
+          {/* Hidden input backing the dropzone */}
           <input
             type="file"
             ref={fileInputRef}
@@ -120,65 +217,45 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
             }}
           />
 
-          {/* Supporting Attachments Manager */}
           <div className="form-group" style={{ margin: 0 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
-              <label className="form-label" style={{ margin: 0 }}>
-                Supporting Documents ({newRequest.supportingDocuments.length}/{MAX_ATTACHMENTS_PER_REQUEST}) <span style={{ color: "#EF4444" }}>*</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ background: "none", border: "none", color: "rgb(var(--color-primary))", fontSize: "0.75rem", fontWeight: "700", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.25rem" }}
-              >
-                <Icons.Upload size={13} />
-                + Add File
-              </button>
-            </div>
+            <label className="form-label" style={{ marginBottom: "0.4rem" }}>
+              Supporting Documents ({newRequest.supportingDocuments.length}/{MAX_ATTACHMENTS_PER_REQUEST}){" "}
+              <span style={{ color: "#EF4444" }}>*</span>
+            </label>
 
-            {/* Dropzone File Upload Input Area */}
             <div
               onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                  handleFileUpload(e.dataTransfer.files, false);
-                }
+                if (e.dataTransfer.files?.length) handleFileUpload(e.dataTransfer.files, false);
               }}
               style={{
-                border: "2px dashed rgba(99, 102, 241, 0.35)",
-                borderRadius: "8px",
-                padding: "1rem",
+                border: "2px dashed rgba(37, 99, 235, 0.35)",
+                borderRadius: "10px",
+                padding: "2rem 1rem",
                 textAlign: "center",
                 cursor: "pointer",
-                background: "rgba(99, 102, 241, 0.03)",
-                marginBottom: "0.5rem",
-                transition: "all 0.2s ease"
+                background: "rgba(37, 99, 235, 0.04)",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", marginBottom: "0.25rem" }}>
-                <Icons.UploadCloud size={22} style={{ color: "rgb(var(--color-primary))" }} />
-                <span style={{ fontSize: "0.85rem", fontWeight: "600", color: "rgb(var(--color-text))" }}>
-                  {isUploadingDoc ? "Uploading file in background..." : "Click or drag & drop files here to attach"}
-                </span>
+              <Icons.FileUp size={26} style={{ color: "#2563EB", marginBottom: "0.5rem" }} />
+              <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "rgb(var(--color-text))" }}>
+                {isUploadingDoc ? "Uploading…" : "Click to upload or drag and drop"}
               </div>
-              <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>
-                Supports PDF, PNG, JPG, DOCX, XLSX
+              <span style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-dim))" }}>
+                PDF, PNG, JPG or DOCX (max. 5MB)
               </span>
             </div>
 
             {uploadDocError && (
-              <p style={{ color: "#EF4444", fontSize: "0.75rem", margin: "0 0 0.5rem 0" }}>{uploadDocError}</p>
+              <p style={{ color: "#EF4444", fontSize: "0.75rem", margin: "0.5rem 0 0" }}>{uploadDocError}</p>
             )}
 
-            {/* Attached files. Each carries its real size and can be removed
-                before the request is created. */}
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+            {/* Attached files carry their real size and can be removed before
+                the request is created. */}
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
               {newRequest.supportingDocuments.map((doc: AttachmentInput) => (
                 <div
                   key={doc.url}
@@ -188,26 +265,21 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
                     gap: "0.35rem",
                     padding: "0.3rem 0.6rem",
                     borderRadius: "6px",
-                    background: "rgba(99, 102, 241, 0.1)",
-                    border: "1px solid rgba(99, 102, 241, 0.25)",
+                    background: "rgba(37, 99, 235, 0.1)",
+                    border: "1px solid rgba(37, 99, 235, 0.25)",
                     fontSize: "0.75rem",
-                    color: "rgb(var(--color-text))"
+                    color: "rgb(var(--color-text))",
                   }}
                 >
-                  <Icons.Paperclip size={12} style={{ color: "rgb(var(--color-primary))" }} />
+                  <Icons.Paperclip size={12} style={{ color: "#2563EB" }} />
                   <span style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {doc.name}
                   </span>
-                  {doc.size ? (
-                    <span style={{ color: "rgb(var(--color-text-dim))" }}>{formatFileSize(doc.size)}</span>
-                  ) : null}
+                  {doc.size ? <span style={{ color: "rgb(var(--color-text-dim))" }}>{formatFileSize(doc.size)}</span> : null}
                   <button
                     type="button"
                     aria-label={`Remove ${doc.name}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeDraftAttachment(doc.url, false);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); removeDraftAttachment(doc.url, false); }}
                     style={{ background: "none", border: "none", padding: 0, marginLeft: "0.2rem", cursor: "pointer", color: "#EF4444", lineHeight: 0 }}
                   >
                     <Icons.X size={12} />
@@ -216,74 +288,17 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
               ))}
             </div>
           </div>
-
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Required Payment Date</label>
-            <input
-              type="date"
-              required
-              value={newRequest.requiredPaymentDate}
-              onChange={(e) => setNewRequest({ ...newRequest, requiredPaymentDate: e.target.value })}
-              className="form-input"
-            />
-          </div>
-
-          <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)" }}>
-            <p style={{ fontSize: "0.8rem", fontWeight: "bold", marginBottom: "0.5rem", color: "rgb(var(--color-primary))" }}>Payee Bank Details</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
-              <input
-                type="text"
-                required
-                placeholder="Vendor / Payee Name"
-                value={newRequest.vendorName}
-                onChange={(e) => setNewRequest({ ...newRequest, vendorName: e.target.value })}
-                className="form-input"
-                style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem" }}
-              />
-              <input
-                type="text"
-                required
-                placeholder="Bank Account Name"
-                value={newRequest.accountName}
-                onChange={(e) => setNewRequest({ ...newRequest, accountName: e.target.value })}
-                className="form-input"
-                style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem" }}
-              />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-              <input
-                type="text"
-                required
-                placeholder="Account Number"
-                value={newRequest.accountNumber}
-                onChange={(e) => setNewRequest({ ...newRequest, accountNumber: e.target.value })}
-                className="form-input"
-                style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem" }}
-              />
-              <input
-                type="text"
-                required
-                placeholder="Bank Name"
-                value={newRequest.bankName}
-                onChange={(e) => setNewRequest({ ...newRequest, bankName: e.target.value })}
-                className="form-input"
-                style={{ padding: "0.5rem 0.75rem", fontSize: "0.85rem" }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>
-            <button type="button" onClick={onClose} className="btn btn-secondary">
-              Cancel
-            </button>
-            <button type="button" onClick={(e) => handleCreateRequest(e, false)} className="btn btn-secondary" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-              Save Draft
-            </button>
-            <button type="submit" className="btn btn-primary">
-              Submit Request
-            </button>
-          </div>
         </form>
+
+        {/* Footer band — Save Draft and Submit Request, as in the design */}
+        <div style={{ padding: "1.25rem 2rem", background: "rgba(37, 99, 235, 0.05)", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
+          <button type="button" onClick={(e) => handleCreateRequest(e, false)} className="btn btn-secondary">
+            Save Draft
+          </button>
+          <button type="button" onClick={(e) => handleCreateRequest(e, true)} className="btn btn-primary" style={{ background: "#2563EB", border: "none" }}>
+            Submit Request
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
 
 interface RejectExpansionModalProps {
   isOpen: boolean;
@@ -8,7 +9,8 @@ interface RejectExpansionModalProps {
   requestAmount?: number;
   remainingBudget?: number;
   deficitAmount?: number;
-  onConfirm?: (reason: string) => void;
+  /** Receives the reason plus the signature the server verifies. */
+  onConfirm?: (reason: string, signature: string) => void;
 }
 
 export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
@@ -26,20 +28,23 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
   const [rejectionReason, setRejectionReason] = useState(
     "This expense is not critical. The department can defer this purchase to the next fiscal year. I do not authorize the one-time expansion."
   );
+  const [signature, setSignature] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleConfirm = () => {
-    if (!rejectionReason.trim()) return;
+  const handleConfirm = async () => {
+    if (!rejectionReason.trim() || !signature.trim() || isSubmitting) return;
     setIsSubmitting(true);
-    setTimeout(() => {
-      if (onConfirm) {
-        onConfirm(rejectionReason);
-      }
-      setIsSubmitting(false);
+    try {
+      // Awaited so the dialog stays open until the rejection is recorded; the
+      // artificial 400ms setTimeout it replaced closed before the call was sent.
+      await onConfirm?.(rejectionReason, signature);
+      setSignature("");
       onClose();
-    }, 400);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -226,6 +231,13 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
           </ul>
         </div>
 
+        {/* Identity re-confirmation — the server rejects an unsigned decision. */}
+        <ElectronicSignatureField
+          value={signature}
+          onChange={setSignature}
+          description="Confirm your identity with your account password to reject this expansion."
+        />
+
         {/* Modal Footer Buttons */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "0.5rem" }}>
           <button
@@ -249,7 +261,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={isSubmitting || !rejectionReason.trim()}
+            disabled={isSubmitting || !rejectionReason.trim() || !signature.trim()}
             className="btn btn-danger"
             style={{
               padding: "0.6rem 1.5rem",

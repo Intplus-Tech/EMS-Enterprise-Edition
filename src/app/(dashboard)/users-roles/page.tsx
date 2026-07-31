@@ -14,9 +14,11 @@ export default function UsersRolesPage() {
     currentUser,
     systemUsers,
     departments,
+    budgets,
     rolePermissions,
     adminBusy,
     saveRolePermissions,
+    updateUser,
     setSelectedAdminUser,
     setShowAdminAddUserModal,
     setShowAdminEditUserProfileModal,
@@ -32,8 +34,12 @@ export default function UsersRolesPage() {
     <AdminUsersAndRolesTab
       systemUsers={systemUsers}
       departments={departments}
+      budgets={budgets}
       rolePermissions={rolePermissions}
       busy={adminBusy}
+      // The inline role select persists through the same mutation the Edit
+      // Profile dialog uses, so both paths refetch and report failures.
+      onChangeUserRole={(user: AdminUserDto, role: SystemRole) => updateUser(user.id, { role })}
       onOpenAddUser={() => setShowAdminAddUserModal(true)}
       onOpenEditUserProfile={(user: AdminUserDto) => {
         setSelectedAdminUser(user);

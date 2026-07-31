@@ -35,7 +35,6 @@ function readStoredIds(key: string): string[] {
 function emptyRequestForm() {
   return {
     category: DEFAULT_EXPENSE_CATEGORY as string,
-    currency: "NGN",
     description: "",
     amount: "",
     supportingDocuments: [] as AttachmentInput[],
@@ -118,6 +117,9 @@ function useDashboardState() {
   const [actionComment, setActionComment] = useState("");
   const [adjustedAmount, setAdjustedAmount] = useState<number>(0);
   const [paymentRef, setPaymentRef] = useState("");
+  // Identity re-confirmation for decisions taken from the detail modal. Held
+  // here (not in the modal) so it is cleared alongside the rest of the form.
+  const [decisionSignature, setDecisionSignature] = useState("");
 
   // Workflow data (Admin)
   const [workflowSteps, setWorkflowSteps] = useState<any[]>([]);
@@ -275,18 +277,21 @@ function useDashboardState() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showResubmitModal, setShowResubmitModal] = useState(false);
   const [selectedResubmitExpense, setSelectedResubmitExpense] = useState<any>(null);
+  // `notifyAuditor` was a checkbox nothing ever read on submit, so it is gone
+  // rather than continuing to promise a Slack notification that never fired.
   const [resubmitForm, setResubmitForm] = useState({
     justification: "",
     supportingDocuments: [] as AttachmentInput[],
-    notifyAuditor: true
   });
   // Attachment currently open in the document viewer (designs/initiator/Attachment View - Modal).
   const [viewedAttachment, setViewedAttachment] = useState<AttachmentTarget | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedReceiptData, setSelectedReceiptData] = useState<any>(null);
-  const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [amountSearchQuery, setAmountSearchQuery] = useState("");
+  // Date controls on the Requests screen (design: "Today" toggle + date picker).
+  const [requestsTodayOnly, setRequestsTodayOnly] = useState(false);
+  const [requestsDateFilter, setRequestsDateFilter] = useState("");
   const [chartViewMode, setChartViewMode] = useState<"daily" | "monthly">("monthly");
   const [approvalDateFilter, setApprovalDateFilter] = useState<"all" | "today">("all");
   const [approvalDatePicker, setApprovalDatePicker] = useState<string>("");
@@ -519,18 +524,6 @@ function useDashboardState() {
     }
   };
 
-  // Initiator submits a draft request
-  const handleSubmitRequest = async (id: string) => {
-    try {
-      await ExpenseClient.submit(id);
-      setSelectedExpense(null);
-      loadDashboardData(currentUser);
-      notifySuccess("Request submitted for approval.");
-    } catch (err) {
-      notifyError(toErrorMessage(err));
-    }
-  };
-
   // Initiator updates and resubmits a returned request
   const handleResubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -565,7 +558,7 @@ function useDashboardState() {
 
       setShowResubmitModal(false);
       setSelectedResubmitExpense(null);
-      setResubmitForm({ justification: "", supportingDocuments: [], notifyAuditor: true });
+      setResubmitForm({ justification: "", supportingDocuments: [] });
       loadDashboardData(currentUser);
       notifySuccess("Request updated and resubmitted.");
     } catch (err) {
@@ -632,10 +625,11 @@ function useDashboardState() {
   // Finance Head exceptional approval (from the request detail modal)
   const handleExceptionalBudgetAction = async (id: string, action: WorkflowActionType) => {
     try {
-      await ExpenseClient.exceptionalAction(id, action, actionComment, adjustedAmount);
+      await ExpenseClient.exceptionalAction(id, action, actionComment, decisionSignature, adjustedAmount);
       setSelectedExpense(null);
       setActionComment("");
       setAdjustedAmount(0);
+      setDecisionSignature("");
       loadDashboardData(currentUser);
       notifySuccess("Decision recorded.");
     } catch (err) {
@@ -646,9 +640,10 @@ function useDashboardState() {
   // Approver decision (from the request detail modal)
   const handleWorkflowAction = async (id: string, action: WorkflowActionType) => {
     try {
-      await ExpenseClient.workflowAction(id, action, actionComment);
+      await ExpenseClient.workflowAction(id, action, actionComment, decisionSignature);
       setSelectedExpense(null);
       setActionComment("");
+      setDecisionSignature("");
       loadDashboardData(currentUser);
       notifySuccess("Decision recorded.");
     } catch (err) {
@@ -675,9 +670,10 @@ function useDashboardState() {
       return;
     }
     try {
-      await ExpenseClient.releasePayment(id, paymentRef);
+      await ExpenseClient.releasePayment(id, paymentRef, decisionSignature);
       setSelectedExpense(null);
       setPaymentRef("");
+      setDecisionSignature("");
       loadDashboardData(currentUser);
       notifySuccess(`Payment released. Reference: ${paymentRef}`);
     } catch (err) {
@@ -779,6 +775,7 @@ function useDashboardState() {
     actionComment, setActionComment,
     adjustedAmount, setAdjustedAmount,
     paymentRef, setPaymentRef,
+    decisionSignature, setDecisionSignature,
     workflowSteps, setWorkflowSteps,
     workflowMessage, setWorkflowMessage,
     systemLogs, setSystemLogs,
@@ -804,9 +801,10 @@ function useDashboardState() {
     viewedAttachment, setViewedAttachment,
     showReceiptModal, setShowReceiptModal,
     selectedReceiptData, setSelectedReceiptData,
-    showPolicyModal, setShowPolicyModal,
     searchQuery, setSearchQuery,
     amountSearchQuery, setAmountSearchQuery,
+    requestsTodayOnly, setRequestsTodayOnly,
+    requestsDateFilter, setRequestsDateFilter,
     chartViewMode, setChartViewMode,
     approvalDateFilter, setApprovalDateFilter,
     approvalDatePicker, setApprovalDatePicker,
@@ -841,7 +839,6 @@ function useDashboardState() {
     handleInviteUser,
     handleLogout,
     handleCreateRequest,
-    handleSubmitRequest,
     handleResubmitRequest,
     handleCancelRequest,
     handleChangePassword,

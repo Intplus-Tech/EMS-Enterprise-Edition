@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { Pagination } from "../ui/Pagination";
-import { formatNaira } from "../ui/format";
+import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
 import { datedFilename, downloadCsv } from "../ui/exportCsv";
-import { DepartmentDto, DepartmentSpendDto } from "../../types/api";
+import { DepartmentDto, DepartmentSpendDto, PopulatedExpenseDto } from "../../types/api";
 
 // Matches the row density shown in designs/system-admin/Admin_ Department Management.png
 const ROWS_PER_PAGE = 5;
@@ -13,6 +13,8 @@ export type AdminDepartmentRow = DepartmentDto & Omit<DepartmentSpendDto, "id" |
 
 interface AdminDepartmentalSpendTabProps {
   departments: AdminDepartmentRow[];
+  /** Every request, used by the per-department analytics drill-down. */
+  expenses?: PopulatedExpenseDto[];
   onOpenCreateDept: () => void;
   onOpenEditDept: (dept: AdminDepartmentRow) => void;
   onOpenDeleteDept: (dept: AdminDepartmentRow) => void;
@@ -20,6 +22,7 @@ interface AdminDepartmentalSpendTabProps {
 
 export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps> = ({
   departments,
+  expenses = [],
   onOpenCreateDept,
   onOpenEditDept,
   onOpenDeleteDept
@@ -44,9 +47,99 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
 
   const deptList = departments;
 
+  /**
+   * Enterprise roll-up for the two tiles at the top. These were the design's
+   * sample figures (₦500,000,000 / ₦34,642,300) hardcoded into the markup.
+   */
+  const enterpriseTotals = departments.reduce(
+    (acc, d) => ({
+      allocated: acc.allocated + (d.totalBudget || 0),
+      utilised: acc.utilised + (d.utilised || 0),
+      pending: acc.pending + (d.pending || 0),
+    }),
+    { allocated: 0, utilised: 0, pending: 0 }
+  );
+
+  /**
+   * Utilisation against allocation, department by department, as the substitute
+   * for the "Budget Trends by Quarter" chart: nothing in the data model records
+   * a quarterly series, and the previous chart drew four fixed bars (40/75/68/95)
+   * that were the same for every organisation.
+   */
+  const utilisationBars = [...departments]
+    .filter((d) => d.hasBudget)
+    .sort((a, b) => b.pctUsed - a.pctUsed)
+    .slice(0, 6);
+
+  /**
+   * Share of the enterprise allocation actually committed. Replaces the fixed
+   * "8.4" score, which was not computed from anything.
+   */
+  const utilisationPct =
+    enterpriseTotals.allocated > 0
+      ? Math.round(((enterpriseTotals.utilised + enterpriseTotals.pending) / enterpriseTotals.allocated) * 100)
+      : 0;
+
   // Clamp the page so a shrinking department list never strands an empty page.
   const safePage = Math.min(page, Math.max(1, Math.ceil(deptList.length / ROWS_PER_PAGE)));
   const visibleDepts = deptList.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
+
+  /**
+   * Everything the analytics drill-down shows, derived from the department's own
+   * requests. Every panel on that screen used to be hardcoded: a fixed 85%
+   * "efficiency score", ₦4.2M of ₦5.0M utilised, three invented budget items and
+   * four invented high-value requests with invented requesters.
+   */
+  const analytics = (() => {
+    const dept = selectedAnalyticsDept;
+    if (!dept) return null;
+
+    const deptExpenses = expenses.filter((e) => String(e.departmentId?._id ?? "") === dept.id);
+    const spent = deptExpenses.filter((e) => ["PAID", "CLOSED"].includes(e.status));
+
+    // Six-month actual spend, newest bucket last.
+    const now = new Date();
+    const months: { label: string; amount: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({ label: d.toLocaleDateString(undefined, { month: "short" }).toUpperCase(), amount: 0 });
+    }
+    spent.forEach((e) => {
+      const d = new Date(e.paymentDate || e.updatedAt || e.createdAt);
+      const offset = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+      if (offset >= 0 && offset <= 5) months[5 - offset].amount += e.amount || 0;
+    });
+
+    // Spend per category. The summary endpoint returns departmental totals but
+    // not per-line allocations, so the bars are sized against the largest
+    // category rather than against an allocation this screen cannot see.
+    const byCategory = new Map<string, number>();
+    spent.forEach((e) => {
+      const key = e.category || "Uncategorised";
+      byCategory.set(key, (byCategory.get(key) || 0) + (e.amount || 0));
+    });
+    const ranked = Array.from(byCategory.entries())
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+    const topCategoryAmount = ranked[0]?.amount ?? 0;
+    const budgetItems = ranked.map((item) => ({
+      ...item,
+      // Share of the department's own committed spend.
+      pct: dept.utilised > 0 ? Math.round((item.amount / dept.utilised) * 100) : 0,
+      barPct: topCategoryAmount > 0 ? Math.round((item.amount / topCategoryAmount) * 100) : 0,
+    }));
+
+    const highValue = [...deptExpenses].sort((a, b) => (b.amount || 0) - (a.amount || 0)).slice(0, 4);
+
+    return {
+      months,
+      maxMonth: Math.max(...months.map((m) => m.amount), 1),
+      budgetItems,
+      highValue,
+      remaining: dept.remaining,
+    };
+  })();
 
   // If Analytics Detail view is selected
   if (selectedAnalyticsDept) {
@@ -98,7 +191,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                 cursor: "pointer"
               }}
             >
-              <Icons.Download size={15} /> Export PDF
+              <Icons.Download size={15} /> Export CSV
             </button>
           </div>
         </div>
@@ -107,43 +200,60 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         <div style={{ display: "grid", gridTemplateColumns: "300px 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
           {/* Left Cards */}
           <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-            {/* Efficiency Score Gauge Card */}
+            {/* Utilisation gauge — the department's real percentage. This was a
+                fixed "85% efficiency score" with no backing calculation. */}
             <div className="glass-panel" style={{ padding: "1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem", textAlign: "center" }}>
               <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "1rem" }}>
-                EFFICIENCY SCORE
+                BUDGET UTILISATION
               </div>
               <div style={{
                 width: "120px",
                 height: "120px",
                 borderRadius: "50%",
-                border: "8px solid #2563eb",
+                background: `conic-gradient(${selectedAnalyticsDept.pctUsed > 90 ? "#DC2626" : "#2563EB"} ${Math.min(100, selectedAnalyticsDept.pctUsed) * 3.6}deg, rgba(var(--color-card-border), 0.5) 0deg)`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 margin: "0 auto 0.5rem auto",
-                fontSize: "1.75rem",
-                fontWeight: "800",
-                color: "rgb(var(--color-text))"
               }}>
-                85%
+                <div style={{
+                  width: "92px",
+                  height: "92px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgb(var(--color-card))",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "1.6rem",
+                  fontWeight: "800",
+                  color: "rgb(var(--color-text))",
+                }}>
+                  {selectedAnalyticsDept.hasBudget ? `${selectedAnalyticsDept.pctUsed}%` : "—"}
+                </div>
               </div>
             </div>
 
-            {/* Budget Utilized Card */}
+            {/* Budget Utilized Card — the department's own allocation and spend. */}
             <div className="glass-panel" style={{ padding: "1.35rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem" }}>
               <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>
                 BUDGET UTILIZED
               </div>
               <div style={{ fontSize: "1.5rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
-                ₦4.2M <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-dim))", fontWeight: "500" }}>/ ₦5.0M</span>
+                {formatNaira(selectedAnalyticsDept.utilised)}{" "}
+                <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-dim))", fontWeight: "500" }}>
+                  / {selectedAnalyticsDept.hasBudget ? formatNaira(selectedAnalyticsDept.totalBudget) : "no budget set"}
+                </span>
               </div>
-              {/* Progress bar */}
-              <div style={{ width: "100%", height: "8px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "4px", margin: "0.85rem 0" }}>
-                <div style={{ width: "84%", height: "100%", backgroundColor: "#2563eb", borderRadius: "4px" }} />
+              <div style={{ width: "100%", height: "8px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "4px", margin: "0.85rem 0" }}>
+                <div style={{ width: `${Math.min(100, selectedAnalyticsDept.pctUsed)}%`, height: "100%", backgroundColor: "#2563EB", borderRadius: "4px" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                <span>84% of quarterly cap</span>
-                <span style={{ color: "#38bdf8", fontWeight: "600" }}>₦800k left</span>
+                <span>{selectedAnalyticsDept.pctUsed}% of allocation</span>
+                {selectedAnalyticsDept.hasBudget && (
+                  <span style={{ color: selectedAnalyticsDept.remaining < 0 ? "#DC2626" : "#2563EB", fontWeight: "600" }}>
+                    {formatNaira(selectedAnalyticsDept.remaining)} left
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -155,32 +265,26 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                 <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Spend Trends Over Time</h3>
                 <p style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))", marginTop: "0.15rem" }}>Monthly comparison of actual vs projected spend</p>
               </div>
-              <div style={{ display: "flex", gap: "1rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                  <span style={{ width: "10px", height: "10px", backgroundColor: "#2563eb", borderRadius: "2px" }} /> Actual
-                </span>
-                <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                  <span style={{ width: "10px", height: "10px", backgroundColor: "#93c5fd", borderRadius: "2px" }} /> Projected
-                </span>
-              </div>
             </div>
 
-            {/* Bar Chart Simulation */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: "180px", paddingTop: "1rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)" }}>
-              {[
-                { month: "JAN", projected: 60, actual: 70 },
-                { month: "FEB", projected: 55, actual: 50 },
-                { month: "MAR", projected: 65, actual: 75 },
-                { month: "APR", projected: 60, actual: 58 },
-                { month: "MAY", projected: 70, actual: 85 },
-                { month: "JUN", projected: 75, actual: 65 }
-              ].map((item, idx) => (
-                <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-                  <div style={{ display: "flex", gap: "4px", alignItems: "flex-end", height: "130px" }}>
-                    <div style={{ width: "14px", height: `${item.projected}%`, backgroundColor: "#93c5fd", borderRadius: "2px 2px 0 0" }} />
-                    <div style={{ width: "14px", height: `${item.actual}%`, backgroundColor: "#2563eb", borderRadius: "2px 2px 0 0" }} />
+            {/* Six months of actual spend for this department. The bars used to
+                be twelve hardcoded percentages labelled "actual vs projected". */}
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: "200px", gap: "0.75rem" }}>
+              {analytics!.months.map((month) => (
+                <div key={month.label} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", height: "100%" }}>
+                  <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                    <div
+                      title={formatNaira(month.amount)}
+                      style={{
+                        width: "50%",
+                        minHeight: month.amount > 0 ? "4px" : "0",
+                        height: `${(month.amount / analytics!.maxMonth) * 100}%`,
+                        backgroundColor: "#2563EB",
+                        borderRadius: "4px 4px 0 0",
+                      }}
+                    />
                   </div>
-                  <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>{item.month}</span>
+                  <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>{month.label}</span>
                 </div>
               ))}
             </div>
@@ -189,130 +293,88 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
 
         {/* Bottom Split Section */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-          {/* Budget Item List */}
+          {/* Spend per category against the department's own budget lines. This
+              listed three fixed items (SaaS / Hardware / Consulting) with fixed
+              amounts and invented month-on-month deltas. */}
           <div className="glass-panel" style={{ padding: "1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem" }}>
             <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "1.25rem" }}>
               Budget Item
             </h3>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem", fontSize: "0.85rem" }}>
-                  <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>SaaS Subscriptions</span>
-                  <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>₦2.4M</span>
-                </div>
-                <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px", marginBottom: "0.35rem" }}>
-                  <div style={{ width: "75%", height: "100%", backgroundColor: "#2563eb", borderRadius: "3px" }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                  <span style={{ color: "rgb(var(--color-text-muted))" }}>75% used</span>
-                  <span style={{ color: "#ef4444", fontWeight: "600" }}>+12% vs last month</span>
-                </div>
+            {analytics!.budgetItems.length === 0 ? (
+              <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.85rem", margin: 0 }}>
+                No spend recorded for this department.
+              </p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                {analytics!.budgetItems.map((item) => (
+                  <div key={item.name}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem", fontSize: "0.85rem", gap: "0.75rem" }}>
+                      <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>{item.name}</span>
+                      <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>{formatNaira(item.amount)}</span>
+                    </div>
+                    <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "3px", marginBottom: "0.35rem" }}>
+                      <div style={{ width: `${item.barPct}%`, height: "100%", backgroundColor: "#2563EB", borderRadius: "3px" }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
+                      <span style={{ color: "rgb(var(--color-text-muted))" }}>
+                        {item.pct}% of departmental spend
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem", fontSize: "0.85rem" }}>
-                  <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>Hardware Procurement</span>
-                  <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>₦1.1M</span>
-                </div>
-                <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px", marginBottom: "0.35rem" }}>
-                  <div style={{ width: "45%", height: "100%", backgroundColor: "#2563eb", borderRadius: "3px" }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                  <span style={{ color: "rgb(var(--color-text-muted))" }}>45% used</span>
-                  <span style={{ color: "#10b981", fontWeight: "600" }}>-5% vs last month</span>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem", fontSize: "0.85rem" }}>
-                  <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>Consulting & Support</span>
-                  <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>₦500k</span>
-                </div>
-                <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px", marginBottom: "0.35rem" }}>
-                  <div style={{ width: "92%", height: "100%", backgroundColor: "#2563eb", borderRadius: "3px" }} />
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
-                  <span style={{ color: "rgb(var(--color-text-muted))" }}>92% used</span>
-                  <span style={{ color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>Stable</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Recent High-Value Requests */}
+          {/* The department's own largest requests. These were four invented
+              requests attributed to invented requesters. */}
           <div className="glass-panel" style={{ padding: "1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-              <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Recent High-Value Requests</h3>
-              <span style={{ fontSize: "0.8rem", color: "#3b82f6", fontWeight: "600", cursor: "pointer" }}>View All</span>
-            </div>
+            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "1.25rem" }}>
+              Highest-Value Requests
+            </h3>
 
-            <table className="data-table" style={{ width: "100%" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
-                  <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>REQUEST DETAILS</th>
-                  <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>STATUS</th>
-                  <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", textAlign: "right" }}>AMOUNT</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <td style={{ padding: "0.85rem 0" }}>
-                    <div style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>AWS Cloud Infrastructure</div>
-                    <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>Requested by: Emeka Nnamdi</div>
-                  </td>
-                  <td>
-                    <span className="badge badge-paid" style={{ fontSize: "0.7rem" }}>APPROVED</span>
-                  </td>
-                  <td style={{ textAlign: "right", fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>
-                    ₦850,000
-                  </td>
-                </tr>
-                <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <td style={{ padding: "0.85rem 0" }}>
-                    <div style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>MacBook Pro M3 Max (5 Units)</div>
-                    <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>Requested by: Sarah Alabi</div>
-                  </td>
-                  <td>
-                    <span className="badge badge-warning" style={{ fontSize: "0.7rem" }}>PENDING</span>
-                  </td>
-                  <td style={{ textAlign: "right", fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>
-                    ₦12,500,000
-                  </td>
-                </tr>
-                <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
-                  <td style={{ padding: "0.85rem 0" }}>
-                    <div style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>Salesforce Enterprise Renewal</div>
-                    <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>Requested by: IT Procurement</div>
-                  </td>
-                  <td>
-                    <span className="badge badge-draft" style={{ fontSize: "0.7rem" }}>REVIEWING</span>
-                  </td>
-                  <td style={{ textAlign: "right", fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>
-                    ₦4,200,000
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ padding: "0.85rem 0" }}>
-                    <div style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>Cybersecurity Audit Fees</div>
-                    <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>Requested by: Security Team</div>
-                  </td>
-                  <td>
-                    <span className="badge badge-paid" style={{ fontSize: "0.7rem" }}>APPROVED</span>
-                  </td>
-                  <td style={{ textAlign: "right", fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>
-                    ₦1,800,000
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            {analytics!.highValue.length === 0 ? (
+              <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.85rem", margin: 0 }}>
+                No requests raised in this department yet.
+              </p>
+            ) : (
+              <table className="data-table" style={{ width: "100%" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)" }}>
+                    <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>REQUEST DETAILS</th>
+                    <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>STATUS</th>
+                    <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", textAlign: "right" }}>AMOUNT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analytics!.highValue.map((request) => (
+                    <tr key={request._id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.3)" }}>
+                      <td style={{ padding: "0.85rem 0" }}>
+                        <div style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>{request.description}</div>
+                        <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+                          Requested by: {request.initiatorId?.name || "—"}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${statusBadgeClass(request.status)}`} style={{ fontSize: "0.7rem" }}>
+                          {humanizeStatus(request.status)}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right", fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>
+                        {formatNaira(request.amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
     );
   }
 
-  // MAIN DEPARTMENTAL SPEND OVERVIEW VIEW
   return (
     <div>
       {/* Header */}
@@ -354,7 +416,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase" }}>TOTAL FY2026 BUDGET</div>
-              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>₦500,000,000</div>
+              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>{formatNaira(enterpriseTotals.allocated)}</div>
             </div>
           </div>
         </div>
@@ -367,7 +429,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase" }}>CURRENT UTILIZATIONS</div>
-              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>₦34,642,300</div>
+              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>{formatNaira(enterpriseTotals.utilised)}</div>
             </div>
           </div>
         </div>
@@ -510,75 +572,96 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         />
       </div>
 
-      {/* Bottom Section: Budget Trends & Efficiency Score Card */}
+      {/* Bottom section: utilisation by department and the enterprise
+          commitment rate. Both panels previously drew fixed values. */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "1.5rem" }}>
-        {/* Budget Trends by Quarter */}
         <div className="glass-panel" style={{ padding: "1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Budget Trends by Quarter</h3>
-            <div style={{ display: "flex", gap: "1rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                <span style={{ width: "10px", height: "10px", backgroundColor: "#2563eb", borderRadius: "2px" }} /> Budgeted
-              </span>
-              <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-                <span style={{ width: "10px", height: "10px", backgroundColor: "#93c5fd", borderRadius: "2px" }} /> Utilized
-              </span>
+            <div>
+              <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Budget Utilisation by Department</h3>
+              <p style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))", marginTop: "0.15rem" }}>
+                Committed spend against allocation
+              </p>
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: "160px", paddingTop: "1rem", borderBottom: "1px solid rgba(255, 255, 255, 0.1)" }}>
-            {[
-              { quarter: "Q1", pct: 40 },
-              { quarter: "Q2", pct: 75 },
-              { quarter: "Q3", pct: 68 },
-              { quarter: "Q4 (Projected)", pct: 95 }
-            ].map((q, idx) => (
-              <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-                <div style={{ width: "65px", height: `${q.pct}%`, backgroundColor: "#2563eb", borderRadius: "4px 4px 0 0", position: "relative" }}>
-                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "40%", backgroundColor: "rgba(147, 197, 253, 0.4)", borderRadius: "4px 4px 0 0" }} />
+          {utilisationBars.length === 0 ? (
+            <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.85rem", margin: 0 }}>
+              No departmental budgets have been set.
+            </p>
+          ) : (
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: "180px", gap: "0.75rem" }}>
+              {utilisationBars.map((d) => (
+                <div key={d.id} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", height: "100%" }}>
+                  <span style={{ fontSize: "0.72rem", fontWeight: 700, color: d.pctUsed > 90 ? "#DC2626" : "rgb(var(--color-text-muted))" }}>
+                    {d.pctUsed}%
+                  </span>
+                  <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+                    <div
+                      title={`${formatNaira(d.utilised)} of ${formatNaira(d.totalBudget)}`}
+                      style={{
+                        width: "60%",
+                        minHeight: "4px",
+                        height: `${Math.min(100, d.pctUsed)}%`,
+                        backgroundColor: d.pctUsed > 90 ? "#DC2626" : "#2563EB",
+                        borderRadius: "4px 4px 0 0",
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: "0.72rem", color: "rgb(var(--color-text-muted))", fontWeight: "600", textAlign: "center", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}>
+                    {d.name}
+                  </span>
                 </div>
-                <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>{q.quarter}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Efficiency Score Blue Card */}
         <div style={{
-          backgroundColor: "#2563eb",
+          backgroundColor: "#2563EB",
           borderRadius: "0.75rem",
           padding: "1.75rem",
-          color: "#ffffff",
+          color: "#FFFFFF",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
           boxShadow: "0 10px 25px -5px rgba(37, 99, 235, 0.4)"
         }}>
           <div>
-            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem" }}>Efficiency Score</h3>
-            <p style={{ fontSize: "0.82rem", color: "#bfdbfe", lineHeight: "1.4" }}>
-              Based on request throughput and budget alignment.
+            <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem" }}>Budget Committed</h3>
+            <p style={{ fontSize: "0.82rem", color: "rgba(255, 255, 255, 0.8)", lineHeight: "1.4" }}>
+              Utilised plus pending, across every departmental allocation.
             </p>
           </div>
 
-          {/* Radial score simulation */}
           <div style={{
             width: "130px",
             height: "130px",
             borderRadius: "50%",
-            border: "8px solid rgba(255, 255, 255, 0.3)",
-            borderTopColor: "#ffffff",
-            borderRightColor: "#ffffff",
+            background: `conic-gradient(#FFFFFF ${Math.min(100, utilisationPct) * 3.6}deg, rgba(255, 255, 255, 0.25) 0deg)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             margin: "1.5rem auto",
-            fontSize: "2.2rem",
-            fontWeight: "800",
-            color: "#ffffff"
           }}>
-            8.4
+            <div style={{
+              width: "100px",
+              height: "100px",
+              borderRadius: "50%",
+              backgroundColor: "#2563EB",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "1.9rem",
+              fontWeight: "800",
+            }}>
+              {utilisationPct}%
+            </div>
           </div>
+
+          <span style={{ fontSize: "0.8rem", color: "rgba(255, 255, 255, 0.85)", textAlign: "center" }}>
+            {formatNaira(enterpriseTotals.utilised + enterpriseTotals.pending)} of {formatNaira(enterpriseTotals.allocated)}
+          </span>
         </div>
       </div>
     </div>

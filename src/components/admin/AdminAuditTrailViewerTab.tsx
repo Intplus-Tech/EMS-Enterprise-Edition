@@ -13,7 +13,9 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
   const [userNameFilter, setUserNameFilter] = useState("");
   const [reqIdFilter, setReqIdFilter] = useState("");
   const [actionTypeFilter, setActionTypeFilter] = useState("All Actions");
-  const [expandedLogId, setExpandedLogId] = useState<string | null>("log-1");
+  // No row is expanded until one is clicked; the previous default id
+  // ("log-1") never matched a real log, so it expanded nothing.
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   const formattedLiveLogs = logs.map((l: any) => ({
     id: l._id || l.id,
@@ -27,7 +29,9 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
     action: l.action || "Log Event",
     statusFrom: l.details?.statusBefore || "System Event",
     statusTo: l.details?.statusAfter || l.action || "Completed",
-    ipAddress: l.ipAddress || "192.168.1.1",
+    // Never fabricated: an audit trail that invents an IP is worse than one
+    // that admits it does not have it, and this value is exported to CSV.
+    ipAddress: l.ipAddress || "",
     verbatimFeedback: l.message ? `"${l.message}"` : '"No comment recorded."',
     attachmentsCount: l.details?.attachmentsCount || 0
   }));
@@ -291,7 +295,7 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
                     </td>
 
                     <td style={{ textAlign: "right", color: "rgb(var(--color-text-muted))", fontSize: "0.82rem", fontFamily: "monospace" }}>
-                      {log.ipAddress}
+                      {log.ipAddress || "—"}
                     </td>
                   </tr>
 

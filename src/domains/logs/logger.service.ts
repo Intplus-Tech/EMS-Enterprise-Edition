@@ -11,6 +11,20 @@ export interface ILogActor {
 }
 
 /**
+ * Best-effort client IP for an audited request.
+ *
+ * Audit rows are only useful if the address on them is real, so this returns
+ * `undefined` rather than a placeholder when no proxy header is present — the
+ * viewer renders "—" for those instead of inventing 192.168.1.1.
+ */
+export function clientIpFrom(req: { headers: { get(name: string): string | null } }): string | undefined {
+  const forwarded = req.headers.get("x-forwarded-for");
+  // `x-forwarded-for` is a comma-separated chain; the client is the first hop.
+  if (forwarded) return forwarded.split(",")[0].trim() || undefined;
+  return req.headers.get("x-real-ip") || undefined;
+}
+
+/**
  * Structured Logger Service following SOLID principles
  * Handles writing logs (App, Exception, Audit) to the database and standard console.
  */

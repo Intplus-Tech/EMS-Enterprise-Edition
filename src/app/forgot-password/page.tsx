@@ -10,15 +10,14 @@ export default function ForgotPasswordPage() {
 
   // State
   const [email, setEmail] = useState("");
-  const [rememberDevice, setRememberDevice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [demoCode, setDemoCode] = useState("");
+  const [sent, setSent] = useState(false);
 
   const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setDemoCode("");
+    setSent(false);
     setLoading(true);
 
     try {
@@ -30,11 +29,12 @@ export default function ForgotPasswordPage() {
       const data = await res.json();
 
       if (data.success) {
-        setDemoCode(data.code);
-        // Navigate to verification page with email as query parameter
+        // The code is emailed and never returned by the API, so nothing is
+        // echoed on screen or carried in the URL.
+        setSent(true);
         setTimeout(() => {
-          router.push(`/verify-code?email=${encodeURIComponent(email)}&demo=${data.code}`);
-        }, 1500);
+          router.push(`/verify-code?email=${encodeURIComponent(email)}`);
+        }, 1200);
       } else {
         setError(data.error || "Failed to process forgot password request.");
       }
@@ -46,22 +46,22 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "#F8FAFC", color: "#0F172A", fontFamily: "var(--font-sans)" }}>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh", background: "rgb(var(--color-background))", color: "rgb(var(--color-text))", fontFamily: "var(--font-sans)" }}>
       {/* Header */}
       <header style={{ 
         padding: "1.25rem 2.5rem", 
         display: "flex", 
         justifyContent: "space-between", 
         alignItems: "center", 
-        background: "#FFFFFF",
-        borderBottom: "1px solid #E2E8F0"
+        background: "rgb(var(--color-surface))",
+        borderBottom: "1px solid rgba(var(--color-card-border), 0.5)"
       }}>
         {/* Brand logo & text */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ 
             padding: "0.4rem", 
             borderRadius: "50%", 
-            background: "rgba(10, 82, 214, 0.1)",
+            background: "rgba(var(--color-primary), 0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
@@ -70,19 +70,19 @@ export default function ForgotPasswordPage() {
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span style={{ fontWeight: "700", fontSize: "1rem", color: "#0F172A" }}>EMS</span>
+              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>EMS</span>
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 
-                background: "#E2E8F0", 
-                color: "#475569", 
+                background: "rgba(var(--color-card-border), 0.4)", 
+                color: "rgb(var(--color-text-muted))", 
                 padding: "0.15rem 0.35rem", 
                 borderRadius: "4px" 
               }}>
                 v1.0
               </span>
             </div>
-            <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block", marginTop: "1px" }}>Enterprise Edition</span>
+            <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block", marginTop: "1px" }}>Enterprise Edition</span>
           </div>
         </div>
 
@@ -96,21 +96,21 @@ export default function ForgotPasswordPage() {
             gap: "0.5rem", 
             padding: "0.5rem 1rem", 
             borderRadius: "8px", 
-            border: "1px solid #E2E8F0", 
-            background: "#FFFFFF",
-            color: "#475569",
+            border: "1px solid rgba(var(--color-card-border), 0.5)", 
+            background: "rgb(var(--color-surface))",
+            color: "rgb(var(--color-text-muted))",
             fontSize: "0.85rem",
             fontWeight: "500",
             textDecoration: "none",
             transition: "all 0.15s ease"
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.borderColor = "#CBD5E1";
-            e.currentTarget.style.background = "#F8FAFC";
+            e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
+            e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
           }}
           onMouseOut={(e) => {
-            e.currentTarget.style.borderColor = "#E2E8F0";
-            e.currentTarget.style.background = "#FFFFFF";
+            e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+            e.currentTarget.style.background = "rgb(var(--color-card))";
           }}
         >
           <Icons.HelpCircle size={16} /> Help
@@ -122,14 +122,14 @@ export default function ForgotPasswordPage() {
         <div style={{ 
           maxWidth: "480px", 
           width: "100%", 
-          background: "#FFFFFF", 
-          border: "1px solid #E2E8F0", 
+          background: "rgb(var(--color-surface))", 
+          border: "1px solid rgba(var(--color-card-border), 0.5)", 
           borderRadius: "16px", 
           padding: "2.5rem", 
-          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.05)" 
+          boxShadow: "var(--shadow-lg)" 
         }}>
-          <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "#0F172A", marginBottom: "0.5rem" }}>Forgot your password?</h2>
-          <p style={{ color: "#64748B", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
+          <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "0.5rem" }}>Forgot your password?</h2>
+          <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
             Enter your work email address and we will send you a verification code to reset your password.
           </p>
 
@@ -138,11 +138,11 @@ export default function ForgotPasswordPage() {
               display: "flex", 
               alignItems: "center", 
               gap: "0.75rem", 
-              background: "#FFF1F2", 
-              border: "1px solid #FCA5A5", 
+              background: "rgba(239, 68, 68, 0.08)", 
+              border: "1px solid rgba(239, 68, 68, 0.3)", 
               borderRadius: "8px", 
               padding: "0.75rem 1rem", 
-              color: "#B91C1C", 
+              color: "#EF4444", 
               fontSize: "0.875rem", 
               marginBottom: "1.5rem" 
             }}>
@@ -151,25 +151,25 @@ export default function ForgotPasswordPage() {
             </div>
           )}
 
-          {demoCode && (
-            <div style={{ 
-              background: "#ECFDF5", 
-              border: "1px solid #10B981", 
-              borderRadius: "8px", 
-              padding: "0.75rem 1rem", 
-              color: "#065F46", 
-              fontSize: "0.875rem", 
+          {sent && (
+            <div style={{
+              background: "rgba(16, 185, 129, 0.1)",
+              border: "1px solid rgba(16, 185, 129, 0.4)",
+              borderRadius: "8px",
+              padding: "0.75rem 1rem",
+              color: "#059669",
+              fontSize: "0.875rem",
               marginBottom: "1.5rem",
               textAlign: "center"
             }}>
-              <strong>[Demo Mode]</strong> Code sent: <span style={{ fontFamily: "Courier", fontSize: "1.1rem", fontWeight: "bold" }}>{demoCode}</span>. Redirecting...
+              If that email is registered, a verification code is on its way. Redirecting…
             </div>
           )}
 
           <form onSubmit={handleSendCode}>
             {/* Work Email input */}
             <div style={{ marginBottom: "1.25rem" }}>
-              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", textTransform: "uppercase", color: "#64748B", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>
+              <label style={{ display: "block", fontSize: "0.75rem", fontWeight: "600", textTransform: "uppercase", color: "rgb(var(--color-text-muted))", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>
                 Work Email
               </label>
               <input 
@@ -181,59 +181,39 @@ export default function ForgotPasswordPage() {
                 style={{ 
                   width: "100%", 
                   padding: "0.75rem 1rem", 
-                  background: "#FFFFFF", 
-                  border: "1px solid #D1D5DB", 
+                  background: "rgb(var(--color-surface))", 
+                  border: "1px solid rgba(var(--color-card-border), 0.6)", 
                   borderRadius: "8px", 
-                  color: "#1F2937", 
+                  color: "rgb(var(--color-text))", 
                   fontSize: "0.95rem",
                   outline: "none"
                 }} 
               />
             </div>
 
-            {/* Remember Me */}
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "2.25rem" }}>
-              <input 
-                type="checkbox" 
-                id="rememberDevice"
-                checked={rememberDevice}
-                onChange={(e) => setRememberDevice(e.target.checked)}
-                style={{ 
-                  width: "16px", 
-                  height: "16px", 
-                  borderRadius: "4px", 
-                  border: "1px solid #D1D5DB",
-                  cursor: "pointer"
-                }} 
-              />
-              <label htmlFor="rememberDevice" style={{ fontSize: "0.85rem", color: "#475569", cursor: "pointer" }}>
-                Remember this device — trusted for 7 days
-              </label>
-            </div>
-
             {/* Submit Button */}
             <button 
               type="submit" 
-              disabled={loading || !!demoCode}
+              disabled={loading || sent}
               style={{ 
                 width: "100%", 
-                background: "#0A52D6", 
+                background: "rgb(var(--color-primary))", 
                 color: "#FFFFFF", 
                 border: "none", 
                 borderRadius: "8px", 
                 padding: "0.875rem", 
                 fontWeight: "600", 
                 fontSize: "1rem",
-                cursor: (loading || !!demoCode) ? "not-allowed" : "pointer",
+                cursor: (loading || sent) ? "not-allowed" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: "0.5rem",
-                opacity: (loading || !!demoCode) ? 0.7 : 1,
+                opacity: (loading || sent) ? 0.7 : 1,
                 transition: "background-color 0.2s"
               }}
-              onMouseOver={(e) => !(loading || !!demoCode) && (e.currentTarget.style.backgroundColor = "#0848BE")}
-              onMouseOut={(e) => !(loading || !!demoCode) && (e.currentTarget.style.backgroundColor = "#0A52D6")}
+              onMouseOver={(e) => !(loading || sent) && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary-hover))")}
+              onMouseOut={(e) => !(loading || sent) && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary))")}
             >
               {loading ? "Sending..." : (
                 <>
@@ -251,7 +231,7 @@ export default function ForgotPasswordPage() {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "0.35rem",
-                color: "#0A52D6", 
+                color: "#2563EB", 
                 fontSize: "0.85rem", 
                 fontWeight: "600", 
                 textDecoration: "none",

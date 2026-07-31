@@ -93,6 +93,21 @@ export interface ExpenseRequestDto {
   updatedAt: string;
 }
 
+/**
+ * A request as `GET /api/expenses` actually returns it: department and
+ * initiator are populated, so screens can read `.name` off them directly
+ * instead of widening the row to `any`.
+ */
+export type PopulatedExpenseDto = Omit<ExpenseRequestDto, "departmentId" | "initiatorId"> & {
+  departmentId?: PopulatedRef | null;
+  initiatorId?: (PopulatedRef & { employeeId?: string }) | null;
+  /** Set once a Finance Head grants a one-time expansion. */
+  exceptionalBudgetAmount?: number;
+  exceptionalApprovedAt?: string;
+  /** Inferred on release when the reference does not encode it. */
+  paymentMethod?: string;
+};
+
 /** The authenticated user as returned by `/api/auth/me`. */
 export interface SessionUserDto {
   id: string;

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { AuthService } from "../domains/auth/auth.service";
+import { clientIpFrom } from "../domains/logs/logger.service";
 import { PermissionService } from "../domains/permissions/permission.service";
 import { SystemRole } from "../enums/roles";
 import { PermissionAction, PermissionResource } from "../enums/permissions";
@@ -12,6 +13,8 @@ export interface AuthenticatedRequestState {
   name: string;
   role: SystemRole;
   departmentId: string | null;
+  /** Client address, carried onto audit rows. Undefined behind no proxy. */
+  ipAddress?: string;
 }
 
 /**
@@ -63,6 +66,7 @@ export async function authenticate(
     name: decoded.name,
     role: decoded.role as SystemRole,
     departmentId: decoded.departmentId,
+    ipAddress: clientIpFrom(req),
   };
 }
 

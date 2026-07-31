@@ -5,6 +5,8 @@ import * as Icons from "lucide-react";
 import { WorkflowActionType } from "../../enums/workflowActions";
 import { AttachmentTarget } from "./AttachmentViewModal";
 import { AttachmentList } from "../ui/AttachmentList";
+import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
+import { formatNaira } from "../ui/format";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
@@ -16,6 +18,9 @@ interface ExpenseDetailModalProps {
   setAdjustedAmount: (amount: number) => void;
   paymentRef: string;
   setPaymentRef: (ref: string) => void;
+  /** Identity re-confirmation; the server rejects a decision without it. */
+  decisionSignature: string;
+  setDecisionSignature: (signature: string) => void;
   handleCancelRequest: (id: string) => Promise<void>;
   handleExceptionalBudgetAction: (id: string, action: WorkflowActionType) => Promise<void>;
   handleWorkflowAction: (id: string, action: WorkflowActionType) => Promise<void>;
@@ -38,6 +43,8 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   setAdjustedAmount,
   paymentRef,
   setPaymentRef,
+  decisionSignature,
+  setDecisionSignature,
   handleCancelRequest,
   handleExceptionalBudgetAction,
   handleWorkflowAction,
@@ -54,6 +61,10 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   // to edit; the server enforces the same rule.
   const canEditDocuments =
     currentUser?.role === "INITIATOR" && ["DRAFT", "RETURNED"].includes(selectedExpense.status);
+
+  // Every decision button in this modal commits a financial transition, so all
+  // of them are gated on the signature the server will verify.
+  const signed = decisionSignature.trim().length > 0;
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
@@ -234,7 +245,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   <label className="form-label">Adjust Approved Amount (Optional)</label>
                   <input
                     type="number"
-                    placeholder={`Original amount: $${selectedExpense.amount}`}
+                    placeholder={`Original amount: ${formatNaira(selectedExpense.amount)}`}
                     value={adjustedAmount || ""}
                     onChange={(e) => setAdjustedAmount(Number(e.target.value))}
                     className="form-input"
@@ -250,14 +261,23 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                     className="form-textarea"
                   />
                 </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                  <ElectronicSignatureField
+                    value={decisionSignature}
+                    onChange={setDecisionSignature}
+                    description="Confirm your identity with your account password to authorise this budget expansion."
+                  />
+                </div>
+
                 <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.RETURN)} className="btn btn-secondary">
+                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.RETURN)} className="btn btn-secondary" disabled={!signed}>
                     Return to Initiator
                   </button>
-                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger">
+                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger" disabled={!signed}>
                     Reject Request
                   </button>
-                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.APPROVE)} className="btn btn-primary" style={{ background: "rgb(var(--color-secondary))" }}>
+                  <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.APPROVE)} className="btn btn-primary" style={{ background: "rgb(var(--color-secondary))" }} disabled={!signed}>
                     Authorize Budget Expansion
                   </button>
                 </div>
@@ -277,14 +297,23 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                     className="form-textarea"
                   />
                 </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                  <ElectronicSignatureField
+                    value={decisionSignature}
+                    onChange={setDecisionSignature}
+                    description="Confirm your identity with your account password to record this decision."
+                  />
+                </div>
+
                 <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
-                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.RETURN)} className="btn btn-secondary">
+                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.RETURN)} className="btn btn-secondary" disabled={!signed}>
                     Return to Initiator
                   </button>
-                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger">
+                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger" disabled={!signed}>
                     Reject
                   </button>
-                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.APPROVE)} className="btn btn-primary">
+                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.APPROVE)} className="btn btn-primary" disabled={!signed}>
                     Approve Step
                   </button>
                 </div>
@@ -319,8 +348,16 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                     className="form-input"
                   />
                 </div>
+
+                <div style={{ marginBottom: "1rem" }}>
+                  <ElectronicSignatureField
+                    value={decisionSignature}
+                    onChange={setDecisionSignature}
+                  />
+                </div>
+
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button onClick={() => handlePaymentRelease(selectedExpense._id)} className="btn btn-primary" style={{ background: "rgb(var(--color-secondary))" }}>
+                  <button onClick={() => handlePaymentRelease(selectedExpense._id)} className="btn btn-primary" style={{ background: "rgb(var(--color-secondary))" }} disabled={!signed}>
                     Release Cash Payment
                   </button>
                 </div>

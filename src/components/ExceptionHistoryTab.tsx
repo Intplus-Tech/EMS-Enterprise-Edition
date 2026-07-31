@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { RequestJustificationModal } from "./RequestJustificationModal";
+import { formatNaira } from "./ui/format";
+import { datedFilename, downloadCsv } from "./ui/exportCsv";
 
 interface ExceptionHistoryTabProps {
   currentUser?: any;
@@ -13,38 +15,60 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
   expenses = [],
   setSelectedExpense
 }) => {
-  const [periodFilter, setPeriodFilter] = useState("FY 2026");
+  // Defaults to "All Periods" — the previous default was a literal "FY 2026"
+  // which showed nothing at all in any other fiscal year.
+  const [periodFilter, setPeriodFilter] = useState("All Periods");
   const [deptFilter, setDeptFilter] = useState("All Departments");
   const [statusFilter, setStatusFilter] = useState("Approved");
   const [searchQuery, setSearchQuery] = useState("");
   const [showJustificationModal, setShowJustificationModal] = useState(false);
   const [justificationTarget, setJustificationTarget] = useState<any>(null);
 
-  // Include dynamic exceptional budget expenses from database
-  const dbExceptions = expenses
-    .filter(e => e.exceptionalBudgetApproved || e.status === "PENDING_EXCEPTIONAL" || (e.history && e.history.some((h: any) => h.action?.includes("EXCEPTIONAL") || h.action?.includes("EXPANSION"))))
-    .map(e => ({
-      id: e._id,
-      date: new Date(e.createdAt || Date.now()).toISOString().split("T")[0],
-      reqId: `#${e.requestNumber?.replace(/^REQ-/, '') || e.requestNumber}`,
-      dept: e.departmentId?.name || "IT",
-      requestTitle: e.description || e.category,
-      expansionAmt: e.amount || 0,
-      financeHead: e.exceptionalApprovedBy?.name || currentUser?.name || "Finance Head",
-      totalExpansionsDept: e.amount || 0,
-      period: "FY 2026",
-      status: e.status === "PENDING_EXCEPTIONAL" ? "Pending" : "Approved",
-      rawExpense: e
-    }));
+  /**
+   * One row per request that went down the exception path.
+   *
+   * Three things here were wrong and are fixed:
+   *  - `expansionAmt` was the whole request amount. The granted expansion is the
+   *    shortfall the Finance Head covered, which the workflow records on the
+   *    approving history entry.
+   *  - `financeHead` fell back to the *current* user, so the reader was named as
+   *    the approver of a decision someone else made.
+   *  - `period` was the literal "FY 2026" on every row, which made the Period
+   *    filter above it inert.
+   */
+  const allRecords = expenses
+    .filter(e =>
+      e.exceptionalBudgetApproved ||
+      e.status === "PENDING_EXCEPTIONAL" ||
+      (e.history && e.history.some((h: any) => h.action?.includes("EXCEPTIONAL") || h.action?.includes("EXPANSION")))
+    )
+    .map(e => {
+      // The entry that granted (or is awaiting) the expansion.
+      const decision = [...(e.history ?? [])]
+        .reverse()
+        .find((h: any) => h.action?.includes("EXCEPTIONAL") || h.action?.includes("EXPANSION"));
+      const decidedAt = decision?.timestamp || e.updatedAt || e.createdAt;
+      const decidedOn = new Date(decidedAt);
 
-  const allRecords = dbExceptions;
+      return {
+        id: e._id,
+        date: decidedOn.toISOString().split("T")[0],
+        reqId: `#${e.requestNumber?.replace(/^REQ-/, "") || e.requestNumber}`,
+        dept: e.departmentId?.name || "Unassigned",
+        requestTitle: e.description || e.category,
+        // `exceptionalBudgetAmount` is the granted expansion when the workflow
+        // recorded one; otherwise the deficit is unknown rather than the amount.
+        expansionAmt: Number(e.exceptionalBudgetAmount ?? 0),
+        financeHead: e.exceptionalApprovedBy?.name || decision?.actorName || "—",
+        period: `FY ${decidedOn.getFullYear()}`,
+        status: e.status === "PENDING_EXCEPTIONAL" ? "Pending" : "Approved",
+        rawExpense: e
+      };
+    });
 
   // Filtering logic
   const filteredRecords = allRecords.filter(rec => {
-    if (periodFilter !== "All Periods" && rec.period !== periodFilter) {
-      // Allow FY 2026 matches
-      if (periodFilter === "FY 2026" && !rec.date.startsWith("2026")) return false;
-    }
+    if (periodFilter !== "All Periods" && rec.period !== periodFilter) return false;
     if (deptFilter !== "All Departments" && rec.dept !== deptFilter) {
       return false;
     }
@@ -62,6 +86,11 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
     return true;
   });
 
+  // Filter options come from the records themselves, so a new department or a
+  // new fiscal year appears without a code change.
+  const periodOptions = Array.from(new Set(allRecords.map(r => r.period))).sort().reverse();
+  const departmentOptions = Array.from(new Set(allRecords.map(r => r.dept))).sort();
+
   // Calculate departmental totals dynamically for filtered view
   const deptTotalsMap: Record<string, number> = {};
   filteredRecords.forEach(rec => {
@@ -72,27 +101,16 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
   const totalExpansionSum = filteredRecords.reduce((sum, r) => sum + r.expansionAmt, 0);
   const approvedCount = filteredRecords.filter(r => r.status === "Approved").length;
 
-  // Handle Export CSV
   const handleExportCSV = () => {
-    const headers = ["DATE", "REQ ID", "DEPT", "REQUEST TITLE", "EXPANSION AMT", "FINANCE HEAD", "TOTAL EXPANSIONS (DEPT)"];
-    const rows = filteredRecords.map(r => [
-      r.date,
-      r.reqId,
-      r.dept,
-      `"${r.requestTitle.replace(/"/g, '""')}"`,
-      r.expansionAmt,
-      `"${r.financeHead}"`,
-      deptTotalsMap[r.dept] || r.totalExpansionsDept
+    downloadCsv(datedFilename(`exception-history-${periodFilter.replace(/\s+/g, "-")}`), filteredRecords, [
+      { header: "Date", value: r => r.date },
+      { header: "Req ID", value: r => r.reqId },
+      { header: "Dept", value: r => r.dept },
+      { header: "Request Title", value: r => r.requestTitle },
+      { header: "Expansion Amount", value: r => r.expansionAmt },
+      { header: "Finance Head", value: r => r.financeHead },
+      { header: "Total Expansions (Dept)", value: r => deptTotalsMap[r.dept] ?? 0 },
     ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Exception_History_${periodFilter.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   return (
@@ -144,10 +162,10 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                 fontWeight: "500"
               }}
             >
-              <option value="FY 2026">FY 2026</option>
-              <option value="FY 2025">FY 2025</option>
-              <option value="FY 2024">FY 2024</option>
               <option value="All Periods">All Periods</option>
+              {periodOptions.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
             </select>
           </div>
 
@@ -171,13 +189,9 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
               }}
             >
               <option value="All Departments">All Departments</option>
-              <option value="IT">IT</option>
-              <option value="Ops">Ops</option>
-              <option value="HR">HR</option>
-              <option value="Engineering">Engineering</option>
-              <option value="Marketing">Marketing</option>
-              <option value="Technology">Technology</option>
-              <option value="Legal">Legal</option>
+              {departmentOptions.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
           </div>
 
@@ -307,7 +321,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
             <tbody>
               {filteredRecords.length > 0 ? (
                 filteredRecords.map((rec) => {
-                  const deptTotal = deptTotalsMap[rec.dept] || rec.totalExpansionsDept;
+                  const deptTotal = deptTotalsMap[rec.dept] ?? 0;
                   return (
                     <tr
                       key={rec.id}
@@ -359,13 +373,13 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                         {rec.requestTitle}
                       </td>
                       <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.875rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-                        ₦{rec.expansionAmt.toLocaleString()}
+                        {formatNaira(rec.expansionAmt)}
                       </td>
                       <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.875rem", color: "rgb(var(--color-text-muted))" }}>
                         {rec.financeHead}
                       </td>
                       <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.875rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-                        ₦{deptTotal.toLocaleString()}
+                        {formatNaira(deptTotal)}
                       </td>
                     </tr>
                   );
@@ -434,7 +448,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
             </span>
             <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem", flexWrap: "wrap" }}>
               <span style={{ fontSize: "2.35rem", fontWeight: "800", letterSpacing: "-0.03em", lineHeight: 1 }}>
-                ₦{totalExpansionSum.toLocaleString()}
+                {formatNaira(totalExpansionSum)}
               </span>
               <span style={{ fontSize: "0.875rem", color: "rgba(255, 255, 255, 0.85)", fontWeight: "500" }}>
                 ({approvedCount} approved request{approvedCount !== 1 ? "s" : ""})

@@ -4,6 +4,7 @@ import { ExpenseService } from "../../../../../domains/expense/expense.service";
 import { authenticate } from "../../../../../middlewares/auth";
 import { withErrorHandling } from "../../../../../middlewares/errors";
 import { ExceptionalBudgetSchema } from "../../../../../validators/validation";
+import { AuthService } from "../../../../../domains/auth/auth.service";
 import { SystemRole } from "../../../../../enums/roles";
 
 export const POST = withErrorHandling(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -13,6 +14,10 @@ export const POST = withErrorHandling(async (req: NextRequest, { params }: { par
 
   const body = await req.json();
   const validated = ExceptionalBudgetSchema.parse(body);
+
+  // A one-time budget expansion is the highest-value decision in the system;
+  // re-confirm the Finance Head's identity before granting it.
+  await AuthService.verifySignature(user.id, validated.signature);
 
   const request = await ExpenseService.processExceptionalBudget(
     id,

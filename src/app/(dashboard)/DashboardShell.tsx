@@ -12,7 +12,6 @@ import { InitiateExpenseRequestModal } from "../../components/modals/InitiateExp
 import { ExpenseDetailModal } from "../../components/modals/ExpenseDetailModal";
 import { ResubmitExpenseModal } from "../../components/modals/ResubmitExpenseModal";
 import { ViewReceiptModal } from "../../components/modals/ViewReceiptModal";
-import { PerDiemPolicyModal } from "../../components/modals/PerDiemPolicyModal";
 import { InviteUserModal } from "../../components/modals/InviteUserModal";
 import { InviteResultModal } from "../../components/modals/InviteResultModal";
 import { EditProfileModal } from "../../components/modals/EditProfileModal";
@@ -69,6 +68,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     actionComment, setActionComment,
     adjustedAmount, setAdjustedAmount,
     paymentRef, setPaymentRef,
+    decisionSignature, setDecisionSignature,
     handleCancelRequest,
     handleExceptionalBudgetAction,
     handleWorkflowAction,
@@ -83,7 +83,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     addAttachments, removeAttachment, attachmentsUploading,
     showReceiptModal, setShowReceiptModal,
     selectedReceiptData, setSelectedReceiptData,
-    showPolicyModal, setShowPolicyModal,
     showInviteModal, setShowInviteModal,
     inviteError,
     inviteForm, setInviteForm,
@@ -126,6 +125,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const navTo = (route: string) => router.push(route);
   const isActive = (route: string) => pathname === route;
 
+  // Only these roles may raise a request — `POST /api/expenses` accepts nobody
+  // else. The button used to render for every role and 403 on submit; the
+  // finance and admin designs show it greyed out for exactly this reason.
+  const canRaiseRequest = ["INITIATOR", "APPROVER", "ADMIN"].includes(currentUser?.role);
+
   // Notification actions resolve back to the live expense record they were derived from.
   const handleNotificationAction = (notification: any) => {
     const expense = expenses.find((e: any) => String(e._id) === String(notification.requestId));
@@ -136,11 +140,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       setSelectedResubmitExpense(expense);
       // Start with no new uploads; the request keeps its existing documents
       // unless the initiator attaches replacements.
-      setResubmitForm({
-        justification: "",
-        supportingDocuments: [],
-        notifyAuditor: true,
-      });
+      setResubmitForm({ justification: "", supportingDocuments: [] });
       setShowResubmitModal(true);
       return;
     }
@@ -288,17 +288,25 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 }}
               >
                 <Icons.AlertTriangle size={18} /> Pending Exceptions
-                <span style={{
-                  marginLeft: "auto",
-                  background: "#2563EB",
-                  color: "#FFFFFF",
-                  fontSize: "0.75rem",
-                  fontWeight: "bold",
-                  padding: "0.15rem 0.55rem",
-                  borderRadius: "999px"
-                }}>
-                  12
-                </span>
+                {/* Real queue depth; this badge was hardcoded to 12. */}
+                {(() => {
+                  const exceptionCount = expenses.filter((e: any) =>
+                    ["PENDING_EXCEPTIONAL", "INSUFFICIENT_BUDGET"].includes(e.status)
+                  ).length;
+                  return exceptionCount > 0 ? (
+                    <span style={{
+                      marginLeft: "auto",
+                      background: "#2563EB",
+                      color: "#FFFFFF",
+                      fontSize: "0.75rem",
+                      fontWeight: "bold",
+                      padding: "0.15rem 0.55rem",
+                      borderRadius: "999px"
+                    }}>
+                      {exceptionCount}
+                    </span>
+                  ) : null;
+                })()}
               </button>
 
               <button
@@ -673,6 +681,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
             <button
               onClick={() => setShowCreateModal(true)}
+              disabled={!canRaiseRequest}
+              title={canRaiseRequest ? undefined : "Your role does not raise expense requests"}
               className="btn btn-primary"
               style={{
                 background: "#2563EB",
@@ -683,7 +693,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 display: "flex",
                 alignItems: "center",
                 gap: "0.4rem",
-                boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)"
+                boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)",
+                opacity: canRaiseRequest ? 1 : 0.45,
+                cursor: canRaiseRequest ? "pointer" : "not-allowed"
               }}
             >
               <Icons.Plus size={16} /> New Request
@@ -707,6 +719,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         formError={formError}
         newRequest={newRequest}
         setNewRequest={setNewRequest}
+        departmentName={currentUser?.departmentName}
         fileInputRef={fileInputRef}
         handleFileUpload={handleFileUpload}
         isUploadingDoc={isUploadingDoc}
@@ -718,13 +731,15 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <ExpenseDetailModal
         selectedExpense={selectedExpense}
         currentUser={currentUser}
-        onClose={() => { setSelectedExpense(null); setActionComment(""); }}
+        onClose={() => { setSelectedExpense(null); setActionComment(""); setDecisionSignature(""); }}
         actionComment={actionComment}
         setActionComment={setActionComment}
         adjustedAmount={adjustedAmount}
         setAdjustedAmount={setAdjustedAmount}
         paymentRef={paymentRef}
         setPaymentRef={setPaymentRef}
+        decisionSignature={decisionSignature}
+        setDecisionSignature={setDecisionSignature}
         handleCancelRequest={handleCancelRequest}
         handleExceptionalBudgetAction={handleExceptionalBudgetAction}
         handleWorkflowAction={handleWorkflowAction}
@@ -749,6 +764,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onViewAttachment={setViewedAttachment}
         isUploadingDoc={isUploadingDoc}
         handleResubmitRequest={handleResubmitRequest}
+        onWithdraw={(id: string) => { setShowResubmitModal(false); handleCancelRequest(id); }}
       />
 
       <AttachmentViewModal
@@ -763,10 +779,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         selectedReceiptData={selectedReceiptData}
       />
 
-      <PerDiemPolicyModal
-        isOpen={showPolicyModal}
-        onClose={() => setShowPolicyModal(false)}
-      />
 
       <InviteUserModal
         isOpen={showInviteModal}

@@ -8,7 +8,11 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   const body = await req.json();
   const credentials = LoginSchema.parse(body);
 
-  const { token, user } = await AuthService.login(credentials.email, credentials.password);
+  const { token, user, expiresInSeconds } = await AuthService.login(
+    credentials.email,
+    credentials.password,
+    credentials.rememberDevice
+  );
 
   const response = NextResponse.json({ success: true, user });
 
@@ -17,7 +21,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     httpOnly: true,
     secure: ENV.isProduction,
     sameSite: "strict",
-    maxAge: 60 * 60 * 8, // 8 hours
+    maxAge: expiresInSeconds,
     path: "/"
   });
 

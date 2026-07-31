@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { DepartmentSpendDto } from "../types/api";
 import { formatNaira } from "./ui/format";
+import { datedFilename, downloadCsv } from "./ui/exportCsv";
 
 // Row accent colours, cycled in the order the design shows them.
 const ROW_COLORS = ["#2563EB", "#475569", "#DC2626", "#0EA5E9", "#94A3B8"];
@@ -15,15 +16,17 @@ interface DepartmentalSpendTabProps {
   /** Server-computed departmental spend summaries. */
   budgets: DepartmentSpendDto[];
   setSelectedExpense?: (expense: any) => void;
+  /** Refetches the dashboard so "Reload Data" actually reloads. */
+  onReload?: () => void | Promise<void>;
 }
 
 export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
   currentUser,
   expenses = [],
   budgets,
-  setSelectedExpense
+  setSelectedExpense,
+  onReload
 }) => {
-  const [periodFilter, setPeriodFilter] = useState("FY 2026");
   const [deptFilter, setDeptFilter] = useState("All Departments");
   const [searchQuery, setSearchQuery] = useState("");
   const [isReloading, setIsReloading] = useState(false);
@@ -66,32 +69,25 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
   });
 
   const handleExportCSV = () => {
-    const headers = ["DEPT", "TOTAL BUDGET", "UTILIZED", "REMAINING", "% USED", "TOP REQUESTER", "OVER-BUDGET COUNT"];
-    const rows = filteredDeptSpend.map(r => [
-      r.dept,
-      r.totalBudget,
-      r.utilized,
-      r.remaining,
-      `${r.percentUsed}%`,
-      `"${r.topRequester}"`,
-      r.overBudgetCount
+    downloadCsv(datedFilename("departmental-spend"), filteredDeptSpend, [
+      { header: "Dept", value: r => r.dept },
+      { header: "Total Budget", value: r => (r.hasBudget ? r.totalBudget : "Not set") },
+      { header: "Utilized", value: r => r.utilized },
+      { header: "Remaining", value: r => (r.hasBudget ? r.remaining : "") },
+      { header: "% Used", value: r => r.percentUsed },
+      { header: "Top Requester", value: r => r.topRequester },
+      { header: "Over-budget Count", value: r => r.overBudgetCount },
     ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Departmental_Spend_${periodFilter.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
-  const handleReloadData = () => {
+  /** Refetches the dashboard. This used to spin for 600ms and load nothing. */
+  const handleReloadData = async () => {
     setIsReloading(true);
-    setTimeout(() => {
+    try {
+      await onReload?.();
+    } finally {
       setIsReloading(false);
-    }, 600);
+    }
   };
 
   // Dynamic Monthly Trend Chart calculated from DB expenses
@@ -267,29 +263,14 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "1.25rem", flexWrap: "wrap", flexGrow: 1 }}>
-          {/* Period Filter */}
+          {/* The figures come from whichever budget period currently covers
+              each department; the endpoint takes no period argument, so this is
+              stated rather than offered as a select that filtered nothing. */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
             <label style={{ fontSize: "0.75rem", fontWeight: "600", color: "rgb(var(--color-text-muted))" }}>
               Period
             </label>
-            <select
-              value={periodFilter}
-              onChange={(e) => setPeriodFilter(e.target.value)}
-              className="form-select"
-              style={{
-                width: "130px",
-                padding: "0.55rem 0.85rem",
-                fontSize: "0.85rem",
-                borderRadius: "8px",
-                background: "rgba(var(--color-surface-secondary), 0.5)",
-                border: "1px solid rgba(var(--color-card-border), 0.6)",
-                fontWeight: "500"
-              }}
-            >
-              <option value="FY 2026">FY 2026</option>
-              <option value="FY 2025">FY 2025</option>
-              <option value="FY 2024">FY 2024</option>
-            </select>
+            <span style={{ fontSize: "0.85rem", fontWeight: 600, padding: "0.55rem 0" }}>Current budget period</span>
           </div>
 
           {/* Department Filter */}

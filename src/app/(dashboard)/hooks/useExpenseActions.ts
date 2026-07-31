@@ -51,34 +51,38 @@ export function useExpenseActions({ currentUser, reload, onSuccess, onError }: E
     [submitting, reload, onSuccess, onError]
   );
 
-  /** Records an approver decision against whichever route the role owns. */
+  /**
+   * Records an approver decision against whichever route the role owns.
+   * `signature` is the identity re-confirmation collected by the dialog; the
+   * server rejects the transition if it does not match the caller's password.
+   */
   const decide = useCallback(
-    (id: string, action: WorkflowActionType, comment: string, successMessage: string) =>
+    (id: string, action: WorkflowActionType, comment: string, signature: string, successMessage: string) =>
       perform(
         () =>
           isFinanceHead
-            ? ExpenseClient.exceptionalAction(id, action, comment)
-            : ExpenseClient.workflowAction(id, action, comment),
+            ? ExpenseClient.exceptionalAction(id, action, comment, signature)
+            : ExpenseClient.workflowAction(id, action, comment, signature),
         successMessage
       ),
     [perform, isFinanceHead]
   );
 
   const approve = useCallback(
-    (id: string, comment = "Approved.") =>
-      decide(id, WorkflowActionType.APPROVE, comment, "Request approved and forwarded to the next stage."),
+    (id: string, comment: string, signature: string) =>
+      decide(id, WorkflowActionType.APPROVE, comment, signature, "Request approved and forwarded to the next stage."),
     [decide]
   );
 
   const reject = useCallback(
-    (id: string, comment: string) =>
-      decide(id, WorkflowActionType.REJECT, comment, "Request rejected."),
+    (id: string, comment: string, signature: string) =>
+      decide(id, WorkflowActionType.REJECT, comment, signature, "Request rejected."),
     [decide]
   );
 
   const returnForClarification = useCallback(
-    (id: string, comment: string) =>
-      decide(id, WorkflowActionType.RETURN, comment, "Clarification request sent to the requester."),
+    (id: string, comment: string, signature: string) =>
+      decide(id, WorkflowActionType.RETURN, comment, signature, "Clarification request sent to the requester."),
     [decide]
   );
 
@@ -94,9 +98,9 @@ export function useExpenseActions({ currentUser, reload, onSuccess, onError }: E
 
   /** Finance Manager: release the payment and close the request. */
   const releasePayment = useCallback(
-    (id: string, reference: string, receipt?: string) =>
+    (id: string, reference: string, signature: string, receipt?: string) =>
       perform(
-        () => ExpenseClient.releasePayment(id, reference, receipt),
+        () => ExpenseClient.releasePayment(id, reference, signature, receipt),
         `Payment released. Reference: ${reference}`
       ),
     [perform]
@@ -104,28 +108,34 @@ export function useExpenseActions({ currentUser, reload, onSuccess, onError }: E
 
   /** Finance Head: approve a one-time budget expansion, optionally adjusted. */
   const approveExpansion = useCallback(
-    (id: string, comment: string, adjustedAmount?: number) =>
+    (id: string, comment: string, signature: string, adjustedAmount?: number) =>
       perform(
         () =>
-          ExpenseClient.exceptionalAction(id, WorkflowActionType.APPROVE, comment, adjustedAmount),
+          ExpenseClient.exceptionalAction(
+            id,
+            WorkflowActionType.APPROVE,
+            comment,
+            signature,
+            adjustedAmount
+          ),
         "Exceptional budget expansion approved."
       ),
     [perform]
   );
 
   const rejectExpansion = useCallback(
-    (id: string, comment: string) =>
+    (id: string, comment: string, signature: string) =>
       perform(
-        () => ExpenseClient.exceptionalAction(id, WorkflowActionType.REJECT, comment),
+        () => ExpenseClient.exceptionalAction(id, WorkflowActionType.REJECT, comment, signature),
         "Budget expansion request rejected."
       ),
     [perform]
   );
 
   const returnExpansion = useCallback(
-    (id: string, comment: string) =>
+    (id: string, comment: string, signature: string) =>
       perform(
-        () => ExpenseClient.exceptionalAction(id, WorkflowActionType.RETURN, comment),
+        () => ExpenseClient.exceptionalAction(id, WorkflowActionType.RETURN, comment, signature),
         "Request returned to the initiator."
       ),
     [perform]

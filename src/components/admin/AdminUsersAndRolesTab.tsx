@@ -6,7 +6,9 @@ import { datedFilename, downloadCsv } from "../ui/exportCsv";
 import { RolePermissionsMatrix } from "./RolePermissionsMatrix";
 import { SystemRole } from "../../enums/roles";
 import { PermissionAction, PermissionResource } from "../../enums/permissions";
-import { AdminUserDto, DepartmentDto, RolePermissionDto } from "../../types/api";
+import { EmptyState } from "../ui/EmptyState";
+import { formatNaira, humanizeStatus } from "../ui/format";
+import { AdminUserDto, DepartmentDto, DepartmentSpendDto, RolePermissionDto } from "../../types/api";
 
 // Matches the row density shown in designs/system-admin/Admin_ User & Role.png
 const ROWS_PER_PAGE = 7;
@@ -25,6 +27,10 @@ interface AdminUsersAndRolesTabProps {
     grants: Record<PermissionResource, PermissionAction[]>;
     description?: string;
   }) => Promise<boolean> | void;
+  /** Persists an inline role change made from the directory table. */
+  onChangeUserRole: (user: AdminUserDto, role: SystemRole) => Promise<boolean> | void;
+  /** Per-department budget allocations, for the access overview. */
+  budgets: DepartmentSpendDto[];
   /** True while an admin mutation is in flight. */
   busy?: boolean;
 }
@@ -39,6 +45,8 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
   onOpenSuspendUser,
   onOpenDeleteUser,
   onSaveRolePermissions,
+  onChangeUserRole,
+  budgets,
   busy = false
 }) => {
   const [viewMode, setViewMode] = useState<"users" | "matrix">("users");
@@ -61,6 +69,27 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
 
   // Reads the department name from either shape the row can arrive in.
   const deptNameOf = (u: AdminUserDto) => u.departmentName || u.department?.name || "";
+
+  /**
+   * Allocation and headcount per department, sorted so the widest bar is the
+   * largest allocation. Bars are relative to the biggest budget, so a directory
+   * with no budgets set renders flat instead of dividing by zero.
+   */
+  const departmentAccess = (() => {
+    const spendById = new Map(budgets.map((b) => [b.id, b]));
+    const rows = departments.map((dept) => ({
+      id: dept.id,
+      name: dept.name,
+      totalBudget: spendById.get(dept.id)?.totalBudget ?? 0,
+      userCount: systemUsers.filter((u) => deptNameOf(u) === dept.name).length,
+      sharePct: 0,
+    }));
+    const largest = Math.max(...rows.map((r) => r.totalBudget), 0);
+    rows.forEach((r) => {
+      r.sharePct = largest > 0 ? Math.round((r.totalBudget / largest) * 100) : 0;
+    });
+    return rows.sort((a, b) => b.totalBudget - a.totalBudget);
+  })();
 
   // Filter users
   const filteredUsers = systemUsers.filter(u => {
@@ -309,27 +338,22 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                       </span>
                     </td>
 
-                    {/* ASSIGNED ROLE Dropdown */}
+                    {/* ASSIGNED ROLE — persists. This used to `alert()` the new
+                        role and change nothing, so the directory disagreed with
+                        what the server enforced on the very next request.
+                        Options come from the SystemRole enum (rule 2). */}
                     <td>
                       <select
                         value={u.role}
-                        onChange={(e) => alert(`Role for ${userName} changed to ${e.target.value}`)}
-                        style={{
-                          padding: "0.4rem 0.75rem",
-                          backgroundColor: "rgba(15, 23, 42, 0.6)",
-                          border: "1px solid rgba(255, 255, 255, 0.12)",
-                          borderRadius: "0.5rem",
-                          color: "rgb(var(--color-text))",
-                          fontSize: "0.82rem",
-                          outline: "none"
-                        }}
+                        disabled={busy}
+                        aria-label={`Role for ${userName}`}
+                        className="form-select"
+                        onChange={(e) => onChangeUserRole(u, e.target.value as SystemRole)}
+                        style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem", width: "auto", minWidth: "150px" }}
                       >
-                        <option value="FINANCE_MANAGER" style={{ background: "rgb(var(--color-card))" }}>Finance Manager</option>
-                        <option value="APPROVER" style={{ background: "rgb(var(--color-card))" }}>Approver</option>
-                        <option value="ADMIN" style={{ background: "rgb(var(--color-card))" }}>Admin</option>
-                        <option value="INITIATOR" style={{ background: "rgb(var(--color-card))" }}>Initiator</option>
-                        <option value="FINANCE_OFFICER" style={{ background: "rgb(var(--color-card))" }}>Finance Officer</option>
-                        <option value="FINANCE_HEAD" style={{ background: "rgb(var(--color-card))" }}>Finance Head</option>
+                        {Object.values(SystemRole).map((role) => (
+                          <option key={role} value={role}>{humanizeStatus(role)}</option>
+                        ))}
                       </select>
                     </td>
 
@@ -405,43 +429,40 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
         />
       </div>
 
-      {/* Departmental Access Overview Card at Bottom */}
+      {/* Departmental Access Overview — allocation and headcount per department,
+          joined from the budget summaries and the directory. These were three
+          fixed rows (Finance / IT Infrastructure / Marketing) with invented
+          figures and bar widths that never moved. */}
       <div className="glass-panel" style={{ padding: "1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem" }}>
         <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "1.25rem" }}>
           Departmental Access Overview
         </h3>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>Finance</span>
-              <span style={{ color: "rgb(var(--color-text-muted))" }}>₦ 45,200,000 Allocated • 42 Users</span>
-            </div>
-            <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px" }}>
-              <div style={{ width: "82%", height: "100%", backgroundColor: "#2563eb", borderRadius: "3px" }} />
-            </div>
+        {departmentAccess.length === 0 ? (
+          <EmptyState
+            icon={<Icons.Building2 size={20} />}
+            title="No departments configured"
+            description="Create a department to see its allocation and headcount here."
+          />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            {departmentAccess.map((dept) => (
+              <div key={dept.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginBottom: "0.35rem", gap: "1rem" }}>
+                  <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>{dept.name}</span>
+                  <span style={{ color: "rgb(var(--color-text-muted))" }}>
+                    {dept.totalBudget > 0 ? `${formatNaira(dept.totalBudget)} Allocated` : "No budget set"}
+                    {" \u2022 "}
+                    {dept.userCount} {dept.userCount === 1 ? "User" : "Users"}
+                  </span>
+                </div>
+                <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "3px" }}>
+                  <div style={{ width: `${dept.sharePct}%`, height: "100%", backgroundColor: "#2563EB", borderRadius: "3px" }} />
+                </div>
+              </div>
+            ))}
           </div>
-
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>IT Infrastructure</span>
-              <span style={{ color: "rgb(var(--color-text-muted))" }}>₦ 12,800,000 Allocated • 28 Users</span>
-            </div>
-            <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px" }}>
-              <div style={{ width: "55%", height: "100%", backgroundColor: "#10b981", borderRadius: "3px" }} />
-            </div>
-          </div>
-
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginBottom: "0.35rem" }}>
-              <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>Marketing</span>
-              <span style={{ color: "rgb(var(--color-text-muted))" }}>₦ 8,500,000 Allocated • 15 Users</span>
-            </div>
-            <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(255, 255, 255, 0.1)", borderRadius: "3px" }}>
-              <div style={{ width: "40%", height: "100%", backgroundColor: "#a78bfa", borderRadius: "3px" }} />
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

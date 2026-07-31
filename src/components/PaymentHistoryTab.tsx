@@ -23,12 +23,35 @@ const PERIOD_OPTIONS: { label: string; days: number }[] = [
 
 const METHOD_OPTIONS = ["All", "Transfer", "Cash", "Cheque"];
 
-interface PaymentHistoryTabProps {
-  expenses: any[];
+/** A released payment as the list endpoint returns it, department populated. */
+interface ExpenseRow {
+  _id: string;
+  requestNumber: string;
+  description: string;
+  amount: number;
+  status: string;
+  departmentId?: { name?: string } | null;
+  paymentMethod?: string;
+  paymentReference?: string;
+  paymentDate?: string;
+  updatedAt?: string;
+  createdAt: string;
 }
 
+interface PaymentHistoryTabProps {
+  expenses: ExpenseRow[];
+}
+
+/**
+ * `/api/expenses` populates the department, so the name lives on the populated
+ * document. Reading a flat `departmentName` — which no expense carries — made
+ * the DEPT. column render "—" for every row and the search never match a
+ * department.
+ */
+const deptNameOf = (expense: ExpenseRow): string => expense.departmentId?.name || "";
+
 /** Payment method is inferred from the reference prefix when not stored explicitly. */
-const resolveMethod = (expense: any): string => {
+const resolveMethod = (expense: ExpenseRow): string => {
   if (expense.paymentMethod) return expense.paymentMethod;
   const ref: string = expense.paymentReference || "";
   if (ref.startsWith("CASH")) return "Cash";
@@ -41,7 +64,7 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }
   const [period, setPeriod] = useState(PERIOD_OPTIONS[0].label);
   const [method, setMethod] = useState("All");
   const [page, setPage] = useState(1);
-  const [selectedRelease, setSelectedRelease] = useState<any | null>(null);
+  const [selectedRelease, setSelectedRelease] = useState<ExpenseRow | null>(null);
 
   const releases = useMemo(() => {
     const days = PERIOD_OPTIONS.find(p => p.label === period)?.days ?? 0;
@@ -58,7 +81,7 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }
         return (
           (e.requestNumber || "").toLowerCase().includes(term) ||
           (e.description || "").toLowerCase().includes(term) ||
-          (e.departmentName || "").toLowerCase().includes(term)
+          (deptNameOf(e) || "").toLowerCase().includes(term)
         );
       })
       .sort((a, b) =>
@@ -78,7 +101,7 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }
       e.requestNumber,
       e.description,
       e.amount,
-      e.departmentName || "",
+      deptNameOf(e),
       resolveMethod(e),
       e.paymentReference || "",
       formatDate(e.paymentDate || e.updatedAt || e.createdAt),
@@ -162,12 +185,12 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }
               </tr>
             </thead>
             <tbody>
-              {visibleRows.map((e: any) => (
+              {visibleRows.map((e) => (
                 <tr key={e._id}>
                   <td><strong>{e.requestNumber}</strong></td>
                   <td>{e.description}</td>
                   <td style={{ textAlign: "right", fontWeight: 700 }}>{formatNaira(e.amount)}</td>
-                  <td>{e.departmentName || "—"}</td>
+                  <td>{deptNameOf(e) || "—"}</td>
                   <td>{resolveMethod(e)}</td>
                   <td>{e.paymentReference || "—"}</td>
                   <td>{formatDate(e.paymentDate || e.updatedAt || e.createdAt)}</td>

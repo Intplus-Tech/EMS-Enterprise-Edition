@@ -8,6 +8,14 @@ import { EmailService } from "../email/email.service";
 
 const JWT_SECRET = ENV.JWT_SECRET;
 
+/** Session lifetimes. "Remembered" matches the sign-in form's 7-day promise. */
+const SESSION_TTL = {
+  default: "8h",
+  defaultSeconds: 60 * 60 * 8,
+  remembered: "7d",
+  rememberedSeconds: 60 * 60 * 24 * 7,
+} as const;
+
 export class AuthService {
   /**
    * Hashes a plain password using bcrypt
@@ -25,9 +33,12 @@ export class AuthService {
   }
 
   /**
-   * Log in user and return user details and token
+   * Log in user and return user details and token.
+   *
+   * `rememberDevice` backs the "trusted for 7 days" checkbox on the sign-in
+   * form. It used to be collected and discarded, so ticking it did nothing.
    */
-  public static async login(email: string, password: string) {
+  public static async login(email: string, password: string, rememberDevice = false) {
     await connectToDatabase();
 
     const user = await User.findOne({ email: email.toLowerCase() }).populate("departmentId");
@@ -47,6 +58,9 @@ export class AuthService {
       throw new Error("Invalid email or password");
     }
 
+    // The cookie and the token must expire together, so both take this value.
+    const expiresIn = rememberDevice ? SESSION_TTL.remembered : SESSION_TTL.default;
+
     // Sign the JSON Web Token
     const token = jwt.sign(
       {
@@ -57,7 +71,7 @@ export class AuthService {
         departmentId: user.departmentId?._id?.toString() || null,
       },
       JWT_SECRET,
-      { expiresIn: "8h" }
+      { expiresIn }
     );
 
     await LoggerService.logAudit(
@@ -69,6 +83,7 @@ export class AuthService {
 
     return {
       token,
+      expiresInSeconds: rememberDevice ? SESSION_TTL.rememberedSeconds : SESSION_TTL.defaultSeconds,
       user: {
         id: user._id.toString(),
         email: user.email,
@@ -78,6 +93,37 @@ export class AuthService {
         departmentId: user.departmentId?._id?.toString() || null,
       }
     };
+  }
+
+  /**
+   * Re-confirms the caller's identity for a financial decision.
+   *
+   * The approval dialogs collect an "Electronic Signature" before an approve /
+   * reject / release is committed. That field used to be discarded client-side,
+   * so any non-empty string authorised a disbursement. The secret is compared
+   * against the account's own password hash and is never stored or logged.
+   */
+  public static async verifySignature(userId: string, secret: string): Promise<void> {
+    if (!secret || !secret.trim()) {
+      throw new Error("An electronic signature is required to authorise this decision.");
+    }
+
+    await connectToDatabase();
+    const user = await User.findById(userId).select("passwordHash name role");
+    if (!user) {
+      throw new Error("Unauthorized: The account for this session no longer exists.");
+    }
+
+    const isMatch = await AuthService.comparePassword(secret, user.passwordHash);
+    if (!isMatch) {
+      // Logged without the attempted secret — a failed signature on a financial
+      // decision is exactly the kind of event an audit needs to see.
+      await LoggerService.logApp(
+        "SIGNATURE_REJECTED",
+        `Electronic signature rejected for ${user.name} (${user.role}).`
+      );
+      throw new Error("The electronic signature is incorrect. Please re-enter your account password.");
+    }
   }
 
   /**

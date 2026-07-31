@@ -1,16 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import * as Icons from "lucide-react";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
 import { ApproveRequestModal, ApproveRequestPayload } from "./modals/ApproveRequestModal";
 import { RejectOrClarifyModal, RejectOrClarifyPayload } from "./modals/RejectOrClarifyModal";
+import { CompletedReleaseModal } from "./modals/CompletedReleaseModal";
 import { Notice } from "./ui/NoticeBanner";
-import { AttachmentDto, BudgetContextDto, ThreadEntryDto } from "../types/api";
+import { AttachmentDto, AttachmentInput, BudgetContextDto, ThreadEntryDto } from "../types/api";
 import { AttachmentTarget } from "./modals/AttachmentViewModal";
 import { AttachmentList } from "./ui/AttachmentList";
+import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
+import { ModalShell } from "./ui/ModalShell";
+import { Pagination } from "./ui/Pagination";
+import { StatCard } from "./ui/StatCard";
+import { EmptyState } from "./ui/EmptyState";
 import { formatFileSize } from "../domains/attachments/attachment.rules";
-import { formatNaira, formatDate, formatDateTime, humanizeStatus } from "./ui/format";
+import { formatNaira, formatDate, formatDateTime, humanizeStatus, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
+import { ExpenseClient } from "../services/expense.client";
+import { toErrorMessage } from "../services/http";
 import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
 
 interface ApprovalsTabProps {
@@ -43,9 +51,20 @@ interface ApprovalsTabProps {
   onNotify?: (notice: Notice) => void;
 }
 
-/** Fallback bank reference when a release is confirmed without the modal. */
-function generateReleaseReference(): string {
-  return `TXN-${Math.floor(Math.random() * 90000000 + 10000000)}-RELEASE`;
+/** Rows shown per page in the pipeline tables. */
+const ROWS_PER_PAGE = 10;
+
+/**
+ * Payment method for a released request. Nothing on the model stores it yet, so
+ * it is inferred from the reference prefix — the same rule PaymentHistoryTab
+ * uses, kept identical so the two screens never disagree.
+ */
+function resolvePaymentMethod(expense: any): string {
+  if (expense.paymentMethod) return expense.paymentMethod;
+  const reference: string = expense.paymentReference || "";
+  if (reference.startsWith("CASH")) return "Cash";
+  if (reference.startsWith("CHQ")) return "Cheque";
+  return "Transfer";
 }
 
 export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
@@ -73,18 +92,25 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   // Bulk selection state
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [activeSubTab, setActiveSubTab] = useState<"new" | "processing" | "completed">("processing");
+  const [listPage, setListPage] = useState(1);
   const [showClarificationForm, setShowClarificationForm] = useState(false);
   const [clarificationQuestion, setClarificationQuestion] = useState("");
+  const [clarificationSignature, setClarificationSignature] = useState("");
   const [directedTo, setDirectedTo] = useState("Initiator");
   const [markAsUrgent, setMarkAsUrgent] = useState(false);
   const [timelineCollapsed, setTimelineCollapsed] = useState(false);
   const [newComment, setNewComment] = useState("");
   // Submission state now lives in useExpenseActions, alongside the I/O it guards.
 
+  // Bulk decision confirmation — one signature authorises the whole batch.
+  const [bulkDecision, setBulkDecision] = useState<"APPROVE" | "REJECT" | null>(null);
+  const [bulkSignature, setBulkSignature] = useState("");
+
   // Escalation Modal state
   const [showEscalateModal, setShowEscalateModal] = useState(false);
   const [escalateJustification, setEscalateJustification] = useState("");
   const [officerAcknowledged, setOfficerAcknowledged] = useState(false);
+  const [escalateSignature, setEscalateSignature] = useState("");
 
   // Finance Manager Role Modals state
   const [showAuthorizeReleaseModal, setShowAuthorizeReleaseModal] = useState(false);
@@ -100,8 +126,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [expansionModalTarget, setExpansionModalTarget] = useState<any>(null);
   const [activeReleaseItem, setActiveReleaseItem] = useState<any>(null);
   const [bankRefNumber, setBankRefNumber] = useState("");
-  const [receiptFileName, setReceiptFileName] = useState("");
+  // The uploaded transfer evidence — a real stored document, not a filename.
+  const [receipt, setReceipt] = useState<AttachmentInput | null>(null);
+  const [receiptUploading, setReceiptUploading] = useState(false);
   const [confirmDebited, setConfirmDebited] = useState(false);
+  const [releaseSignature, setReleaseSignature] = useState("");
+  const receiptInputRef = useRef<HTMLInputElement>(null);
   const [methodFilter, setMethodFilter] = useState("ALL");
   const [dateRangeFilter, setDateRangeFilter] = useState("30DAYS");
 
@@ -112,8 +142,13 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   // Handler for the primary decision buttons. All I/O and role→endpoint routing
   // is delegated to `actions` (useExpenseActions); this only decides which
   // action the button maps to and clears local dialog state on success.
+  //
+  // `signature` is the identity re-confirmation captured by whichever dialog
+  // raised the decision. The server verifies it against the caller's password,
+  // so no decision path may reach here without one.
   const handleWorkflowClick = async (
     actionType: "APPROVE" | "INSUFFICIENT" | "CLARIFY" | "ESCALATE",
+    signature: string,
     decisionComment?: string
   ) => {
     if (!selectedExpense || actions.submitting) return;
@@ -126,11 +161,18 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       if (currentUser?.role === "FINANCE_OFFICER") {
         ok = await actions.verifyAndUpload(id);
       } else if (currentUser?.role === "FINANCE_MANAGER") {
-        // A release from this screen has no captured reference, so the modal
-        // flow (handleReleasePayment) is preferred; this generates a fallback.
-        ok = await actions.releasePayment(id, generateReleaseReference());
+        // A release must carry a real bank reference, so this screen routes the
+        // manager to the release dialog rather than inventing one.
+        onNotify?.({
+          tone: "error",
+          message: "Open the release dialog to record the bank reference and transfer evidence.",
+        });
+        setActiveReleaseItem(selectedExpense);
+        setBankRefNumber(selectedExpense.paymentReference || "");
+        setShowAuthorizeReleaseModal(true);
+        return;
       } else {
-        ok = await actions.approve(id, decisionComment || "Approved.");
+        ok = await actions.approve(id, decisionComment || "Approved.", signature);
       }
       if (ok) setSelectedExpense(null);
       return;
@@ -139,7 +181,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     if (actionType === "INSUFFICIENT") {
       const ok = await actions.returnForClarification(
         id,
-        "Returned due to insufficient departmental budget."
+        "Returned due to insufficient departmental budget.",
+        signature
       );
       if (ok) setSelectedExpense(null);
       return;
@@ -151,21 +194,27 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         return;
       }
       const comment = `[Clarification Required - Directed to ${directedTo}${markAsUrgent ? " - URGENT" : ""}]: ${clarificationQuestion}`;
-      const ok = await actions.returnForClarification(id, comment);
+      const ok = await actions.returnForClarification(id, comment, signature);
       if (ok) {
         setShowClarificationForm(false);
         setClarificationQuestion("");
+        setClarificationSignature("");
         setSelectedExpense(null);
       }
       return;
     }
 
     // ESCALATE — approving at the officer step forwards to the Finance Head queue.
-    const ok = await actions.approve(id, `[Officer Escalation] Justification: ${escalateJustification}`);
+    const ok = await actions.approve(
+      id,
+      `[Officer Escalation] Justification: ${escalateJustification}`,
+      signature
+    );
     if (ok) {
       setShowEscalateModal(false);
       setEscalateJustification("");
       setOfficerAcknowledged(false);
+      setEscalateSignature("");
       setSelectedExpense(null);
     }
   };
@@ -175,7 +224,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const handleApproveConfirm = async (payload: ApproveRequestPayload) => {
     const budgetNote = payload.budgetItem ? ` [Budget item: ${payload.budgetItem}]` : "";
     setShowApproveRequestModal(false);
-    await handleWorkflowClick("APPROVE", `${payload.justification || "Approved."}${budgetNote}`);
+    await handleWorkflowClick(
+      "APPROVE",
+      payload.signature,
+      `${payload.justification || "Approved."}${budgetNote}`
+    );
   };
 
   // Confirms the "Reject or Request Clarification" dialog. REJECT closes the request
@@ -185,10 +238,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
     const isRejection = payload.decision === "REJECT";
     const ok = isRejection
-      ? await actions.reject(selectedExpense._id, payload.reason)
+      ? await actions.reject(selectedExpense._id, payload.reason, payload.signature)
       : await actions.returnForClarification(
           selectedExpense._id,
-          `[Clarification Required]: ${payload.reason}`
+          `[Clarification Required]: ${payload.reason}`,
+          payload.signature
         );
 
     if (ok) {
@@ -203,23 +257,23 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
    * Each request is decided individually and the outcome is tallied — the
    * previous version fired the calls and discarded every response, so a batch
    * where the server rejected half the items still reported a clean success.
+   * One signature covers the batch; it is verified per request server-side.
    */
-  const handleBulkDecision = async (decision: "APPROVE" | "REJECT") => {
-    const verb = decision === "APPROVE" ? "Approve" : "Reject";
-    if (!confirm(`${verb} the selected ${selectedIds.length} request(s)?`)) return;
-
+  const handleBulkDecision = async (decision: "APPROVE" | "REJECT", signature: string) => {
     const ids = [...selectedIds];
     let succeeded = 0;
 
     for (const id of ids) {
       const ok =
         decision === "APPROVE"
-          ? await actions.approve(id, "Bulk approval")
-          : await actions.reject(id, "Bulk rejection");
+          ? await actions.approve(id, "Bulk approval", signature)
+          : await actions.reject(id, "Bulk rejection", signature);
       if (ok) succeeded += 1;
     }
 
     setSelectedIds([]);
+    setBulkDecision(null);
+    setBulkSignature("");
 
     const failed = ids.length - succeeded;
     onNotify?.(
@@ -232,15 +286,40 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     );
   };
 
+  /**
+   * Uploads the transfer evidence to storage. The dropzone used to simply set a
+   * hardcoded filename, so the "receipt" recorded against a released payment
+   * pointed at nothing.
+   */
+  const handleReceiptUpload = async (files: FileList | File[] | null) => {
+    const file = files?.[0];
+    if (!file) return;
+
+    setReceiptUploading(true);
+    try {
+      setReceipt(await ExpenseClient.uploadDocument(file));
+    } catch (error) {
+      setReceipt(null);
+      onNotify?.({ tone: "error", message: toErrorMessage(error, "The receipt could not be uploaded.") });
+    } finally {
+      setReceiptUploading(false);
+    }
+  };
+
   // Finance Manager Payment Release Action
   const handleReleasePayment = async (expToRelease: any) => {
     if (!expToRelease || actions.submitting) return;
 
-    // Both guards are control requirements, not UI polish: a release without a
-    // bank reference cannot be reconciled, and the debit confirmation is the
-    // manager's attestation that funds actually left the corporate account.
+    // Each guard is a control requirement, not UI polish: a release without a
+    // bank reference cannot be reconciled, the receipt is the audit evidence the
+    // label promises, and the debit confirmation is the manager's attestation
+    // that funds actually left the corporate account.
     if (!bankRefNumber.trim()) {
       onNotify?.({ tone: "error", message: "Please enter a Bank Reference Number." });
+      return;
+    }
+    if (!receipt) {
+      onNotify?.({ tone: "error", message: "Attach the payment receipt or evidence of transfer." });
       return;
     }
     if (!confirmDebited) {
@@ -254,7 +333,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     const ok = await actions.releasePayment(
       expToRelease._id,
       bankRefNumber,
-      receiptFileName || undefined
+      releaseSignature,
+      receipt.url
     );
 
     if (ok) {
@@ -262,8 +342,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       setActiveReleaseItem(null);
       setSelectedExpense(null);
       setBankRefNumber("");
-      setReceiptFileName("");
+      setReceipt(null);
       setConfirmDebited(false);
+      setReleaseSignature("");
     }
   };
 
@@ -325,13 +406,30 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   if (activeSubTab === "new") currentList = newRequests;
   if (activeSubTab === "completed") currentList = completedRequests;
 
-  // Apply filters/search to the current sub-tab list
+  /**
+   * Applies every control in the bar to the current sub-tab list.
+   *
+   * The search box, period select and payment-method select each held state
+   * that nothing read, so the table always showed the unfiltered list.
+   */
   const filteredList = currentList.filter(exp => {
-    if (amountSearchQuery) {
-      const amtStr = exp.amount.toString();
-      if (!amtStr.includes(amountSearchQuery) && !exp.amount.toLocaleString().includes(amountSearchQuery)) {
-        return false;
-      }
+    // The box is labelled "Request ID, Title, or Dept", so it searches all three
+    // as well as the amount rather than the amount alone.
+    const term = amountSearchQuery.trim().toLowerCase();
+    if (term) {
+      const haystack = [
+        exp.requestNumber,
+        exp.description,
+        exp.category,
+        exp.departmentId?.name,
+        exp.initiatorId?.name,
+        String(exp.amount),
+        Number(exp.amount).toLocaleString(),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(term)) return false;
     }
 
     const expDate = new Date(exp.createdAt);
@@ -345,8 +443,28 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       if (expDate.toDateString() !== pickerDate.toDateString()) return false;
     }
 
+    if (dateRangeFilter === "TODAY") {
+      if (expDate.toDateString() !== new Date().toDateString()) return false;
+    } else if (dateRangeFilter === "30DAYS") {
+      if (expDate.getTime() < Date.now() - 30 * 24 * 60 * 60 * 1000) return false;
+    }
+
+    if (methodFilter !== "ALL" && resolvePaymentMethod(exp) !== methodFilter) return false;
+
     return true;
   });
+
+  // Reset to the first page whenever the visible set changes underneath us.
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / ROWS_PER_PAGE));
+  const safePage = Math.min(listPage, totalPages);
+  const visibleRows = filteredList.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
+
+  // Documents and approver justifications for the request open in the release
+  // dialog. Both used to read `selectedExpense`, which is null in the list view.
+  const releaseAttachments: AttachmentDto[] = activeReleaseItem?.attachments ?? [];
+  const releaseJustifications: any[] = (activeReleaseItem?.history ?? []).filter(
+    (h: any) => h.comment && h.actorRole && h.actorRole !== "INITIATOR"
+  );
 
   // Department spend calculation helper
   const deptExpenses = expenses.filter(e => {
@@ -354,12 +472,71 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     return e.departmentId?._id === dId || e.departmentId === dId;
   });
   
+  // A department with no committed spend is a real ₦0; the previous `|| 545000`
+  // fallback showed the design's sample figure whenever the total came to zero.
   const totalDeptSpend = deptExpenses
     .filter(e => ["PAID", "CLOSED", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK"].includes(e.status))
-    .reduce((sum, e) => sum + e.amount, 0) || 545000;
+    .reduce((sum, e) => sum + e.amount, 0);
 
   const isSelectedCompleted = selectedExpense ? ["PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(selectedExpense.status) : false;
-  const isSelectedOverBudget = selectedExpense ? (selectedExpense.amount > 30000 || selectedExpense.status === "INSUFFICIENT_BUDGET" || selectedExpense.status === "PENDING_EXCEPTIONAL") : false;
+
+  /**
+   * Whether the request exceeds its department's budget. This was `amount >
+   * 30000` — an invented threshold unrelated to any department's allocation.
+   * The server-computed context is authoritative; the status flags remain as a
+   * fallback for requests already routed down the exception path.
+   */
+  const isSelectedOverBudget = selectedExpense
+    ? (budgetContext?.hasBudget
+        ? selectedExpense.amount > (budgetContext.remaining ?? 0)
+        : false) ||
+      ["INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL"].includes(selectedExpense.status)
+    : false;
+
+  /**
+   * The approval stepper, built from the request's real history so each stage
+   * names the person who completed it and carries their timestamp.
+   */
+  const stageFor = (actions: string[]) =>
+    (selectedExpense?.history ?? []).find((h: any) => actions.includes(h.action));
+
+  const initiatedAt = selectedExpense?.createdAt;
+  const departmentStep = stageFor(["APPROVE", "APPROVED"]);
+  const financeStep = stageFor(["UPLOAD", "UPLOADED_TO_BANK", "VERIFY"]);
+  const disbursementStep = stageFor(["RELEASE", "PAID", "PAYMENT_RELEASED"]);
+
+  const workflowStages = selectedExpense
+    ? [
+        {
+          label: "Request Initiated",
+          desc: `by ${selectedExpense.initiatorId?.name || "—"}`,
+          date: formatDate(initiatedAt),
+          active: true,
+          current: false,
+        },
+        {
+          label: "Department Approval",
+          desc: departmentStep ? `by ${departmentStep.actorName}` : "Awaiting action…",
+          date: departmentStep ? formatDate(departmentStep.timestamp) : "",
+          active: Boolean(departmentStep),
+          current: selectedExpense.status === "PENDING_APPROVAL",
+        },
+        {
+          label: "Finance Verification",
+          desc: financeStep ? `by ${financeStep.actorName}` : "Awaiting action…",
+          date: financeStep ? formatDate(financeStep.timestamp) : "",
+          active: Boolean(financeStep),
+          current: selectedExpense.status === "SENT_TO_FINANCE",
+        },
+        {
+          label: "Final Disbursement",
+          desc: disbursementStep ? `by ${disbursementStep.actorName}` : "Pending approval…",
+          date: disbursementStep ? formatDate(disbursementStep.timestamp) : "",
+          active: Boolean(disbursementStep) || ["PAID", "CLOSED"].includes(selectedExpense.status),
+          current: selectedExpense.status === "UPLOADED_TO_BANK",
+        },
+      ]
+    : [];
 
   // RENDER DETAILED REQUEST PROFILE PAGE
   if (selectedExpense) {
@@ -442,9 +619,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 </>
               ) : (
                 <>
-                  <button 
-                    onClick={() => handleWorkflowClick("INSUFFICIENT")}
-                    className="btn" 
+                  {/* Routed through the signed dialog, pre-set to CLARIFY, so
+                      returning a request for budget reasons is recorded and
+                      signed like every other decision. */}
+                  <button
+                    onClick={() => setShowRejectClarifyModal(true)}
+                    className="btn"
                     style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent", borderWidth: "1.5px" }}
                     disabled={actions.submitting}
                   >
@@ -510,11 +690,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div>
                     <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Department</span>
-                    <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.departmentId?.name || selectedExpense.departmentName || "Technology"}</strong>
+                    <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.departmentId?.name || "—"}</strong>
                   </div>
                   <div>
                     <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Initiator</span>
-                    <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.initiatorId?.name || "James Okafor"}</strong>
+                    <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.initiatorId?.name || "—"}</strong>
                   </div>
                   <div>
                     <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Submission Date</span>
@@ -525,13 +705,14 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div>
                     <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Requested Amount</span>
-                    <strong style={{ fontSize: "1.1rem", color: "#2563EB" }}>₦{selectedExpense.amount.toLocaleString()}</strong>
+                    <strong style={{ fontSize: "1.1rem", color: "#2563EB" }}>{formatNaira(selectedExpense.amount)}</strong>
                   </div>
+                  {/* Nothing on the model records a priority, so the tile shows
+                      the required payment date instead of a badge that always
+                      read NORMAL regardless of the request. */}
                   <div>
-                    <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Priority</span>
-                    <span className="badge" style={{ background: "rgba(99, 102, 241, 0.15)", color: "rgb(var(--color-primary))", fontWeight: "700", padding: "0.25rem 0.6rem", borderRadius: "4px" }}>
-                      NORMAL
-                    </span>
+                    <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Required Payment Date</span>
+                    <strong style={{ fontSize: "0.95rem" }}>{formatDate(selectedExpense.requiredPaymentDate)}</strong>
                   </div>
                 </div>
               </div>
@@ -544,7 +725,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <h3 style={{ fontSize: "1.05rem", fontWeight: "700", margin: 0 }}>Detailed Justification</h3>
               </div>
               <p style={{ margin: 0, fontSize: "0.9rem", lineHeight: "1.6", color: "rgb(var(--color-text-muted))" }}>
-                {selectedExpense.description || "The server maintenance fee reflects emergency cooling upgrades inside core transaction platforms. Required to prevent service interrupts ahead of high capacity periods."}
+                {selectedExpense.description || "No justification was provided with this request."}
               </p>
             </div>
 
@@ -681,18 +862,27 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   <label htmlFor="urgent" style={{ fontSize: "0.8rem", cursor: "pointer" }}>Mark as Urgent (Notify immediately)</label>
                 </div>
 
+                <div style={{ marginBottom: "1.25rem" }}>
+                  <ElectronicSignatureField
+                    value={clarificationSignature}
+                    onChange={setClarificationSignature}
+                    description="Confirm your identity with your account password to return this request."
+                  />
+                </div>
+
                 <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
-                  <button 
-                    onClick={() => { setShowClarificationForm(false); setClarificationQuestion(""); }}
-                    className="btn btn-secondary" 
+                  <button
+                    onClick={() => { setShowClarificationForm(false); setClarificationQuestion(""); setClarificationSignature(""); }}
+                    className="btn btn-secondary"
                     style={{ padding: "0.45rem 1rem", fontSize: "0.8rem" }}
                   >
                     Cancel
                   </button>
-                  <button 
-                    onClick={() => handleWorkflowClick("CLARIFY")}
+                  <button
+                    onClick={() => handleWorkflowClick("CLARIFY", clarificationSignature)}
                     className="btn btn-primary"
                     style={{ padding: "0.45rem 1.2rem", fontSize: "0.8rem", background: "#2563EB", border: "none" }}
+                    disabled={!clarificationSignature.trim() || !clarificationQuestion.trim() || actions.submitting}
                   >
                     Submit
                   </button>
@@ -715,22 +905,22 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       fontWeight: "700",
                       color: "#3B82F6"
                     }}>
-                      {selectedExpense.initiatorId?.name?.charAt(0) || "J"}
+                      {selectedExpense.initiatorId?.name?.charAt(0) || "?"}
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: "700" }}>{selectedExpense.initiatorId?.name || "James Okafor"}</h4>
-                      <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>ID: {selectedExpense.initiatorId?.employeeId || "VND 2023 994"}</span>
+                      <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: "700" }}>{selectedExpense.initiatorId?.name || "—"}</h4>
+                      <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>ID: {selectedExpense.initiatorId?.employeeId || selectedExpense.initiatorId?.email || "—"}</span>
                     </div>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.8rem", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "0.75rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span style={{ color: "rgb(var(--color-text-muted))" }}>Account Number</span>
-                      <strong>{selectedExpense.vendorBankDetails?.accountNumber || "0019283746"}</strong>
+                      <strong>{selectedExpense.vendorBankDetails?.accountNumber || "—"}</strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span style={{ color: "rgb(var(--color-text-muted))" }}>Bank Name</span>
-                      <strong>{selectedExpense.vendorBankDetails?.bankName || "Access Bank PLC"}</strong>
+                      <strong>{selectedExpense.vendorBankDetails?.bankName || "—"}</strong>
                     </div>
                   </div>
                 </div>
@@ -782,24 +972,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             {/* Approval Workflow Checklist Stepper (Always visible below) */}
             <div className="glass-panel" style={{ padding: "1.25rem" }}>
               <h4 style={{ margin: "0 0 1rem 0", fontSize: "0.85rem", fontWeight: "700" }}>Approval Workflow</h4>
+              {/* Derived from the request's own history: each stage names the
+                  person who actually completed it. The four steps used to carry
+                  hardcoded names ("by Sarah Williams", "by Jerry Doe"), so the
+                  stepper credited a decision to someone who never made it. */}
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem", position: "relative" }}>
-                {[
-                  { label: "Request Initiated", desc: `by ${selectedExpense.initiatorId?.name || "John Doe"}`, date: new Date(selectedExpense.createdAt).toLocaleDateString(), active: true },
-                  { label: "Department Approval", desc: "by Sarah Williams", date: new Date(selectedExpense.createdAt).toLocaleDateString(), active: isSelectedCompleted || ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
-                  { 
-                    label: "Finance Verification", 
-                    desc: isSelectedCompleted ? `by ${currentUser.name || "Jane Doe"}` : (selectedExpense.status === "SENT_TO_FINANCE" ? "Awaiting action..." : "Completed"), 
-                    date: isSelectedCompleted ? new Date(selectedExpense.updatedAt).toLocaleDateString() : (["UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) ? new Date(selectedExpense.updatedAt).toLocaleDateString() : ""), 
-                    active: isSelectedCompleted || ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), 
-                    current: !isSelectedCompleted && selectedExpense.status === "SENT_TO_FINANCE" 
-                  },
-                  { 
-                    label: "Final Disbursement", 
-                    desc: isSelectedCompleted ? "by Jerry Doe" : (selectedExpense.status === "PAID" ? "Completed" : "Pending approval..."), 
-                    date: isSelectedCompleted ? new Date(selectedExpense.updatedAt).toLocaleDateString() : (selectedExpense.status === "PAID" ? new Date(selectedExpense.updatedAt).toLocaleDateString() : ""), 
-                    active: isSelectedCompleted || ["PAID", "CLOSED"].includes(selectedExpense.status) 
-                  }
-                ].map((step, idx) => (
+                {workflowStages.map((step, idx) => (
                   <div key={idx} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start", position: "relative" }}>
                     {/* Circle */}
                     <div style={{
@@ -912,22 +1090,30 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                   <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</span>
-                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.departmentId?.name || selectedExpense.departmentName || "Technology"}</strong>
+                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.departmentId?.name || "—"}</strong>
                   </div>
                   <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGET ITEM</span>
-                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.category || "Data Centre Operations"}</strong>
+                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.category || "—"}</strong>
                   </div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                   <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGETED</span>
-                    <strong style={{ fontSize: "0.9rem" }}>₦1,220,000</strong>
+                    {/* The department's real allocation and spend. These were
+                        fixed at ₦1,220,000 / ₦1,211,000 for every request, so
+                        the Finance Head was shown a variance that was not the
+                        one they were being asked to authorise. */}
+                    <strong style={{ fontSize: "0.9rem" }}>
+                      {budgetContext?.hasBudget ? formatNaira(budgetContext.totalBudget) : "Not set"}
+                    </strong>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
-                    <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>AMOUNT SPEND</span>
-                    <strong style={{ fontSize: "0.9rem" }}>₦1,211,000</strong>
+                  <div style={{ background: "rgba(var(--color-surface-secondary), 0.4)", border: "1px solid rgba(var(--color-card-border), 0.4)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                    <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>AMOUNT SPENT</span>
+                    <strong style={{ fontSize: "0.9rem" }}>
+                      {budgetContext?.hasBudget ? formatNaira(budgetContext.utilisedYTD) : "—"}
+                    </strong>
                   </div>
                 </div>
               </div>
@@ -942,8 +1128,14 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 justifyContent: "space-between",
                 alignItems: "center"
               }}>
+                {/* The design labels this the amount *over* the cap, so it now
+                    shows the shortfall rather than the full request amount. */}
                 <strong style={{ fontSize: "0.9rem", color: "#EF4444" }}>Request (Over Cap)</strong>
-                <strong style={{ fontSize: "1.1rem", color: "#EF4444" }}>₦{selectedExpense.amount.toLocaleString()}</strong>
+                <strong style={{ fontSize: "1.1rem", color: "#EF4444" }}>
+                  {budgetContext?.hasBudget
+                    ? formatNaira(Math.max(0, selectedExpense.amount - (budgetContext.remaining ?? 0)))
+                    : formatNaira(selectedExpense.amount)}
+                </strong>
               </div>
 
               {/* Justification Textarea */}
@@ -984,20 +1176,26 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 </label>
               </div>
 
+              <ElectronicSignatureField
+                value={escalateSignature}
+                onChange={setEscalateSignature}
+                description="Confirm your identity with your account password to escalate this request."
+              />
+
               {/* Footer */}
               <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", marginTop: "0.5rem" }}>
-                <button 
-                  onClick={() => { setShowEscalateModal(false); setEscalateJustification(""); setOfficerAcknowledged(false); }}
-                  className="btn btn-secondary" 
-                  style={{ padding: "0.55rem 1.25rem", fontSize: "0.85rem", background: "transparent", borderColor: "rgba(255,255,255,0.12)" }}
+                <button
+                  onClick={() => { setShowEscalateModal(false); setEscalateJustification(""); setOfficerAcknowledged(false); setEscalateSignature(""); }}
+                  className="btn btn-secondary"
+                  style={{ padding: "0.55rem 1.25rem", fontSize: "0.85rem" }}
                 >
                   Cancel
                 </button>
-                <button 
-                  onClick={() => handleWorkflowClick("ESCALATE")}
+                <button
+                  onClick={() => handleWorkflowClick("ESCALATE", escalateSignature)}
                   className="btn btn-primary"
                   style={{ padding: "0.55rem 1.5rem", fontSize: "0.85rem", background: "#2563EB", border: "none" }}
-                  disabled={escalateJustification.length < 50 || !officerAcknowledged || actions.submitting}
+                  disabled={escalateJustification.length < 50 || !officerAcknowledged || !escalateSignature.trim() || actions.submitting}
                 >
                   Forward to Finance Head
                 </button>
@@ -1011,10 +1209,26 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     );
   }
 
-  // Calculate total awaiting release for metric card
+  // Calculate total awaiting release for metric card. An empty pipeline is a
+  // real ₦0 — the previous `|| 4850200` fallback reported the design's mock
+  // figure whenever there was nothing to release.
   const pendingReleaseTotal = expenses
     .filter(e => e.status === "UPLOADED_TO_BANK" || e.status === "SENT_TO_FINANCE")
-    .reduce((sum, e) => sum + (e.amount || 0), 0) || 4850200;
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+
+  /**
+   * Mean days from submission to payment across released requests. This tile
+   * read a hardcoded "1.4 Days" regardless of the data.
+   */
+  const releasedRequests = expenses.filter(e => ["PAID", "CLOSED"].includes(e.status) && e.createdAt);
+  const avgReleaseDays = releasedRequests.length
+    ? releasedRequests.reduce((sum, e) => {
+        const released = new Date(e.paymentDate || e.updatedAt || e.createdAt).getTime();
+        return sum + Math.max(0, released - new Date(e.createdAt).getTime());
+      }, 0) /
+      releasedRequests.length /
+      86_400_000
+    : null;
 
   const isFinanceManager = currentUser?.role === "FINANCE_MANAGER";
 
@@ -1030,10 +1244,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           </p>
         </div>
 
-        {/* Action controls next to title */}
+        {/* Action controls next to title. The hand-rolled CSV builder that used
+            to sit here duplicated `handleExportPipeline`; both buttons now go
+            through the shared `downloadCsv` helper. */}
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <button 
-            onClick={() => setApprovalDateFilter(approvalDateFilter === "today" ? "all" : "today")}
+          <button
+            onClick={() => { setApprovalDateFilter(approvalDateFilter === "today" ? "all" : "today"); setListPage(1); }}
             className={`btn ${approvalDateFilter === "today" ? "btn-primary" : "btn-secondary"}`}
             style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}
           >
@@ -1041,20 +1257,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             {approvalDateFilter === "today" ? "Today Only" : "All Dates"}
           </button>
 
-          <button 
-            onClick={() => {
-              const csvContent = "data:text/csv;charset=utf-8," 
-                + ["Request Number,Initiator,Category,Amount,Date,Status"].join(",") + "\n"
-                + filteredList.map(e => `"${e.requestNumber}","${e.initiatorId?.name || "System"}","${e.category}",${e.amount},"${new Date(e.createdAt).toLocaleDateString()}","${e.status}"`).join("\n");
-              const encodedUri = encodeURI(csvContent);
-              const link = document.createElement("a");
-              link.setAttribute("href", encodedUri);
-              link.setAttribute("download", `pipeline_export_${new Date().toISOString().split('T')[0]}.csv`);
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-            }}
-            className="btn btn-secondary" 
+          <button
+            onClick={handleExportPipeline}
+            className="btn btn-secondary"
             style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.35rem" }}
           >
             <Icons.Download size={15} /> Export CSV
@@ -1064,82 +1269,60 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
       {/* Top Metric Cards for Finance Manager (Screenshot 5) */}
       {isFinanceManager && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1.5rem" }}>
-          <div className="glass-panel" style={{ padding: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "#2563EB", display: "block", marginBottom: "0.25rem" }}>
-                Total Value Awaiting Release
-              </span>
-              <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", display: "block", marginBottom: "0.75rem" }}>
-                this month
-              </span>
-              <strong style={{ fontSize: "1.85rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
-                ₦{pendingReleaseTotal.toLocaleString()}
-              </strong>
-            </div>
-            <div style={{ padding: "0.85rem", borderRadius: "12px", background: "rgba(37, 99, 235, 0.1)", color: "#2563EB" }}>
-              <Icons.Banknote size={32} />
-            </div>
-          </div>
-
-          <div className="glass-panel" style={{ padding: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <span style={{ fontSize: "0.85rem", fontWeight: "700", color: "#2563EB", display: "block", marginBottom: "0.25rem" }}>
-                Avg. Release Time
-              </span>
-              <span style={{ fontSize: "0.75rem", opacity: 0, display: "block", marginBottom: "0.75rem" }}>placeholder</span>
-              <strong style={{ fontSize: "1.85rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
-                1.4 Days
-              </strong>
-            </div>
-            <div style={{ padding: "0.85rem", borderRadius: "12px", background: "rgba(37, 99, 235, 0.1)", color: "#2563EB" }}>
-              <Icons.FileText size={32} />
-            </div>
-          </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>
+          <StatCard
+            label="Total Value Awaiting Release"
+            hint="uploaded to bank, not yet released"
+            value={formatNaira(pendingReleaseTotal)}
+            icon={<Icons.Banknote size={18} />}
+          />
+          {/* Measured from the released requests rather than the design's
+              placeholder "1.4 Days", which never changed. */}
+          <StatCard
+            label="Avg. Release Time"
+            hint="submission to payment"
+            value={avgReleaseDays === null ? "—" : `${avgReleaseDays.toFixed(1)} Days`}
+            icon={<Icons.FileText size={18} />}
+            tone="neutral"
+          />
         </div>
       )}
 
-      {/* Control Bar: Search, Date Filter, Method Filter, Filter & Export buttons (Screenshots 1 & 5) */}
+      {/* Control Bar: search, period and payment method. Every control here is
+          applied in `filteredList`; the decorative "Filter" button that opened
+          nothing has been removed. */}
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
-        
-        {/* Search input */}
+
         <div style={{ position: "relative", flexGrow: 1, minWidth: "260px" }}>
           <Icons.Search size={16} style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-muted))" }} />
           <input
             type="text"
             placeholder="Search Request ID, Title, or Dept..."
             value={amountSearchQuery}
-            onChange={(e) => setAmountSearchQuery(e.target.value)}
+            onChange={(e) => { setAmountSearchQuery(e.target.value); setListPage(1); }}
             className="form-input"
-            style={{ 
-              padding: "0.55rem 0.55rem 0.55rem 2.4rem", 
-              fontSize: "0.85rem", 
-              background: "rgba(255, 255, 255, 0.03)", 
-              borderRadius: "8px", 
-              height: "auto",
-              border: "1px solid rgba(255, 255, 255, 0.08)"
-            }}
+            style={{ padding: "0.55rem 0.55rem 0.55rem 2.4rem", fontSize: "0.85rem", borderRadius: "8px", height: "auto" }}
           />
         </div>
 
-        {/* Date Filter Dropdown */}
         <select
           value={dateRangeFilter}
-          onChange={(e) => setDateRangeFilter(e.target.value)}
-          className="form-input"
-          style={{ width: "160px", padding: "0.55rem 0.75rem", fontSize: "0.85rem", background: "rgba(255, 255, 255, 0.03)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.08)" }}
+          onChange={(e) => { setDateRangeFilter(e.target.value); setListPage(1); }}
+          className="form-select"
+          aria-label="Period"
+          style={{ width: "160px", padding: "0.55rem 0.75rem", fontSize: "0.85rem", borderRadius: "8px" }}
         >
           <option value="30DAYS">Last 30 Days</option>
           <option value="TODAY">Today</option>
           <option value="ALL">All Time</option>
         </select>
 
-        {/* Payment Method Dropdown */}
         <select
           value={methodFilter}
-          onChange={(e) => setMethodFilter(e.target.value)}
-          className="form-input"
-          style={{ width: "150px", padding: "0.55rem 0.75rem", fontSize: "0.85rem", background: "rgba(255, 255, 255, 0.03)", borderRadius: "8px", border: "1px solid rgba(255, 255, 255, 0.08)" }}
+          onChange={(e) => { setMethodFilter(e.target.value); setListPage(1); }}
+          className="form-select"
+          aria-label="Payment method"
+          style={{ width: "150px", padding: "0.55rem 0.75rem", fontSize: "0.85rem", borderRadius: "8px" }}
         >
           <option value="ALL">Method: All</option>
           <option value="Transfer">Transfer</option>
@@ -1147,80 +1330,58 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           <option value="Cheque">Cheque</option>
         </select>
 
-        {/* Filter Toggle button (Screenshot 5) */}
-        <button className="btn btn-secondary" style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-          <Icons.SlidersHorizontal size={15} /> Filter
-        </button>
-
-        {/* Export button */}
-        <button 
+        <button
           onClick={handleExportPipeline}
-          className="btn btn-secondary" 
+          className="btn btn-secondary"
           style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.35rem" }}
         >
           <Icons.Download size={15} /> Export
         </button>
       </div>
 
-      {/* Sub-tab Pill: New Request 12 (Screenshot 5) */}
-      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.08)", marginBottom: "1.25rem", gap: "1.5rem" }}>
-        <button
-          onClick={() => setActiveSubTab("processing")}
-          style={{
-            padding: "0.75rem 0.5rem",
-            background: "none",
-            border: "none",
-            borderBottom: activeSubTab !== "completed" ? "2px solid #2563EB" : "2px solid transparent",
-            color: activeSubTab !== "completed" ? "inherit" : "rgb(var(--color-text-muted))",
-            fontWeight: "700",
-            fontSize: "0.9rem",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem"
-          }}
-        >
-          {isFinanceManager ? "New Request" : "Processing Requests"}
-          <span style={{
-            fontSize: "0.75rem",
-            background: "#2563EB",
-            color: "#FFFFFF",
-            padding: "0.15rem 0.55rem",
-            borderRadius: "999px",
-            fontWeight: "bold"
-          }}>
-            {processingRequests.length || 12}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab("completed")}
-          style={{
-            padding: "0.75rem 0.5rem",
-            background: "none",
-            border: "none",
-            borderBottom: activeSubTab === "completed" ? "2px solid #10B981" : "2px solid transparent",
-            color: activeSubTab === "completed" ? "inherit" : "rgb(var(--color-text-muted))",
-            fontWeight: "700",
-            fontSize: "0.9rem",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem"
-          }}
-        >
-          Completed Releases
-          <span style={{
-            fontSize: "0.75rem",
-            background: "rgba(16, 185, 129, 0.15)",
-            color: "#10B981",
-            padding: "0.15rem 0.55rem",
-            borderRadius: "999px",
-            fontWeight: "bold"
-          }}>
-            {completedRequests.length}
-          </span>
-        </button>
+      {/* Sub-tabs. The designs call for three (New Requests / Processing /
+          Completed); only two were reachable, so `newRequests` — which is what
+          a Finance Officer actually picks work off — could never be opened.
+          Rendered from a list so the tabs and their counts cannot drift. */}
+      <div style={{ display: "flex", borderBottom: "1px solid rgb(var(--color-card-border))", marginBottom: "1.25rem", gap: "1.5rem" }}>
+        {([
+          { id: "new", label: isFinanceManager ? "New Request" : "New Requests", count: newRequests.length, accent: "#2563EB" },
+          { id: "processing", label: "Processing", count: processingRequests.length, accent: "#2563EB" },
+          { id: "completed", label: isFinanceManager ? "Completed Releases" : "Completed", count: completedRequests.length, accent: "#10B981" },
+        ] as const).map((tab) => {
+          const active = activeSubTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveSubTab(tab.id); setListPage(1); setSelectedIds([]); }}
+              style={{
+                padding: "0.75rem 0.5rem",
+                background: "none",
+                border: "none",
+                borderBottom: active ? `2px solid ${tab.accent}` : "2px solid transparent",
+                color: active ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))",
+                fontWeight: 700,
+                fontSize: "0.9rem",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+            >
+              {tab.label}
+              <span style={{
+                fontSize: "0.75rem",
+                background: active ? tab.accent : `${tab.accent}26`,
+                color: active ? "#FFFFFF" : tab.accent,
+                padding: "0.15rem 0.55rem",
+                borderRadius: "999px",
+                fontWeight: "bold",
+              }}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Data Table */}
@@ -1250,13 +1411,22 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredList.map((exp) => {
-                const initiatorName = exp.vendorName || exp.initiatorId?.name || "Olamide Adenuga";
-                const initials = initiatorName.split(" ").map((n: string) => n[0]).join("").toUpperCase() || "OA";
+              {/* Rows are the current page, not the whole list — the footer used
+                  to advertise pagination the table never applied. */}
+              {visibleRows.map((exp) => {
+                // The column is INITIATOR, so it shows the initiator. It used to
+                // fall back to the vendor name and then to an invented person.
+                const initiatorName = exp.initiatorId?.name || "Unassigned";
+                const initials = initiatorName
+                  .split(" ")
+                  .map((n: string) => n[0])
+                  .join("")
+                  .toUpperCase()
+                  .slice(0, 2);
                 return (
-                  <tr 
+                  <tr
                     key={exp._id}
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", transition: "all 0.15s ease" }}
+                    style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", transition: "all 0.15s ease" }}
                   >
                     <td style={{ padding: "1rem 0.5rem 1rem 1rem", width: "40px" }}>
                       <input
@@ -1274,30 +1444,30 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     </td>
 
                     <td style={{ padding: "1rem" }}>
-                      <strong style={{ fontSize: "0.9rem", display: "block", color: "rgb(var(--color-text))" }}>{exp.category}</strong>
+                      <strong style={{ fontSize: "0.9rem", display: "block", color: "rgb(var(--color-text))" }}>{exp.description}</strong>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                        Budget Item &bull; {exp.departmentId?.name || "IT Server Q3"}
+                        {[exp.departmentId?.name, exp.category].filter(Boolean).join(" • ") || "—"}
                       </span>
                     </td>
 
                     <td style={{ padding: "1rem" }}>
                       <strong style={{ fontSize: "1rem", color: "rgb(var(--color-text))" }}>
-                        ₦{exp.amount.toLocaleString()}
+                        {formatNaira(exp.amount)}
                       </strong>
                     </td>
 
                     <td style={{ padding: "1rem" }}>
                       <strong style={{ fontSize: "0.85rem", display: "block", color: "rgb(var(--color-text))" }}>
-                        {exp.vendorBankDetails?.bankName || "Access Bank"}
+                        {exp.vendorBankDetails?.bankName || "—"}
                       </strong>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                        {exp.vendorBankDetails?.accountNumber || "0019283746"}
+                        {exp.vendorBankDetails?.accountNumber || "—"}
                       </span>
                     </td>
 
                     <td style={{ padding: "1rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#DBEAFE", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: "bold" }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(37, 99, 235, 0.15)", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: "bold" }}>
                           {initials}
                         </div>
                         <span style={{ fontSize: "0.85rem", fontWeight: "600" }}>{initiatorName}</span>
@@ -1305,17 +1475,26 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     </td>
 
                     <td style={{ padding: "1rem", textAlign: "center" }}>
-                      <button 
-                        onClick={() => {
-                          setActiveReleaseItem(exp);
-                          setBankRefNumber(exp.paymentReference || "");
-                          setShowAuthorizeReleaseModal(true);
-                        }}
-                        className="btn btn-primary"
-                        style={{ padding: "0.45rem 1rem", fontSize: "0.8rem", fontWeight: "600", background: "#2563EB", border: "none" }}
-                      >
-                        View Request
-                      </button>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.4rem" }}>
+                        {/* The design shows the request's status alongside the
+                            action; the button alone used to replace it. */}
+                        <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
+                        <button
+                          onClick={() => {
+                            if (isFinanceManager && exp.status === "UPLOADED_TO_BANK") {
+                              setActiveReleaseItem(exp);
+                              setBankRefNumber(exp.paymentReference || "");
+                              setShowAuthorizeReleaseModal(true);
+                            } else {
+                              setSelectedExpense(exp);
+                            }
+                          }}
+                          className="btn btn-primary"
+                          style={{ padding: "0.4rem 0.9rem", fontSize: "0.78rem", fontWeight: "600", background: "#2563EB", border: "none" }}
+                        >
+                          View Request
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1323,9 +1502,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
               {filteredList.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: "3rem", textAlign: "center", color: "rgb(var(--color-text-muted))" }}>
-                    <Icons.CheckCircle size={44} style={{ color: "#10B981", marginBottom: "0.75rem" }} />
-                    <p style={{ fontSize: "0.95rem", fontWeight: "700", margin: 0 }}>No pending releases</p>
+                  <td colSpan={7} style={{ padding: 0 }}>
+                    <EmptyState
+                      icon={<Icons.CheckCircle size={20} />}
+                      title="Nothing in this queue"
+                      description="Requests appear here once they reach this stage of the pipeline."
+                    />
                   </td>
                 </tr>
               )}
@@ -1333,9 +1515,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           </table>
         ) : (
           /* Completed Release / History Table View (Screenshot 1) */
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
+          <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
             <thead>
-              <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+              <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.6)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "90px" }}>ID</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>REQUEST</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "120px" }}>AMOUNT</th>
@@ -1347,35 +1529,35 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredList.map((exp) => (
-                <tr key={exp._id} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+              {/* Every cell here is the request's own record. Method, reference
+                  and released date used to fall back to fixed sample values, so
+                  a request that was never paid still showed a bank reference. */}
+              {visibleRows.map((exp) => (
+                <tr key={exp._id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)" }}>
                   <td style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
                     {exp.requestNumber}
                   </td>
-                  <td style={{ padding: "1rem", fontWeight: "600" }}>
-                    {exp.category}
-                  </td>
-                  <td style={{ padding: "1rem", fontWeight: "700" }}>
-                    ₦{exp.amount.toLocaleString()}
+                  <td style={{ padding: "1rem", fontWeight: "600" }}>{exp.description}</td>
+                  <td style={{ padding: "1rem", fontWeight: "700" }}>{formatNaira(exp.amount)}</td>
+                  <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                    {exp.departmentId?.name || "—"}
                   </td>
                   <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    {exp.departmentId?.name || "Technology"}
+                    {exp.paymentReference ? resolvePaymentMethod(exp) : "—"}
                   </td>
                   <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    Transfer
+                    {exp.paymentReference || "—"}
                   </td>
                   <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    {exp.paymentReference || "TXN-2026-0789"}
-                  </td>
-                  <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    {exp.paymentDate ? new Date(exp.paymentDate).toLocaleDateString("en-GB") : "15-07-2026"}
+                    {exp.paymentDate ? formatDate(exp.paymentDate) : "—"}
                   </td>
                   <td style={{ padding: "1rem", textAlign: "center" }}>
-                    <button 
+                    <button
                       onClick={() => {
                         setActiveReleaseItem(exp);
                         setShowCompletedReleaseModal(true);
                       }}
+                      aria-label={`View release ${exp.requestNumber}`}
                       style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer", padding: "0.3rem" }}
                     >
                       <Icons.Eye size={18} />
@@ -1383,23 +1565,66 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   </td>
                 </tr>
               ))}
+
+              {filteredList.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ padding: 0 }}>
+                    <EmptyState
+                      icon={<Icons.Archive size={20} />}
+                      title="No completed releases"
+                      description="Released payments appear here once a bank reference has been recorded."
+                    />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* Pagination Footer */}
+      {/* Pagination footer — the shared primitive, so the summary line and the
+          rows actually shown can no longer disagree. */}
       {filteredList.length > 0 && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
-          <span>Showing 1 to {filteredList.length} of {currentList.length} pending releases</span>
-          <div style={{ display: "flex", gap: "0.35rem" }}>
-            <button className="btn btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }}>&lt;</button>
-            <button className="btn btn-primary" style={{ padding: "0.3rem 0.75rem", fontSize: "0.75rem", background: "#2563EB" }}>1</button>
-            <button className="btn btn-secondary" style={{ padding: "0.3rem 0.75rem", fontSize: "0.75rem" }}>2</button>
-            <button className="btn btn-secondary" style={{ padding: "0.3rem 0.6rem", fontSize: "0.75rem" }}>&gt;</button>
-          </div>
-        </div>
+        <Pagination
+          page={safePage}
+          rowsPerPage={ROWS_PER_PAGE}
+          totalCount={filteredList.length}
+          onPageChange={setListPage}
+          itemLabel="requests"
+        />
       )}
+
+      {/* Bulk decision confirmation — one signature authorises the batch. */}
+      <ModalShell
+        isOpen={bulkDecision !== null}
+        onClose={() => { setBulkDecision(null); setBulkSignature(""); }}
+        title={`${bulkDecision === "APPROVE" ? "Approve" : "Reject"} ${selectedIds.length} request(s)`}
+        maxWidth="480px"
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary" onClick={() => { setBulkDecision(null); setBulkSignature(""); }}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={bulkDecision === "APPROVE" ? "btn btn-primary" : "btn btn-danger"}
+              disabled={!bulkSignature.trim() || actions.submitting}
+              onClick={() => bulkDecision && handleBulkDecision(bulkDecision, bulkSignature)}
+            >
+              {actions.submitting ? "Processing..." : "Confirm"}
+            </button>
+          </>
+        }
+      >
+        <p style={{ fontSize: "0.88rem", color: "rgb(var(--color-text-muted))", marginBottom: "1rem" }}>
+          This decision is applied to each selected request individually and recorded on every audit trail.
+        </p>
+        <ElectronicSignatureField
+          value={bulkSignature}
+          onChange={setBulkSignature}
+          description="Confirm your identity with your account password to authorise this batch."
+        />
+      </ModalShell>
 
       {/* MODAL 1: REVIEW & AUTHORIZE RELEASE MODAL (Screenshot 4) */}
       {showAuthorizeReleaseModal && activeReleaseItem && (
@@ -1409,44 +1634,44 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           display: "flex", alignItems: "center", justifyContent: "center",
           backdropFilter: "blur(6px)"
         }}>
-          <div style={{
+          <div className="glass-panel" style={{
             width: "95%", maxWidth: "980px", maxHeight: "90vh", overflowY: "auto",
-            background: "#FFFFFF", color: "#0F172A", borderRadius: "16px",
-            padding: "2rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
+            background: "rgb(var(--color-surface))", color: "rgb(var(--color-text))", borderRadius: "16px",
+            padding: "2rem", boxShadow: "var(--shadow-lg)"
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
               <div>
-                <h2 style={{ fontSize: "1.35rem", fontWeight: "700", margin: 0, color: "#1E293B" }}>Review & Authorize Release</h2>
+                <h2 style={{ fontSize: "1.35rem", fontWeight: "700", margin: 0 }}>Review &amp; Authorize Release</h2>
                 <span style={{ fontSize: "0.85rem", color: "#2563EB", fontWeight: "700" }}>{activeReleaseItem.requestNumber}</span>
               </div>
-              <button onClick={() => setShowAuthorizeReleaseModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B" }}>
+              <button onClick={() => setShowAuthorizeReleaseModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgb(var(--color-text-muted))" }}>
                 <Icons.X size={22} />
               </button>
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.75rem" }}>
-              
+
               {/* Left Column (Review Details) */}
-              <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <div style={{ background: "rgba(var(--color-surface-secondary), 0.5)", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "12px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 <div>
-                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748B", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
-                    INITIATOR ACCOUNT DETAILS
+                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
+                    PAYEE ACCOUNT DETAILS
                   </span>
-                  <div style={{ background: "#EDF2F7", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.85rem 1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
+                  {/* Bank details come from the request. There is no sensible
+                      placeholder for an account number, so a request missing
+                      them says so rather than showing a plausible-looking one. */}
+                  <div style={{ background: "rgb(var(--color-card))", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "8px", padding: "0.85rem 1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
                     <div>
-                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Payee Name</span>
-                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorName || "Blessing Okafor"}</strong>
+                      <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block" }}>Payee Name</span>
+                      <strong style={{ fontSize: "0.85rem" }}>{activeReleaseItem.vendorName || "—"}</strong>
                     </div>
                     <div>
-                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Bank</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: "bold" }}>A</div>
-                        <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorBankDetails?.bankName || "Access Bank"}</strong>
-                      </div>
+                      <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block" }}>Bank</span>
+                      <strong style={{ fontSize: "0.85rem" }}>{activeReleaseItem.vendorBankDetails?.bankName || "—"}</strong>
                     </div>
                     <div>
-                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Account Number</span>
-                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorBankDetails?.accountNumber || "0012933746"}</strong>
+                      <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block" }}>Account Number</span>
+                      <strong style={{ fontSize: "0.85rem" }}>{activeReleaseItem.vendorBankDetails?.accountNumber || "—"}</strong>
                     </div>
                   </div>
                 </div>
@@ -1456,59 +1681,64 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     <Icons.Paperclip size={16} />
                     <strong style={{ fontSize: "0.85rem" }}>Documentation</strong>
                   </div>
-                  {/* The request's actual documents. These were two invented
-                      files with fixed sizes regardless of the request. */}
+                  {/* Documents belong to the request being released. This read
+                      `selectedExpense`, which is null when the dialog is opened
+                      from the list, so it always reported "no documents". */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    {((selectedExpense?.attachments ?? []) as AttachmentDto[]).map((doc, idx) => (
+                    {releaseAttachments.map((doc, idx) => (
                       <button
                         key={doc._id || `${doc.url}-${idx}`}
                         type="button"
-                        onClick={() => onViewAttachment({ ...doc, requestNumber: selectedExpense?.requestNumber })}
-                        style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem", cursor: "pointer", textAlign: "left", width: "100%" }}
+                        onClick={() => onViewAttachment({ ...doc, requestNumber: activeReleaseItem.requestNumber })}
+                        style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "rgb(var(--color-card))", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "8px", padding: "0.65rem 0.85rem", cursor: "pointer", textAlign: "left", width: "100%", color: "inherit" }}
                       >
                         <Icons.FileText size={18} style={{ color: "#2563EB", flexShrink: 0 }} />
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</div>
-                          <span style={{ fontSize: "0.7rem", color: "#64748B" }}>
+                          <div style={{ fontSize: "0.8rem", fontWeight: "600", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</div>
+                          <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>
                             {[formatFileSize(doc.size), doc.uploadedByName].filter(Boolean).join(" • ") || "Supporting document"}
                           </span>
                         </div>
                       </button>
                     ))}
-                    {(selectedExpense?.attachments ?? []).length === 0 && (
-                      <span style={{ fontSize: "0.78rem", color: "#64748B" }}>No documents attached.</span>
+                    {releaseAttachments.length === 0 && (
+                      <span style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))" }}>No documents attached.</span>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748B", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
                     JUSTIFICATION SUMMARY
                   </span>
+                  {/* Real approver comments off the request's own history. This
+                      block previously showed two invented quotations with fixed
+                      timestamps — the very evidence the release is judged on. */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                    <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.75rem 0.85rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                        <strong style={{ fontSize: "0.75rem", color: "#475569" }}>Approver's Justification (Dept. Head)</strong>
-                        <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 09:12 AM</span>
+                    {releaseJustifications.map((entry, idx) => (
+                      <div key={idx} style={{ background: "rgb(var(--color-card))", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "8px", padding: "0.75rem 0.85rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", gap: "0.5rem" }}>
+                          <strong style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+                            {entry.actorName} ({humanizeStatus(entry.actorRole)})
+                          </strong>
+                          <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))", whiteSpace: "nowrap" }}>
+                            {formatDateTime(entry.timestamp)}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontStyle: "italic" }}>
+                          &lsquo;{entry.comment}&rsquo;
+                        </p>
                       </div>
-                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748B", fontStyle: "italic" }}>
-                        'Urgent replacement of failed server nodes in the Lagos data center to prevent downtime. Budget approved for Q3.'
-                      </p>
-                    </div>
-
-                    <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.75rem 0.85rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                        <strong style={{ fontSize: "0.75rem", color: "#475569" }}>Finance Officer's Justification</strong>
-                        <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 11:45 AM</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748B", fontStyle: "italic" }}>
-                        'Documentation verified against vendor quote. Bank instruction file prepared and validated. No compliance issues detected.'
-                      </p>
-                    </div>
+                    ))}
+                    {releaseJustifications.length === 0 && (
+                      <span style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))" }}>
+                        No approver justifications were recorded on this request.
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <button 
+                <button
                   onClick={() => setShowThreadModal(true)}
                   style={{ background: "none", border: "none", color: "#2563EB", cursor: "pointer", fontSize: "0.8rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.35rem", padding: 0 }}
                 >
@@ -1517,46 +1747,69 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
               </div>
 
               {/* Right Column (Confirm Payment Release Form) */}
-              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0, color: "#1E293B" }}>Confirm Payment Release</h3>
+              <div style={{ background: "rgb(var(--color-card))", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "12px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>Confirm Payment Release</h3>
 
                 <div className="form-group">
-                  <label className="form-label" style={{ color: "rgb(var(--color-card-border))", fontSize: "0.8rem", fontWeight: "600", marginBottom: "0.35rem" }}>
+                  <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: "600", marginBottom: "0.35rem" }}>
                     Bank Reference Number <span style={{ color: "#EF4444" }}>*</span>
                   </label>
                   <div style={{ position: "relative" }}>
-                    <Icons.Building size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "#64748B" }} />
+                    <Icons.Building size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))" }} />
                     <input
                       type="text"
                       placeholder="Enter transaction reference ID"
                       value={bankRefNumber}
                       onChange={(e) => setBankRefNumber(e.target.value)}
                       className="form-input"
-                      style={{ paddingLeft: "2.25rem", border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#0F172A", fontSize: "0.85rem" }}
+                      style={{ paddingLeft: "2.25rem", fontSize: "0.85rem" }}
                     />
                   </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label" style={{ color: "rgb(var(--color-card-border))", fontSize: "0.8rem", fontWeight: "600", marginBottom: "0.35rem" }}>
+                  <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: "600", marginBottom: "0.35rem" }}>
                     Payment Receipt / Evidence of Transfer <span style={{ color: "#EF4444" }}>*</span>
                   </label>
-                  <div 
-                    onClick={() => setReceiptFileName("payment_receipt_2101.pdf")}
+
+                  {/* A real upload. Clicking here used to set a fixed filename,
+                      so every released payment recorded the same "receipt". */}
+                  <input
+                    type="file"
+                    ref={receiptInputRef}
+                    style={{ display: "none" }}
+                    accept="image/*,.pdf"
+                    onChange={(e) => {
+                      handleReceiptUpload(e.target.files);
+                      if (receiptInputRef.current) receiptInputRef.current.value = "";
+                    }}
+                  />
+                  <div
+                    onClick={() => receiptInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleReceiptUpload(e.dataTransfer.files);
+                    }}
                     style={{
-                      border: "2px dashed #CBD5E1", borderRadius: "8px", padding: "1.5rem 1rem",
-                      textAlign: "center", background: "#F8FAFC", cursor: "pointer", transition: "all 0.15s ease"
+                      border: "2px dashed rgba(var(--color-card-border), 0.9)", borderRadius: "8px", padding: "1.5rem 1rem",
+                      textAlign: "center", background: "rgba(var(--color-surface-secondary), 0.4)", cursor: "pointer"
                     }}
                   >
-                    <Icons.UploadCloud size={32} style={{ color: "#64748B", margin: "0 auto 0.5rem" }} />
-                    <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "#1E293B" }}>
-                      {receiptFileName ? receiptFileName : "Drop your file here or click to browse"}
+                    <Icons.UploadCloud size={32} style={{ color: "rgb(var(--color-text-muted))", margin: "0 auto 0.5rem" }} />
+                    <div style={{ fontSize: "0.85rem", fontWeight: "700" }}>
+                      {receiptUploading
+                        ? "Uploading receipt…"
+                        : receipt
+                          ? `${receipt.name}${receipt.size ? ` • ${formatFileSize(receipt.size)}` : ""}`
+                          : "Drop your file here or click to browse"}
                     </div>
-                    <span style={{ fontSize: "0.7rem", color: "#64748B" }}>Supports PDF, PNG, JPG (Max 5MB)</span>
+                    <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>Supports PDF, PNG, JPG (Max 5MB)</span>
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start", background: "#F0F7FF", border: "1px solid #BFDBFE", padding: "0.75rem", borderRadius: "8px" }}>
+                <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start", background: "rgba(37, 99, 235, 0.08)", border: "1px solid rgba(37, 99, 235, 0.2)", padding: "0.75rem", borderRadius: "8px" }}>
                   <input
                     type="checkbox"
                     id="confirmDebited"
@@ -1564,24 +1817,22 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     onChange={(e) => setConfirmDebited(e.target.checked)}
                     style={{ width: "1.1rem", height: "1.1rem", marginTop: "0.1rem", cursor: "pointer" }}
                   />
-                  <label htmlFor="confirmDebited" style={{ fontSize: "0.75rem", color: "rgb(var(--color-card-border))", lineHeight: "1.4", cursor: "pointer" }}>
+                  <label htmlFor="confirmDebited" style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", lineHeight: "1.4", cursor: "pointer" }}>
                     I confirm that the funds have been successfully debited from the corporate account and the transaction is complete.
                   </label>
                 </div>
 
+                <ElectronicSignatureField value={releaseSignature} onChange={setReleaseSignature} />
+
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "auto" }}>
-                  <button
-                    onClick={() => setShowAuthorizeReleaseModal(false)}
-                    className="btn btn-secondary"
-                    style={{ border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#475569" }}
-                  >
+                  <button onClick={() => setShowAuthorizeReleaseModal(false)} className="btn btn-secondary">
                     Cancel
                   </button>
                   <button
                     onClick={() => handleReleasePayment(activeReleaseItem)}
                     className="btn btn-primary"
                     style={{ background: "#2563EB", border: "none", padding: "0.6rem 1.75rem", fontWeight: "700" }}
-                    disabled={!bankRefNumber || !confirmDebited || actions.submitting}
+                    disabled={!bankRefNumber || !receipt || !confirmDebited || !releaseSignature.trim() || actions.submitting}
                   >
                     {actions.submitting ? "Processing..." : "Paid"}
                   </button>
@@ -1593,195 +1844,17 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         </div>
       )}
 
-      {/* MODAL 2: COMPLETED RELEASE MODAL (Screenshot 2) */}
-      {showCompletedReleaseModal && activeReleaseItem && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "rgba(15, 23, 42, 0.65)", zIndex: 120,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          backdropFilter: "blur(6px)"
-        }}>
-          <div style={{
-            width: "95%", maxWidth: "980px", maxHeight: "90vh", overflowY: "auto",
-            background: "#FFFFFF", color: "#0F172A", borderRadius: "16px",
-            padding: "2rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
-              <div>
-                <h2 style={{ fontSize: "1.35rem", fontWeight: "700", margin: 0, color: "#1E293B" }}>Completed Release</h2>
-                <span style={{ fontSize: "0.85rem", color: "#2563EB", fontWeight: "700" }}>ID: {activeReleaseItem.requestNumber || "6682528"}</span>
-              </div>
-              <button onClick={() => setShowCompletedReleaseModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B" }}>
-                <Icons.X size={22} />
-              </button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.5rem" }}>
-              
-              {/* Left Card */}
-              <div style={{ background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #E2E8F0", paddingBottom: "0.75rem" }}>
-                  <div>
-                    <span style={{ fontSize: "0.7rem", fontWeight: "700", color: "#64748B" }}>REQUEST REFERENCE</span>
-                    <h4 style={{ margin: 0, fontSize: "0.95rem", color: "#1E293B" }}>#2101 - {activeReleaseItem.category}</h4>
-                  </div>
-                  <span className="badge" style={{ background: "#DBEAFE", color: "#2563EB", fontWeight: "700", fontSize: "0.75rem", padding: "0.2rem 0.6rem", borderRadius: "999px" }}>
-                    PAID
-                  </span>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: "0.75rem", color: "#64748B" }}>Amount Disbursed</span>
-                  <div style={{ fontSize: "1.75rem", fontWeight: "800", color: "#2563EB" }}>
-                    ₦{(activeReleaseItem.amount || 12450000).toLocaleString()}.00
-                  </div>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", background: "#F8FAFC", padding: "0.6rem 0.75rem", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-                    <Icons.FileText size={20} style={{ color: "#64748B" }} />
-                    <div>
-                      <span style={{ fontSize: "0.65rem", color: "#64748B", display: "block" }}>Reference Number</span>
-                      <strong style={{ fontSize: "0.8rem", color: "#1E293B" }}>{activeReleaseItem.paymentReference || "TXN-2026-0789-1234"}</strong>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", background: "#F8FAFC", padding: "0.6rem 0.75rem", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-                    <Icons.Building size={20} style={{ color: "#64748B" }} />
-                    <div>
-                      <span style={{ fontSize: "0.65rem", color: "#64748B", display: "block" }}>Payment Method</span>
-                      <strong style={{ fontSize: "0.8rem", color: "#1E293B" }}>Bank Transfer (CBN NIP)</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", background: "#F8FAFC", padding: "0.6rem 0.75rem", borderRadius: "8px", border: "1px solid #E2E8F0" }}>
-                  <Icons.Calendar size={20} style={{ color: "#64748B" }} />
-                  <div>
-                    <span style={{ fontSize: "0.65rem", color: "#64748B", display: "block" }}>Transaction Date</span>
-                    <strong style={{ fontSize: "0.8rem", color: "#1E293B" }}>July 15, 2026 &bull; 14:32 WAT</strong>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#F0F7FF", border: "1px dashed #93C5FD", padding: "0.75rem 1rem", borderRadius: "8px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                    <Icons.FileText size={20} style={{ color: "#2563EB" }} />
-                    <div>
-                      <div style={{ fontSize: "0.8rem", fontWeight: "700", color: "#1E293B" }}>
-                        {selectedExpense?.paymentReceipt || "No receipt attached"}
-                      </div>
-                      <span style={{ fontSize: "0.65rem", color: "#64748B" }}>Bank payment confirmation</span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() =>
-                      selectedExpense?.paymentReceipt &&
-                      onViewAttachment({
-                        url: selectedExpense.paymentReceipt,
-                        requestNumber: selectedExpense.requestNumber,
-                      })
-                    }
-                    disabled={!selectedExpense?.paymentReceipt}
-                    style={{ background: "none", border: "none", color: "#2563EB", cursor: selectedExpense?.paymentReceipt ? "pointer" : "not-allowed", opacity: selectedExpense?.paymentReceipt ? 1 : 0.5, fontWeight: "700", fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.25rem" }}
-                  >
-                    <Icons.Download size={14} /> View
-                  </button>
-                </div>
-              </div>
-
-              {/* Right Column */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                <div>
-                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748B", letterSpacing: "0.05em", display: "block", marginBottom: "0.5rem" }}>
-                    INITIATOR ACCOUNT DETAILS
-                  </span>
-                  <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.85rem 1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
-                    <div>
-                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Payee Name</span>
-                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorName || "Blessing Okafor"}</strong>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Bank</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                        <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: "bold" }}>A</div>
-                        <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorBankDetails?.bankName || "Access Bank"}</strong>
-                      </div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: "0.7rem", color: "#64748B", display: "block" }}>Account Number</span>
-                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>{activeReleaseItem.vendorBankDetails?.accountNumber || "0012933746"}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#2563EB", marginBottom: "0.5rem" }}>
-                    <Icons.Paperclip size={16} />
-                    <strong style={{ fontSize: "0.85rem" }}>Documentation</strong>
-                  </div>
-                  {/* The request's actual documents (was two invented files). */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    {((selectedExpense?.attachments ?? []) as AttachmentDto[]).map((doc, idx) => (
-                      <button
-                        key={doc._id || `${doc.url}-${idx}`}
-                        type="button"
-                        onClick={() => onViewAttachment({ ...doc, requestNumber: selectedExpense?.requestNumber })}
-                        style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem", cursor: "pointer", textAlign: "left", width: "100%" }}
-                      >
-                        <Icons.FileText size={18} style={{ color: "#2563EB", flexShrink: 0 }} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: "0.8rem", fontWeight: "600", color: "#1E293B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</div>
-                          <span style={{ fontSize: "0.7rem", color: "#64748B" }}>
-                            {[formatFileSize(doc.size), doc.uploadedByName].filter(Boolean).join(" • ") || "Supporting document"}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                    {(selectedExpense?.attachments ?? []).length === 0 && (
-                      <span style={{ fontSize: "0.78rem", color: "#64748B" }}>No documents attached.</span>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "#64748B", letterSpacing: "0.05em", display: "block", marginBottom: "0.5rem" }}>
-                    JUSTIFICATION SUMMARY
-                  </span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
-                        <strong style={{ fontSize: "0.75rem", color: "#475569" }}>Approver's Justification (Dept. Head)</strong>
-                        <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 09:12 AM</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748B", fontStyle: "italic" }}>
-                        'Urgent replacement of failed server nodes in the Lagos data center to prevent downtime. Budget approved for Q3.'
-                      </p>
-                    </div>
-
-                    <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", padding: "0.65rem 0.85rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
-                        <strong style={{ fontSize: "0.75rem", color: "#475569" }}>Finance Officer's Justification</strong>
-                        <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 11:45 AM</span>
-                      </div>
-                      <p style={{ margin: 0, fontSize: "0.75rem", color: "#64748B", fontStyle: "italic" }}>
-                        'Documentation verified against vendor quote. Bank instruction file prepared and validated. No compliance issues detected.'
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => setShowThreadModal(true)}
-                  style={{ background: "none", border: "none", color: "#2563EB", cursor: "pointer", fontSize: "0.8rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.35rem", padding: 0 }}
-                >
-                  <Icons.MessageSquare size={16} /> View Full Communication Thread &rarr;
-                </button>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Completed release — the shared dialog, which reads the request's own
+          payee, reference, date and approver justifications. The copy that used
+          to be inlined here carried fabricated fallbacks ("Blessing Okafor",
+          account 0012933746, TXN-2026-0789-1234, two invented justification
+          quotes) and hardcoded light-mode colours. */}
+      <CompletedReleaseModal
+        isOpen={showCompletedReleaseModal}
+        onClose={() => { setShowCompletedReleaseModal(false); setActiveReleaseItem(null); }}
+        expense={activeReleaseItem}
+        onViewThread={() => setShowThreadModal(true)}
+      />
 
       {/* MODAL 3: COMMUNICATION THREAD MODAL (Screenshot 3) */}
       {showThreadModal && (
@@ -1936,9 +2009,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         requestAmount={selectedExpense?.amount ?? 0}
         remainingBudget={budgetContext?.remaining ?? 0}
         deficitAmount={budgetContext?.criticalGap ?? 0}
-        onConfirm={async (notes) => {
+        onConfirm={async (notes, signature) => {
           if (!selectedExpense) return;
-          if (await actions.approveExpansion(selectedExpense._id, notes)) {
+          if (await actions.approveExpansion(selectedExpense._id, notes, signature)) {
             setShowApproveExpansionModal(false);
             setSelectedExpense(null);
           }
@@ -1953,9 +2026,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         requestAmount={selectedExpense?.amount ?? 0}
         remainingBudget={budgetContext?.remaining ?? 0}
         deficitAmount={budgetContext?.criticalGap ?? 0}
-        onConfirm={async (reason) => {
+        onConfirm={async (reason, signature) => {
           if (!selectedExpense) return;
-          if (await actions.rejectExpansion(selectedExpense._id, reason)) {
+          if (await actions.rejectExpansion(selectedExpense._id, reason, signature)) {
             setShowRejectExpansionModal(false);
             setSelectedExpense(null);
           }
@@ -1981,8 +2054,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           border: "1px solid rgba(var(--color-card-border), 0.6)"
         }}>
           <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>{selectedIds.length} items selected</span>
+          {/* Both open the signed confirmation dialog. They previously fired
+              straight through a `confirm()`, so a batch of financial decisions
+              was the only path in the app that skipped the signature. */}
           <button
-            onClick={() => handleBulkDecision("APPROVE")}
+            onClick={() => setBulkDecision("APPROVE")}
             disabled={actions.submitting}
             className="btn btn-primary"
             style={{ background: "#2563EB", border: "none", fontSize: "0.85rem", fontWeight: "700", padding: "0.5rem 1rem" }}
@@ -1990,7 +2066,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             Approve Selected ({selectedIds.length})
           </button>
           <button
-            onClick={() => handleBulkDecision("REJECT")}
+            onClick={() => setBulkDecision("REJECT")}
             disabled={actions.submitting}
             className="btn btn-danger"
             style={{ background: "#EF4444", border: "none", fontSize: "0.85rem", fontWeight: "700", color: "#FFFFFF", padding: "0.5rem 1rem" }}

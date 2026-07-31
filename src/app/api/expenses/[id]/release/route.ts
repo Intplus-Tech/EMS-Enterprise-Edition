@@ -4,6 +4,7 @@ import { ExpenseService } from "../../../../../domains/expense/expense.service";
 import { authenticate } from "../../../../../middlewares/auth";
 import { withErrorHandling } from "../../../../../middlewares/errors";
 import { PaymentReleaseSchema } from "../../../../../validators/validation";
+import { AuthService } from "../../../../../domains/auth/auth.service";
 import { SystemRole } from "../../../../../enums/roles";
 
 export const POST = withErrorHandling(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
@@ -13,6 +14,9 @@ export const POST = withErrorHandling(async (req: NextRequest, { params }: { par
 
   const body = await req.json();
   const validated = PaymentReleaseSchema.parse(body);
+
+  // Releasing cash is irreversible; re-confirm the manager's identity first.
+  await AuthService.verifySignature(user.id, validated.signature);
 
   const request = await ExpenseService.processPaymentRelease(
     id,

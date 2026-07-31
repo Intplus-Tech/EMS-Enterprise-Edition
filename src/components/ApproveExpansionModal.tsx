@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
 
 interface ApproveExpansionModalProps {
   isOpen: boolean;
@@ -8,7 +9,8 @@ interface ApproveExpansionModalProps {
   requestAmount?: number;
   remainingBudget?: number;
   deficitAmount?: number;
-  onConfirm?: (notes: string) => void;
+  /** Receives the notes plus the signature the server verifies. */
+  onConfirm?: (notes: string, signature: string) => void;
 }
 
 export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
@@ -25,20 +27,26 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
 }) => {
   const [acknowledged, setAcknowledged] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState("");
+  const [signature, setSignature] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleConfirm = () => {
-    if (!acknowledged) return;
+  const canConfirm = acknowledged && signature.trim().length > 0 && !isSubmitting;
+
+  const handleConfirm = async () => {
+    if (!canConfirm) return;
     setIsSubmitting(true);
-    setTimeout(() => {
-      if (onConfirm) {
-        onConfirm(approvalNotes);
-      }
-      setIsSubmitting(false);
+    try {
+      // Awaited, so the dialog stays open (and the button stays disabled) until
+      // the expansion is actually recorded. The artificial 400ms setTimeout it
+      // replaced closed the dialog before the request had been sent.
+      await onConfirm?.(approvalNotes, signature);
+      setSignature("");
       onClose();
-    }, 400);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -251,6 +259,13 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
           />
         </div>
 
+        {/* Identity re-confirmation — the server rejects an unsigned expansion. */}
+        <ElectronicSignatureField
+          value={signature}
+          onChange={setSignature}
+          description="Confirm your identity with your account password to authorise this one-time expansion."
+        />
+
         {/* Workflow Info Note */}
         <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
           <Icons.GitFork size={18} style={{ color: "rgb(var(--color-text-dim))", flexShrink: 0, marginTop: "2px" }} />
@@ -282,17 +297,18 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={!acknowledged || isSubmitting}
+            disabled={!canConfirm}
             className="btn btn-primary"
             style={{
               padding: "0.6rem 1.5rem",
               borderRadius: "8px",
               fontSize: "0.875rem",
               fontWeight: "600",
-              background: acknowledged ? "#2563EB" : "#93C5FD",
+              background: "#2563EB",
               color: "#FFFFFF",
               border: "none",
-              cursor: acknowledged ? "pointer" : "not-allowed",
+              cursor: canConfirm ? "pointer" : "not-allowed",
+              opacity: canConfirm ? 1 : 0.55,
               display: "flex",
               alignItems: "center",
               gap: "0.5rem"

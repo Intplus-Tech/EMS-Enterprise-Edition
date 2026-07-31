@@ -1,11 +1,14 @@
 import React from "react";
 import * as Icons from "lucide-react";
+import { formatNaira, formatDateTime } from "../ui/format";
 
 interface AdminSystemOverviewTabProps {
   currentUser: any;
   systemUsersCount?: number;
   departmentsCount?: number;
   systemLogs?: any[];
+  /** Server-computed budget summaries, for the period and total tiles. */
+  budgets?: { totalBudget: number; periodLabel?: string }[];
   onOpenAddUser: () => void;
   onOpenCreateDept: () => void;
   onOpenSetBudget: () => void;
@@ -16,11 +19,25 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
   systemUsersCount = 0,
   departmentsCount = 0,
   systemLogs = [],
+  budgets = [],
   onOpenAddUser,
   onOpenCreateDept,
   onOpenSetBudget
 }) => {
   const userName = currentUser?.name || "System Admin";
+
+  // Today's date and the newest audit entry, rather than the design's mock
+  // "Monday, May 12, 2025" / "Last login: Today, 07:15 AM" / "as of 09:00 AM",
+  // all three of which were fixed strings.
+  const today = new Date().toLocaleDateString(undefined, {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+  const lastActivityAt = systemLogs[0]?.timestamp;
+
+  // Enterprise allocation, summed from the real budget periods. This tile read
+  // a hardcoded ₦250,000,000, and the period beside it a hardcoded "FY 2026".
+  const totalBudget = budgets.reduce((sum, b) => sum + (b.totalBudget || 0), 0);
+  const periodLabel = budgets.find((b) => b.periodLabel)?.periodLabel;
 
   const recentActivities: any[] = systemLogs.slice(0, 5).map((l: any, idx: number) => ({
     id: l._id || `act-${idx}`,
@@ -36,7 +53,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
     <div>
       {/* Welcome Blue Banner */}
       <div style={{
-        backgroundColor: "#2563eb",
+        backgroundColor: "#2563EB",
         borderRadius: "1rem",
         padding: "2rem 2.5rem",
         color: "#ffffff",
@@ -48,12 +65,16 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
         </h1>
         <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", fontSize: "0.9rem", color: "#bfdbfe" }}>
           <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <Icons.Calendar size={16} /> Monday, May 12, 2025
+            <Icons.Calendar size={16} /> {today}
           </span>
-          <span>•</span>
-          <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-            <Icons.Clock size={16} /> Last login: Today, 07:15 AM
-          </span>
+          {lastActivityAt && (
+            <>
+              <span>•</span>
+              <span style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <Icons.Clock size={16} /> Last activity: {formatDateTime(lastActivityAt)}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -61,7 +82,8 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
         <h2 style={{ fontSize: "1.35rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>System Overview</h2>
         <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-          <Icons.RefreshCw size={14} /> Live data as of 09:00 AM
+          <Icons.RefreshCw size={14} />
+          {lastActivityAt ? `Live data as of ${formatDateTime(lastActivityAt)}` : "Live data"}
         </span>
       </div>
 
@@ -147,7 +169,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                 BUDGET PERIOD
               </div>
               <div style={{ fontSize: "1.5rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>
-                FY 2026
+                {periodLabel || "Not set"}
               </div>
             </div>
           </div>
@@ -174,7 +196,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                 TOTAL BUDGET
               </div>
               <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>
-                ₦250,000,000
+                {formatNaira(totalBudget)}
               </div>
             </div>
           </div>

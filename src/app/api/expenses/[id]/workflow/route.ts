@@ -4,7 +4,7 @@ import { ExpenseService } from "../../../../../domains/expense/expense.service";
 import { authenticate } from "../../../../../middlewares/auth";
 import { withErrorHandling } from "../../../../../middlewares/errors";
 import { WorkflowActionSchema } from "../../../../../validators/validation";
-import { SystemRole } from "../../../../../enums/roles";
+import { AuthService } from "../../../../../domains/auth/auth.service";
 
 export const POST = withErrorHandling(async (req: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
   await connectToDatabase();
@@ -15,6 +15,10 @@ export const POST = withErrorHandling(async (req: NextRequest, { params }: { par
 
   const body = await req.json();
   const validated = WorkflowActionSchema.parse(body);
+
+  // The dialog's electronic signature is a control, not decoration: re-confirm
+  // the approver's identity before the transition is applied.
+  await AuthService.verifySignature(user.id, validated.signature);
 
   const request = await ExpenseService.processWorkflowAction(
     id,

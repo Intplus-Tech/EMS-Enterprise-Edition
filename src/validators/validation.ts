@@ -7,6 +7,8 @@ import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_REQUEST } from "../domains/at
 export const LoginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(4, "Password must be at least 4 characters long"),
+  /** "Remember this device — trusted for 7 days" on the sign-in form. */
+  rememberDevice: z.boolean().optional().default(false),
 });
 
 export const VendorBankDetailsSchema = z.object({
@@ -53,20 +55,31 @@ export const ExpenseInitiateSchema = z.object({
   { message: "At least one supporting invoice or document is mandatory", path: ["supportingDocuments"] }
 );
 
+/**
+ * Identity re-confirmation captured by the approval dialogs. Required on every
+ * payload that commits a financial decision — the field is verified against the
+ * caller's own password before the transition is applied.
+ */
+const SignatureSchema = z.string().min(1, "An electronic signature is required");
+
 export const ExceptionalBudgetSchema = z.object({
   action: z.nativeEnum(WorkflowActionType),
   comment: z.string().optional(),
   adjustedAmount: z.number().positive().optional(),
+  signature: SignatureSchema,
 });
 
 export const WorkflowActionSchema = z.object({
   action: z.nativeEnum(WorkflowActionType),
   comment: z.string().optional(),
+  signature: SignatureSchema,
 });
 
 export const PaymentReleaseSchema = z.object({
   reference: z.string().min(3, "Payment transaction reference is required"),
+  /** Stored document reference for the transfer evidence, never a bare filename. */
   receipt: z.string().optional(),
+  signature: SignatureSchema,
 });
 
 export const WorkflowStepConfigSchema = z.object({

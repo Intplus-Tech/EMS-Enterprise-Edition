@@ -11,7 +11,13 @@ import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
 import { IAttachment, IUser } from "../../types";
 
-const getActorId = (actor: any): string => {
+/**
+ * The authenticated caller as the API routes hand it over: a User document or
+ * the session state from `authenticate()`, which also carries the client IP.
+ */
+type WorkflowActor = IUser & { id?: string; ipAddress?: string };
+
+const getActorId = (actor: WorkflowActor): string => {
   return (actor?._id || actor?.id)?.toString() || "";
 };
 
@@ -84,7 +90,7 @@ export class ExpenseService {
   /**
    * Create a new draft expense request
    */
-  public static async createRequest(actor: IUser | any, data: any) {
+  public static async createRequest(actor: WorkflowActor, data: any) {
     await connectToDatabase();
     
     const supportingDocuments = normaliseAttachments(data, actor);
@@ -142,7 +148,9 @@ export class ExpenseService {
 
     await request.save();
     
-    const logActor = { id: actorId, name: actor.name, role: actor.role };
+    // `ipAddress` rides along on the authenticated actor so audit rows carry
+    // the real client address; the viewer no longer substitutes a fake one.
+    const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
     await LoggerService.logAudit(
       AuditAction.EXPENSE_CREATED,
       `Draft request ${requestNumber} created for ₦${request.amount.toLocaleString()}`,
@@ -156,7 +164,7 @@ export class ExpenseService {
   /**
    * Submits a request and triggers the automatic budget validation
    */
-  public static async submitRequest(requestId: string, actor: IUser) {
+  public static async submitRequest(requestId: string, actor: WorkflowActor) {
     await connectToDatabase();
     
     const request = await ExpenseRequest.findById(requestId);
@@ -170,7 +178,9 @@ export class ExpenseService {
     await request.save();
     
     const actorId = getActorId(actor);
-    const logActor = { id: actorId, name: actor.name, role: actor.role };
+    // `ipAddress` rides along on the authenticated actor so audit rows carry
+    // the real client address; the viewer no longer substitutes a fake one.
+    const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
     
     // Add to history
     request.history.push({
@@ -256,7 +266,7 @@ export class ExpenseService {
   /**
    * Processes exceptional budget approval from Finance Head
    */
-  public static async processExceptionalBudget(requestId: string, actor: IUser, action: WorkflowActionType, comment?: string, adjustedAmount?: number) {
+  public static async processExceptionalBudget(requestId: string, actor: WorkflowActor, action: WorkflowActionType, comment?: string, adjustedAmount?: number) {
     await connectToDatabase();
     if (actor.role !== SystemRole.FINANCE_HEAD) {
       throw new Error("Only the Finance Head can perform exceptional budget actions.");
@@ -270,16 +280,27 @@ export class ExpenseService {
 
     const previousStatus = request.status;
     const actorId = getActorId(actor);
-    const logActor = { id: actorId, name: actor.name, role: actor.role };
+    // `ipAddress` rides along on the authenticated actor so audit rows carry
+    // the real client address; the viewer no longer substitutes a fake one.
+    const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
 
     if (action === WorkflowActionType.APPROVE) {
       request.exceptionalBudgetApproved = true;
       request.exceptionalApprovedBy = actorId as any;
-      
+      request.exceptionalApprovedAt = new Date();
+
       if (adjustedAmount && adjustedAmount > 0) {
         request.originalAmount = request.amount;
         request.amount = adjustedAmount;
       }
+
+      // Capture the shortfall being granted *before* the budget is locked —
+      // afterwards the remaining balance already reflects this request, so the
+      // gap can no longer be recovered. The exception history reports this.
+      const contextBeforeLock = await BudgetService.getBudgetContextForRequest(request._id.toString());
+      request.exceptionalBudgetAmount = contextBeforeLock?.hasBudget
+        ? Math.max(0, request.amount - contextBeforeLock.remaining)
+        : request.amount;
 
       // Lock budget (bypassing normal checks, locks whatever amount is now approved)
       await BudgetService.lockBudget(request._id.toString());
@@ -358,7 +379,7 @@ export class ExpenseService {
   /**
    * Processes a standard workflow step action (Approve, Reject, Return) by an approver
    */
-  public static async processWorkflowAction(requestId: string, actor: IUser, action: WorkflowActionType, comment?: string) {
+  public static async processWorkflowAction(requestId: string, actor: WorkflowActor, action: WorkflowActionType, comment?: string) {
     await connectToDatabase();
     
     const request = await ExpenseRequest.findById(requestId);
@@ -380,7 +401,9 @@ export class ExpenseService {
 
     const previousStatus = request.status;
     const actorId = getActorId(actor);
-    const logActor = { id: actorId, name: actor.name, role: actor.role };
+    // `ipAddress` rides along on the authenticated actor so audit rows carry
+    // the real client address; the viewer no longer substitutes a fake one.
+    const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
 
     if (action === WorkflowActionType.APPROVE) {
       // Look up next step in the sequence
@@ -488,7 +511,7 @@ export class ExpenseService {
   /**
    * Finance Officer processes the payment and uploads the bank file instructions
    */
-  public static async processFinanceUpload(requestId: string, actor: IUser) {
+  public static async processFinanceUpload(requestId: string, actor: WorkflowActor) {
     await connectToDatabase();
     if (actor.role !== SystemRole.FINANCE_OFFICER) {
       throw new Error("Unauthorized. Only Finance Officers can verify and upload bank files.");
@@ -516,7 +539,9 @@ export class ExpenseService {
 
     await request.save();
     
-    const logActor = { id: actorId, name: actor.name, role: actor.role };
+    // `ipAddress` rides along on the authenticated actor so audit rows carry
+    // the real client address; the viewer no longer substitutes a fake one.
+    const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
     await LoggerService.logAudit(
       AuditAction.EXPENSE_BANK_UPLOADED,
       `Finance Officer ${actor.name} uploaded payment file for request ${request.requestNumber} to the bank platform`,
@@ -536,7 +561,7 @@ export class ExpenseService {
    */
   public static async processPaymentRelease(
     requestId: string,
-    actor: IUser,
+    actor: WorkflowActor,
     reference: string,
     receiptFileName?: string
   ) {
@@ -573,7 +598,9 @@ export class ExpenseService {
 
     await request.save();
     
-    const logActor = { id: actorId, name: actor.name, role: actor.role };
+    // `ipAddress` rides along on the authenticated actor so audit rows carry
+    // the real client address; the viewer no longer substitutes a fake one.
+    const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
     await LoggerService.logAudit(
       AuditAction.PAYMENT_RELEASED,
       `Payment released for request ${request.requestNumber}. Reference: ${reference}`,

@@ -8,6 +8,9 @@ export default function RequestsPage() {
     currentUser,
     expenses,
     searchQuery, setSearchQuery,
+    amountSearchQuery, setAmountSearchQuery,
+    requestsTodayOnly, setRequestsTodayOnly,
+    requestsDateFilter, setRequestsDateFilter,
     setSelectedResubmitExpense,
     setResubmitForm,
     setShowResubmitModal,
@@ -28,6 +31,12 @@ export default function RequestsPage() {
       expenses={expenses}
       searchQuery={searchQuery}
       setSearchQuery={setSearchQuery}
+      amountSearchQuery={amountSearchQuery}
+      setAmountSearchQuery={setAmountSearchQuery}
+      todayOnly={requestsTodayOnly}
+      setTodayOnly={setRequestsTodayOnly}
+      dateFilter={requestsDateFilter}
+      setDateFilter={setRequestsDateFilter}
       setSelectedResubmitExpense={setSelectedResubmitExpense}
       setResubmitForm={setResubmitForm}
       setShowResubmitModal={setShowResubmitModal}
