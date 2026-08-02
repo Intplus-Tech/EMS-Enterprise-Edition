@@ -103,25 +103,22 @@ export class ExpenseService {
       throw new Error("Initiator ID is required.");
     }
 
-    let departmentId = actor.departmentId || data.departmentId;
+    // The department is re-derived from the initiator, never taken from the
+    // payload — it decides which budget the request draws down. The DB lookup
+    // covers a session issued before the department was assigned. There is no
+    // fallback department: previously an initiator with none was booked against
+    // whichever department happened to be first in the collection.
+    let departmentId = actor.departmentId;
 
     if (!departmentId) {
       const dbUser = await User.findById(actorId);
-      if (dbUser && dbUser.departmentId) {
-        departmentId = dbUser.departmentId;
-      }
+      departmentId = dbUser?.departmentId;
     }
 
     if (!departmentId) {
-      const Department = (await import("../../models/Department")).Department;
-      const defaultDept = await Department.findOne();
-      if (defaultDept) {
-        departmentId = defaultDept._id;
-      }
-    }
-
-    if (!departmentId) {
-      throw new Error("Department ID is required.");
+      throw new Error(
+        "Your account is not assigned to a department. Ask an administrator to assign one before raising a request."
+      );
     }
 
     const requestNumber = await this.generateRequestNumber();

@@ -62,7 +62,9 @@ export const UsersTab: React.FC<UsersTabProps> = ({
                   <td>
                     <span className="badge badge-draft" style={{ textTransform: "none" }}>{user.role}</span>
                   </td>
-                  <td>{user.department ? user.department.name : <span style={{ color: "rgb(var(--color-text-dim))" }}>N/A</span>}</td>
+                  {/* Admin and finance accounts are global, so they read as
+                      enterprise-wide rather than as a missing department. */}
+                  <td>{user.department ? user.department.name : <span style={{ color: "rgb(var(--color-text-dim))" }}>Enterprise-wide</span>}</td>
                   <td>
                     {user.isActive ? (
                       <span className="badge badge-paid">Active</span>

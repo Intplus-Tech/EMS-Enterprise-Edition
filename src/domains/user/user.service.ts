@@ -4,7 +4,7 @@ import { Department } from "../../models/Department";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
 import { LoggerService, ILogActor } from "../logs/logger.service";
 import { AuditAction } from "../../enums/auditActions";
-import { SystemRole } from "../../enums/roles";
+import { SystemRole, isDepartmentScopedRole } from "../../enums/roles";
 import { RequestStatus } from "../../enums/statuses";
 import { AdminUserDto } from "../../types/api";
 
@@ -83,14 +83,23 @@ export class UserService {
       await this.assertNotLastActiveAdmin(id, "change the role of");
     }
 
-    if (data.departmentId !== undefined) {
+    // Department assignment follows the role, not the submitted payload: only
+    // initiators and approvers are department-scoped. Promoting someone to a
+    // global role therefore clears their department instead of leaving a stale
+    // one behind that would keep narrowing what they can see.
+    const effectiveRole = data.role ?? user.role;
+    if (isDepartmentScopedRole(effectiveRole)) {
+      const nextDepartmentId = data.departmentId ?? user.departmentId;
+      if (!nextDepartmentId) {
+        throw new Error(`Invalid request: a ${effectiveRole} must belong to a department.`);
+      }
       if (data.departmentId) {
         const dept = await Department.findById(data.departmentId);
         if (!dept) throw new Error("Department not found");
-        user.departmentId = data.departmentId;
-      } else {
-        user.departmentId = undefined;
       }
+      user.departmentId = nextDepartmentId;
+    } else {
+      user.departmentId = undefined;
     }
 
     if (data.name !== undefined) user.name = data.name.trim();

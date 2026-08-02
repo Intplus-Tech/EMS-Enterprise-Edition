@@ -13,6 +13,10 @@ import { AdminUserDto, DepartmentDto, DepartmentSpendDto, RolePermissionDto } fr
 // Matches the row density shown in designs/system-admin/Admin_ User & Role.png
 const ROWS_PER_PAGE = 7;
 
+// Shown wherever a department would go for admin and finance accounts, which
+// are enterprise-wide rather than department-scoped. Doubles as a filter value.
+const GLOBAL_SCOPE_LABEL = "Enterprise-wide";
+
 interface AdminUsersAndRolesTabProps {
   systemUsers: AdminUserDto[];
   departments: DepartmentDto[];
@@ -61,7 +65,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
       { header: "Name", value: (u) => u.name },
       { header: "Email", value: (u) => u.email },
       { header: "Role", value: (u) => u.role },
-      { header: "Department", value: (u) => deptNameOf(u) },
+      { header: "Department", value: (u) => deptNameOf(u) || GLOBAL_SCOPE_LABEL },
       { header: "Status", value: (u) => (u.isActive ? "Active" : "Suspended") },
       { header: "Invite Pending", value: (u) => (u.isInvited ? "Yes" : "No") },
     ]);
@@ -98,7 +102,13 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
       (u.email || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
       deptNameOf(u).toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = selectedRoleFilter === "ALL" || u.role === selectedRoleFilter;
-    const matchesDept = selectedDeptFilter === "ALL" || deptNameOf(u).toLowerCase() === selectedDeptFilter.toLowerCase();
+    // The synthetic "Enterprise-wide" option isolates the global-role accounts,
+    // which have no department name to match on.
+    const matchesDept =
+      selectedDeptFilter === "ALL" ||
+      (selectedDeptFilter === GLOBAL_SCOPE_LABEL
+        ? !deptNameOf(u)
+        : deptNameOf(u).toLowerCase() === selectedDeptFilter.toLowerCase());
     return matchesSearch && matchesRole && matchesDept;
   });
 
@@ -232,6 +242,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
               {departments.map((d: any) => (
                 <option key={d._id || d.id} value={d.name}>{d.name}</option>
               ))}
+              <option value={GLOBAL_SCOPE_LABEL}>{GLOBAL_SCOPE_LABEL}</option>
             </select>
           </div>
 
@@ -294,7 +305,10 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
               {visibleUsers.map((u: any, idx: number) => {
                 const userName = u.name || u.fullName || "User";
                 const userEmail = u.email || "";
-                const deptName = u.departmentName || u.department?.name || "General";
+                // Global roles (admin, finance officer/manager/head) hold no
+                // department, so the cell states the scope rather than implying
+                // a "General" department that does not exist.
+                const deptName = u.departmentName || u.department?.name || GLOBAL_SCOPE_LABEL;
                 const initials = userName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
 
                 return (

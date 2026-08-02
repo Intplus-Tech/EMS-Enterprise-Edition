@@ -127,13 +127,15 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))", marginTop: "0.25rem", display: "block", fontStyle: "italic" }}>Managed by Administration</span>
             </div>
 
+            {/* Department — only initiators and approvers have one; the previous
+                "Operations" fallback named a department that does not exist. */}
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: "700" }}>Department</label>
               <div className="icon-input-wrapper">
                 <input
                   type="text"
                   disabled
-                  value={currentUser?.departmentName || "Operations"}
+                  value={currentUser?.departmentName || "Enterprise-wide"}
                   className="form-input icon-input-field"
                   style={{ fontSize: "0.85rem", padding: "0.6rem 2.25rem 0.6rem 0.85rem", background: "rgba(99, 102, 241, 0.05)", cursor: "not-allowed" }}
                 />

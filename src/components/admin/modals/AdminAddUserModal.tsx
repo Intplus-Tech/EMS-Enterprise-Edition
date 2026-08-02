@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { isDepartmentScopedRole } from "../../../enums/roles";
 
 interface AdminAddUserModalProps {
   isOpen: boolean;
@@ -17,10 +18,14 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [contactNumber, setContactNumber] = useState("");
-  const [departmentId, setDepartmentId] = useState(departments[0]?._id || departments[0]?.id || "");
+  const [departmentId, setDepartmentId] = useState("");
   const [role, setRole] = useState("INITIATOR");
 
   if (!isOpen) return null;
+
+  // Only initiators and approvers belong to a department; every other role is
+  // enterprise-wide, so the picker is hidden and no department is submitted.
+  const needsDepartment = isDepartmentScopedRole(role);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +33,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
       fullName,
       email,
       contactNumber,
-      departmentId,
+      departmentId: needsDepartment ? departmentId : "",
       role
     });
     onClose();
@@ -168,32 +173,40 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
             </div>
           </div>
 
-          {/* Department & Role */}
+          {/* Department & Role — department only applies to scoped roles */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
-                Department
+                {needsDepartment ? "Department" : "Scope"}
               </label>
-              <select
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "0.5rem",
-                  color: "rgb(var(--color-text))",
-                  fontSize: "0.9rem",
-                  outline: "none"
-                }}
-              >
-                {departments.map((d: any) => (
-                  <option key={d._id || d.id} value={d._id || d.id} style={{ background: "rgb(var(--color-card))" }}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+              {needsDepartment ? (
+                <select
+                  required
+                  value={departmentId}
+                  onChange={(e) => setDepartmentId(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem 0.85rem",
+                    backgroundColor: "rgba(15, 23, 42, 0.6)",
+                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    borderRadius: "0.5rem",
+                    color: "rgb(var(--color-text))",
+                    fontSize: "0.9rem",
+                    outline: "none"
+                  }}
+                >
+                  <option value="" style={{ background: "rgb(var(--color-card))" }}>Select a department</option>
+                  {departments.map((d: any) => (
+                    <option key={d._id || d.id} value={d._id || d.id} style={{ background: "rgb(var(--color-card))" }}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", paddingTop: "0.65rem" }}>
+                  Enterprise-wide
+                </p>
+              )}
             </div>
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>

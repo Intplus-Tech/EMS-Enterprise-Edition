@@ -2,6 +2,7 @@
 
 import React from "react";
 import * as Icons from "lucide-react";
+import { isDepartmentScopedRole } from "../../enums/roles";
 
 interface InviteUserModalProps {
   isOpen: boolean;
@@ -25,6 +26,10 @@ export const InviteUserModal: React.FC<InviteUserModalProps> = ({
   handleInviteUser,
 }) => {
   if (!isOpen) return null;
+
+  // Only initiators and approvers are department-scoped; the rest are global,
+  // so the field is hidden rather than shown empty and ignored on the server.
+  const needsDepartment = isDepartmentScopedRole(inviteForm.role);
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
@@ -72,7 +77,15 @@ export const InviteUserModal: React.FC<InviteUserModalProps> = ({
               <label className="form-label">Role</label>
               <select
                 value={inviteForm.role}
-                onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
+                onChange={(e) =>
+                  setInviteForm({
+                    ...inviteForm,
+                    role: e.target.value,
+                    // Drop any department already picked when switching to a
+                    // global role, so a hidden field cannot be submitted.
+                    departmentId: isDepartmentScopedRole(e.target.value) ? inviteForm.departmentId : "",
+                  })
+                }
                 className="form-select"
               >
                 <option value="INITIATOR">Initiator</option>
@@ -84,19 +97,30 @@ export const InviteUserModal: React.FC<InviteUserModalProps> = ({
               </select>
             </div>
 
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Department (Optional)</label>
-              <select
-                value={inviteForm.departmentId}
-                onChange={(e) => setInviteForm({ ...inviteForm, departmentId: e.target.value })}
-                className="form-select"
-              >
-                <option value="">None / Corporate Global</option>
-                {departments.map((d: any) => (
-                  <option key={d.id || d._id} value={d.id || d._id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* Department — only rendered for the two department-scoped roles */}
+            {needsDepartment ? (
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Department</label>
+                <select
+                  required
+                  value={inviteForm.departmentId}
+                  onChange={(e) => setInviteForm({ ...inviteForm, departmentId: e.target.value })}
+                  className="form-select"
+                >
+                  <option value="">Select a department</option>
+                  {departments.map((d: any) => (
+                    <option key={d.id || d._id} value={d.id || d._id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Scope</label>
+                <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", paddingTop: "0.6rem" }}>
+                  Enterprise-wide — this role is not tied to a department.
+                </p>
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem" }}>

@@ -4,7 +4,7 @@ import { connectToDatabase } from "../../../../config/db";
 import { User } from "../../../../models/User";
 import { Department } from "../../../../models/Department";
 import { authenticate } from "../../../../middlewares/auth";
-import { SystemRole } from "../../../../enums/roles";
+import { SystemRole, isDepartmentScopedRole } from "../../../../enums/roles";
 import { withErrorHandling } from "../../../../middlewares/errors";
 import { EmailService } from "../../../../domains/email/email.service";
 import { LoggerService } from "../../../../domains/logs/logger.service";
@@ -30,6 +30,20 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     throw new Error(`Invalid role: '${role}' is not a recognized system role.`);
   }
 
+  // Only initiators and approvers belong to a department; for every other role
+  // the field is dropped so a global account never gets scoped to one silently.
+  let resolvedDepartmentId: string | null = null;
+  if (isDepartmentScopedRole(role)) {
+    if (!departmentId) {
+      throw new Error(`Invalid request: a ${role} must be assigned to a department.`);
+    }
+    const dept = await Department.findById(departmentId);
+    if (!dept) {
+      throw new Error("Invalid request: the selected department does not exist.");
+    }
+    resolvedDepartmentId = departmentId;
+  }
+
   // 3. Check if user already exists
   const existingUser = await User.findOne({ email: email.toLowerCase() });
   if (existingUser) {
@@ -40,7 +54,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       const inviteToken = crypto.randomUUID();
       existingUser.name = name;
       existingUser.role = role;
-      existingUser.departmentId = departmentId || null;
+      existingUser.departmentId = resolvedDepartmentId;
       existingUser.inviteToken = inviteToken;
       existingUser.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
       await existingUser.save();
@@ -81,7 +95,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     email: email.toLowerCase(),
     name,
     role,
-    departmentId: departmentId || null,
+    departmentId: resolvedDepartmentId,
     isActive: false,
     passwordHash: await AuthService.hashPassword(crypto.randomUUID()),
     inviteToken,

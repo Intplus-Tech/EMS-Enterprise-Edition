@@ -168,19 +168,11 @@ export async function runDatabaseSeed() {
     { key: "legal", dept: legalDept, name: "Legal" },
   ];
 
-  // Seed every role for every department
+  // Only the two department-scoped roles are seeded per department. Finance
+  // officer/manager/head and admin are enterprise-wide, so they exist once
+  // (above) — seeding a copy per department would have created accounts the
+  // system has no notion of, e.g. an "Engineering Finance Head".
   for (const { key, dept, name } of deptList) {
-    // 1. Department Admin (Admin assigned to a specific department)
-    userDocs.push(new User({
-      email: `admin.${key}@mailinator.com`,
-      name: `${name} Admin`,
-      role: SystemRole.ADMIN,
-      departmentId: dept._id,
-      passwordHash: adminPassword,
-      isActive: true,
-    }));
-
-    // 2. Department Initiator
     userDocs.push(new User({
       email: `initiator.${key}@mailinator.com`,
       name: `${name} Initiator`,
@@ -190,43 +182,12 @@ export async function runDatabaseSeed() {
       isActive: true,
     }));
 
-    // 3. Department Approver
     userDocs.push(new User({
       email: `approver.${key}@mailinator.com`,
       name: `${name} Approver`,
       role: SystemRole.APPROVER,
       departmentId: dept._id,
       passwordHash: appPassword,
-      isActive: true,
-    }));
-
-    // 4. Department Finance Officer
-    userDocs.push(new User({
-      email: `officer.${key}@mailinator.com`,
-      name: `${name} Finance Officer`,
-      role: SystemRole.FINANCE_OFFICER,
-      departmentId: dept._id,
-      passwordHash: officerPassword,
-      isActive: true,
-    }));
-
-    // 5. Department Finance Manager
-    userDocs.push(new User({
-      email: `manager.${key}@mailinator.com`,
-      name: `${name} Finance Manager`,
-      role: SystemRole.FINANCE_MANAGER,
-      departmentId: dept._id,
-      passwordHash: managerPassword,
-      isActive: true,
-    }));
-
-    // 6. Department Finance Head
-    userDocs.push(new User({
-      email: `head.${key}@mailinator.com`,
-      name: `${name} Finance Head`,
-      role: SystemRole.FINANCE_HEAD,
-      departmentId: dept._id,
-      passwordHash: headPassword,
       isActive: true,
     }));
   }
