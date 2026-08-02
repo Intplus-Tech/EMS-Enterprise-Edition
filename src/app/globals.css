@@ -9,8 +9,11 @@
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   
   /* Brand Theme Variables (sourced from branding.ts configuration) */
-  --color-primary: 99 102 241;
-  --color-primary-hover: 79 70 229;
+  --color-primary: 37 99 235;
+  --color-primary-hover: 29 78 216;
+  /* Accent lifted for dark surfaces: the brand blue is only ~3.4:1 against the
+     navy sidebar, which fails contrast for the active nav label. */
+  --color-primary-soft: 147 197 253;
   --color-secondary: 16 185 129;
   --color-secondary-hover: 5 150 105;
   --color-accent: 245 158 11;
@@ -183,6 +186,50 @@ body {
   background: rgba(255, 255, 255, 0.08);
   color: rgb(var(--color-text));
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Sidebar navigation — one active treatment for every role (see
+   SidebarNavItem). Roles previously disagreed: some highlighted the active page
+   with a white wash, others with the brand blue the designs specify. */
+.sidebar-nav-item {
+  justify-content: flex-start;
+  width: 100%;
+  background: transparent;
+  color: rgb(var(--color-text-muted));
+  font-weight: 500;
+}
+
+.sidebar-nav-item:hover {
+  background: rgba(var(--color-primary), 0.1);
+  color: rgb(var(--color-text));
+}
+
+.sidebar-nav-item.active {
+  background: rgba(var(--color-primary), 0.18);
+  color: rgb(var(--color-primary-soft));
+  font-weight: 700;
+}
+
+/* On the light sidebar the brand blue is the design's own colour and passes
+   contrast unaided. */
+[data-theme="light"] .sidebar-nav-item.active {
+  background: rgba(var(--color-primary), 0.12);
+  color: rgb(var(--color-primary));
+}
+
+[data-theme="light"] .sidebar-nav-item:hover {
+  background: rgba(var(--color-primary), 0.07);
+}
+
+/* Queue depth pill, e.g. the number of exceptions awaiting a Finance Head. */
+.sidebar-nav-badge {
+  margin-left: auto;
+  background: rgb(var(--color-primary));
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
 }
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.15);

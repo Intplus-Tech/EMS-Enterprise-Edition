@@ -6,6 +6,8 @@ import { BRANDING } from "../../config/branding";
 
 import { DynamicIcon } from "../../components/DynamicIcon";
 import { NotificationsPanel } from "../../components/NotificationsPanel";
+import { SidebarNavItem } from "../../components/ui/SidebarNavItem";
+import { getNavItemsForRole } from "./navItems";
 
 // Modular Dialog Modals
 import { InitiateExpenseRequestModal } from "../../components/modals/InitiateExpenseRequestModal";
@@ -204,7 +206,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             height: 40
           }}>
             {BRANDING.logoUrl ? (
-              <img src={BRANDING.logoUrl} alt="Logo" style={{ width: 28, height: 28, objectFit: "contain" }} />
+              <img src={BRANDING.logoUrl} alt={`${BRANDING.appName} Logo`} style={{ width: 28, height: 28, objectFit: "contain" }} />
             ) : (
               <DynamicIcon name={BRANDING.logoIcon} style={{ color: "rgb(var(--color-primary))", width: 28, height: 28 }} />
             )}
@@ -215,347 +217,19 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Dynamic view filters based on active tabs */}
+        {/* Role navigation. Every role renders the same primitive from the same
+            config, so the active page reads identically everywhere. */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flexGrow: 1 }}>
-          {currentUser?.role === "INITIATOR" ? (
-            <>
-              <button
-                onClick={() => navTo("/requests")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/requests") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/requests") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.Receipt size={18} /> Requests
-                {(() => {
-                  const pendingCount = expenses.filter((e: any) => ["DRAFT", "RETURNED"].includes(e.status)).length;
-                  return pendingCount > 0 ? (
-                    <span style={{
-                      marginLeft: "auto",
-                      background: "rgba(99, 102, 241, 0.2)",
-                      color: "rgb(var(--color-primary))",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      padding: "0.15rem 0.5rem",
-                      borderRadius: "999px"
-                    }}>
-                      {pendingCount}
-                    </span>
-                  ) : null;
-                })()}
-              </button>
-
-              <button
-                onClick={() => navTo("/history")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/history") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/history") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.History size={18} /> History
-              </button>
-
-              <button
-                onClick={() => navTo("/settings")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/settings") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/settings") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.Settings size={18} /> Settings
-              </button>
-            </>
-          ) : currentUser?.role === "FINANCE_HEAD" ? (
-            <>
-              <div style={{ padding: "0.5rem 0.5rem 0.25rem", fontSize: "0.7rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                EXCEPTIONS
-              </div>
-
-              <button
-                onClick={() => navTo("/pending-exceptions")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/pending-exceptions") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/pending-exceptions") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/pending-exceptions") ? "700" : "500"
-                }}
-              >
-                <Icons.AlertTriangle size={18} /> Pending Exceptions
-                {/* Real queue depth; this badge was hardcoded to 12. */}
-                {(() => {
-                  const exceptionCount = expenses.filter((e: any) =>
-                    ["PENDING_EXCEPTIONAL", "INSUFFICIENT_BUDGET"].includes(e.status)
-                  ).length;
-                  return exceptionCount > 0 ? (
-                    <span style={{
-                      marginLeft: "auto",
-                      background: "#2563EB",
-                      color: "#FFFFFF",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      padding: "0.15rem 0.55rem",
-                      borderRadius: "999px"
-                    }}>
-                      {exceptionCount}
-                    </span>
-                  ) : null;
-                })()}
-              </button>
-
-              <button
-                onClick={() => navTo("/departmental-spend")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/departmental-spend") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/departmental-spend") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/departmental-spend") ? "700" : "500"
-                }}
-              >
-                <Icons.PieChart size={18} /> Departmental Spend
-              </button>
-
-              <button
-                onClick={() => navTo("/exception-history")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/exception-history") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/exception-history") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/exception-history") ? "700" : "500"
-                }}
-              >
-                <Icons.BarChart2 size={18} /> Exception History
-              </button>
-
-              <button
-                onClick={() => navTo("/settings")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/settings") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/settings") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/settings") ? "700" : "500"
-                }}
-              >
-                <Icons.Settings size={18} /> Settings
-              </button>
-            </>
-          ) : currentUser?.role === "ADMIN" ? (
-            <>
-              <button
-                onClick={() => navTo("/dashboard")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/dashboard") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/dashboard") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/dashboard") ? "700" : "500"
-                }}
-              >
-                <Icons.LayoutDashboard size={18} /> Dashboard
-              </button>
-
-              <button
-                onClick={() => navTo("/departmental-spend")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/departmental-spend") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/departmental-spend") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/departmental-spend") ? "700" : "500"
-                }}
-              >
-                <Icons.PieChart size={18} /> Departmental Spend
-              </button>
-
-              <button
-                onClick={() => navTo("/reports")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/reports") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/reports") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/reports") ? "700" : "500"
-                }}
-              >
-                <Icons.BarChart2 size={18} /> Report
-              </button>
-
-              <button
-                onClick={() => navTo("/users-roles")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/users-roles") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/users-roles") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/users-roles") ? "700" : "500"
-                }}
-              >
-                <Icons.Users size={18} /> Users & Roles
-              </button>
-
-              <button
-                onClick={() => navTo("/audit-trail")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/audit-trail") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/audit-trail") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/audit-trail") ? "700" : "500"
-                }}
-              >
-                <Icons.FileText size={18} /> Audit Trail
-              </button>
-
-              <button
-                onClick={() => navTo("/settings")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/settings") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/settings") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/settings") ? "700" : "500"
-                }}
-              >
-                <Icons.Settings size={18} /> Settings
-              </button>
-
-              <button
-                onClick={() => navTo("/workflow")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/workflow") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/workflow") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/workflow") ? "700" : "500"
-                }}
-              >
-                <Icons.GitFork size={18} /> Workflow Rules
-              </button>
-
-              <button
-                onClick={() => navTo("/logs")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/logs") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/logs") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/logs") ? "700" : "500"
-                }}
-              >
-                <Icons.History size={18} /> System Audits
-              </button>
-
-              <button
-                onClick={() => navTo("/users")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/users") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/users") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/users") ? "700" : "500"
-                }}
-              >
-                <Icons.Users size={18} /> Users & Invites
-              </button>
-            </>
-          ) : (
-            <>
-              {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
-                <button
-                  onClick={() => navTo("/dashboard")}
-                  className="btn"
-                  style={{
-                    justifyContent: "flex-start",
-                    background: isActive("/dashboard") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                    color: isActive("/dashboard") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                  }}
-                >
-                  <Icons.LayoutDashboard size={18} /> Dashboard
-                </button>
-              )}
-
-              <button
-                onClick={() => navTo("/approvals")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/approvals") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/approvals") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.CheckSquare size={18} /> {["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) ? "Pipeline Overview" : "Pending Approvals"}
-                {(() => {
-                  const pendingCount = expenses.filter((exp: any) => {
-                    if (currentUser?.role === "FINANCE_HEAD" && exp.status === "PENDING_EXCEPTIONAL") return true;
-                    if (currentUser?.role === "APPROVER" && exp.status === "PENDING_APPROVAL" && exp.currentStepIndex === 0) return true;
-                    if (currentUser?.role === "FINANCE_OFFICER" && exp.status === "SENT_TO_FINANCE") return true;
-                    if (currentUser?.role === "FINANCE_MANAGER" && exp.status === "UPLOADED_TO_BANK") return true;
-                    return false;
-                  }).length;
-                  return pendingCount > 0 ? (
-                    <span style={{
-                      marginLeft: "auto",
-                      background: "rgba(239, 68, 68, 0.2)",
-                      color: "rgb(var(--color-danger))",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      padding: "0.15rem 0.5rem",
-                      borderRadius: "999px"
-                    }}>
-                      {pendingCount}
-                    </span>
-                  ) : null;
-                })()}
-              </button>
-
-              <button
-                onClick={() => navTo("/history")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/history") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/history") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.History size={18} /> History
-              </button>
-
-              {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
-                <button
-                  onClick={() => navTo("/requests")}
-                  className="btn"
-                  style={{
-                    justifyContent: "flex-start",
-                    background: isActive("/requests") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                    color: isActive("/requests") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                  }}
-                >
-                  <Icons.Receipt size={18} /> Requests
-                </button>
-              )}
-
-              <button
-                onClick={() => navTo("/settings")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/settings") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/settings") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.Settings size={18} /> Settings
-              </button>
-            </>
-          )}
+          {getNavItemsForRole(currentUser?.role).map((item) => (
+            <SidebarNavItem
+              key={item.route}
+              label={item.label}
+              icon={item.icon}
+              isActive={isActive(item.route)}
+              onClick={() => navTo(item.route)}
+              badgeCount={item.badge?.({ expenses, role: currentUser?.role })}
+            />
+          ))}
         </div>
 
         {/* User profile card at bottom of sidebar */}
@@ -685,7 +359,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               title={canRaiseRequest ? undefined : "Your role does not raise expense requests"}
               className="btn btn-primary"
               style={{
-                background: "#2563EB",
+                // `btn-primary` already paints the brand blue; no override needed.
                 padding: "0.55rem 1.15rem",
                 borderRadius: "8px",
                 fontWeight: "600",

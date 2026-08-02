@@ -135,7 +135,7 @@ export function getEmailFooter(): string {
               
               <!-- Copyright -->
               <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #94A3B8; margin: 0; text-align: center;">
-                &copy; 2026 EMS. All rights reserved.
+                &copy; 2026 ${BRANDING.appName}. All rights reserved.
               </p>
             </td>
           </tr>
@@ -171,7 +171,7 @@ export function getInviteEmailHtml(inviteUrl: string, roleName: string, recipien
     </p>
     
     <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px 0; text-align: left;">
-      EMS provides your team with high-density, low-friction tools to manage complex financial data, streamline approvals, and ensure institutional trust across all departments.
+      ${BRANDING.appName} provides your team with high-density, low-friction tools to manage complex financial data, streamline approvals, and ensure institutional trust across all departments.
     </p>
     
     <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 28px 0; text-align: left;">
@@ -194,7 +194,7 @@ export function getInviteEmailHtml(inviteUrl: string, roleName: string, recipien
     </p>
   `;
 
-  return compileTemplate(content, { title: "Invitation to join EMS", origin });
+  return compileTemplate(content, { title: `Invitation to join ${BRANDING.appName}`, origin });
 }
 
 /**
@@ -228,5 +228,5 @@ export function getResetCodeEmailHtml(code: string, recipientName: string = "Use
     </p>
   `;
 
-  return compileTemplate(content, { title: "Reset your EMS password", origin });
+  return compileTemplate(content, { title: `Reset your ${BRANDING.appName} password`, origin });
 }

@@ -1,6 +1,7 @@
 import { IEmailService } from "./email-service.interface";
 import { getInviteEmailHtml, getResetCodeEmailHtml, compileTemplate } from "./templates";
 import { ENV } from "../../config/env";
+import { BRANDING } from "../../config/branding";
 
 export class BrevoEmailService implements IEmailService {
   private apiKey: string;
@@ -10,7 +11,8 @@ export class BrevoEmailService implements IEmailService {
   constructor(apiKey: string) {
     this.apiKey = apiKey;
     this.senderEmail = ENV.BREVO_SENDER_EMAIL;
-    this.senderName = ENV.BREVO_SENDER_NAME;
+    // Deployments may override the "from" name; otherwise it is the product name.
+    this.senderName = ENV.BREVO_SENDER_NAME || BRANDING.appName;
   }
 
   private async sendSmtpEmail(
@@ -65,7 +67,7 @@ export class BrevoEmailService implements IEmailService {
     origin?: string
   ): Promise<boolean> {
     const htmlContent = getInviteEmailHtml(inviteUrl, roleName, recipientName, origin);
-    const subject = `Invitation to join SpendFlow EMS as ${roleName}`;
+    const subject = `Invitation to join ${BRANDING.appName} as ${roleName}`;
     return this.sendSmtpEmail(to, recipientName, subject, htmlContent);
   }
 
@@ -76,7 +78,7 @@ export class BrevoEmailService implements IEmailService {
     origin?: string
   ): Promise<boolean> {
     const htmlContent = getResetCodeEmailHtml(code, recipientName, origin);
-    const subject = "Your Password Reset Code - SpendFlow EMS";
+    const subject = `Your Password Reset Code - ${BRANDING.appName}`;
     return this.sendSmtpEmail(to, recipientName, subject, htmlContent);
   }
 

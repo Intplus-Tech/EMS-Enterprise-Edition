@@ -354,11 +354,11 @@ export default function VerifyCodePage() {
             alignItems: "center",
             justifyContent: "center"
           }}>
-            <img src={BRANDING.logoUrl || "/logo.svg"} alt="EMS Logo" style={{ width: 26, height: 26, objectFit: "contain", borderRadius: "50%" }} />
+            <img src={BRANDING.logoUrl || "/logo.svg"} alt={`${BRANDING.appName} Logo`} style={{ width: 26, height: 26, objectFit: "contain", borderRadius: "50%" }} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>EMS</span>
+              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>{BRANDING.appName}</span>
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 

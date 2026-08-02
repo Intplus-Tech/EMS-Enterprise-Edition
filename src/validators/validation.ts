@@ -35,7 +35,10 @@ export const AttachmentAddSchema = z.object({
 });
 
 export const ExpenseInitiateSchema = z.object({
-  category: z.string().min(2, "Category is required"),
+  // Optional: the New Request form no longer asks the initiator to classify
+  // their spend, so the service applies DEFAULT_EXPENSE_CATEGORY. Still accepted
+  // for resubmissions and older clients, which carry the stored value.
+  category: z.string().min(2, "Category is required").optional(),
   description: z.string().min(3, "Description is required"),
   amount: z.number().positive("Amount must be greater than zero"),
   // At least one supporting document is mandatory. `supportingDocument` is still

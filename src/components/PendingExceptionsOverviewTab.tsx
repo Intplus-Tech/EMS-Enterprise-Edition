@@ -473,8 +473,13 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
 
                       {/* ACTION Button */}
                       <td style={{ padding: "1.1rem 1.25rem", textAlign: "right" }}>
+                        {/* Hands back the raw expense, not the display record:
+                            the page resolves the selection by `_id`, which only
+                            exists on the former. Passing `r` sent `_id:
+                            undefined`, so the lookup missed and Review did
+                            nothing. */}
                         <button
-                          onClick={() => onReviewRequest && onReviewRequest(r)}
+                          onClick={() => onReviewRequest && onReviewRequest(r.rawExpense)}
                           className="btn btn-secondary"
                           style={{
                             display: "inline-flex",

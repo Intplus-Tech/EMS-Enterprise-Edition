@@ -9,6 +9,7 @@ import { RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
 import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
+import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
 import { IAttachment, IUser } from "../../types";
 
 /**
@@ -127,7 +128,10 @@ export class ExpenseService {
       requestNumber,
       departmentId,
       initiatorId: actorId,
-      category: data.category,
+      // The initiator does not choose a category; the model requires one and
+      // reporting groups on it, so an unclassified request lands in the default
+      // bucket rather than an empty string.
+      category: data.category || DEFAULT_EXPENSE_CATEGORY,
       description: data.description,
       amount: Number(data.amount),
       supportingDocuments,
@@ -271,7 +275,13 @@ export class ExpenseService {
 
     const request = await ExpenseRequest.findById(requestId);
     if (!request) throw new Error("Request not found");
-    if (request.status !== RequestStatus.PENDING_EXCEPTIONAL) {
+    // Both states mean "over budget, waiting on the Finance Head" — the queue
+    // lists them together. Accepting only PENDING_EXCEPTIONAL stranded records
+    // parked at INSUFFICIENT_BUDGET: they were reviewable but never decidable.
+    if (
+      request.status !== RequestStatus.PENDING_EXCEPTIONAL &&
+      request.status !== RequestStatus.INSUFFICIENT_BUDGET
+    ) {
       throw new Error("Request is not awaiting exceptional budget approval.");
     }
 

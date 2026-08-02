@@ -12,7 +12,6 @@ import { ExpenseClient } from "../../services/expense.client";
 import { AdminClient } from "../../services/admin.client";
 import { AuthClient } from "../../services/auth.client";
 import { ApiRequestError, toErrorMessage } from "../../services/http";
-import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
 import { AttachmentInput } from "../../types/api";
 import type { AttachmentTarget } from "../../components/modals/AttachmentViewModal";
 import { WorkflowActionType } from "../../enums/workflowActions";
@@ -34,7 +33,6 @@ function readStoredIds(key: string): string[] {
 /** Blank New Request form. Extracted so create and reset cannot drift apart. */
 function emptyRequestForm() {
   return {
-    category: DEFAULT_EXPENSE_CATEGORY as string,
     description: "",
     amount: "",
     supportingDocuments: [] as AttachmentInput[],
@@ -494,8 +492,10 @@ function useDashboardState() {
     }
 
     try {
+      // No `category`: the initiator does not classify their own spend, so the
+      // server applies the default. Resubmission (below) still sends the stored
+      // value, since that request already has one.
       const created = await ExpenseClient.create({
-        category: newRequest.category,
         description: newRequest.description,
         amount: Number(newRequest.amount),
         supportingDocuments: newRequest.supportingDocuments,

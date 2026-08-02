@@ -205,7 +205,7 @@ function SetupContent() {
         padding: "2.5rem", 
         boxShadow: "var(--shadow-lg)" 
       }}>
-        <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "0.5rem" }}>Welcome to EMS</h2>
+        <h2 style={{ fontSize: "1.75rem", fontWeight: "700", color: "rgb(var(--color-text))", marginBottom: "0.5rem" }}>Welcome to {BRANDING.appName}</h2>
         <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
           Your administrator has invited you to join the Finance Hub. Please set up your secure password to continue.
         </p>
@@ -402,11 +402,11 @@ export default function SetupPage() {
             alignItems: "center",
             justifyContent: "center"
           }}>
-            <img src={BRANDING.logoUrl || "/logo.svg"} alt="EMS Logo" style={{ width: 26, height: 26, objectFit: "contain", borderRadius: "50%" }} />
+            <img src={BRANDING.logoUrl || "/logo.svg"} alt={`${BRANDING.appName} Logo`} style={{ width: 26, height: 26, objectFit: "contain", borderRadius: "50%" }} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>EMS</span>
+              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>{BRANDING.appName}</span>
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 

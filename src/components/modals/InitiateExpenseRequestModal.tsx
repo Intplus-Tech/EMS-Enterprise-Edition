@@ -6,17 +6,17 @@
  *
  * Field order follows the design: department (read-only), payee and bank
  * details, business purpose, amount and required date, then the document
- * dropzone. The category select the previous version led with is kept because
- * the API requires a category, but it now reads from the shared enum rather
- * than a hand-written option list, and the currency select has been removed —
- * it was collected and never sent, and every amount in the system is Naira.
+ * dropzone. Neither the category select nor the currency select the earlier
+ * versions carried appears in the design — currency because every amount in
+ * the system is Naira, category because an initiator does not classify their
+ * own spend. The server now applies the default category (see
+ * ExpenseService.initiateRequest), so reporting still groups these requests.
  */
 
 import React, { RefObject } from "react";
 import * as Icons from "lucide-react";
 import { AttachmentInput } from "../../types/api";
 import { formatFileSize, MAX_ATTACHMENTS_PER_REQUEST } from "../../domains/attachments/attachment.rules";
-import { EXPENSE_CATEGORIES } from "../../enums/expenseCategories";
 
 interface InitiateExpenseRequestModalProps {
   isOpen: boolean;
@@ -142,21 +142,6 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
                 className="form-input"
               />
             </div>
-          </div>
-
-          {/* Category is required by the API; options come from the enum so the
-              form can never offer a value the server rejects (rule 2). */}
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Expense Category</label>
-            <select
-              value={newRequest.category}
-              onChange={(e) => set({ category: e.target.value })}
-              className="form-select"
-            >
-              {EXPENSE_CATEGORIES.map((category) => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>

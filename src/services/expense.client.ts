@@ -11,7 +11,8 @@ import { AttachmentDto, AttachmentInput, BudgetContextDto, ExpenseRequestDto, Th
 import { MAX_ATTACHMENT_BYTES } from "../domains/attachments/attachment.rules";
 
 export interface ExpenseInput {
-  category: string;
+  /** Omitted when an initiator raises a request; the server defaults it. */
+  category?: string;
   description: string;
   amount: number;
   /** At least one is required; the server rejects an empty set. */
