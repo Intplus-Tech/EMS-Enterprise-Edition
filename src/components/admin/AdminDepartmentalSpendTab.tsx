@@ -64,8 +64,24 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
     ]);
   };
   const [page, setPage] = useState(1);
+  // Controls behind the two icon buttons above the table. Both rendered as bare
+  // icons with no handler, so the "filter" and "sort" affordances the design
+  // shows did nothing at all.
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "AT_RISK">("ALL");
+  const [sortBy, setSortBy] = useState<"NAME" | "UTILISATION">("NAME");
 
-  const deptList = departments;
+  /** A department is at risk once it has committed most of its allocation. */
+  const AT_RISK_PCT = 85;
+
+  const deptList = departments
+    .filter((d) => {
+      if (statusFilter === "ACTIVE") return d.isActive !== false;
+      if (statusFilter === "AT_RISK") return d.hasBudget && d.pctUsed >= AT_RISK_PCT;
+      return true;
+    })
+    .sort((a, b) =>
+      sortBy === "UTILISATION" ? b.pctUsed - a.pctUsed : a.name.localeCompare(b.name)
+    );
 
   /**
    * Enterprise roll-up for the two tiles at the top. These were the design's
@@ -490,13 +506,36 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
       <div className="glass-panel" style={{ padding: "1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem", marginBottom: "2rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
           <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Department Overview</h3>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button style={{ padding: "0.4rem 0.6rem", background: "none", border: "1px solid rgb(var(--color-card-border))", borderRadius: "0.375rem", color: "rgb(var(--color-text-muted))" }}>
+          {/* The design's two icon affordances, now backed by the filter and
+              sort the table actually applies. */}
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.78rem", color: "rgb(var(--color-text-muted))" }}>
               <Icons.SlidersHorizontal size={14} />
-            </button>
-            <button style={{ padding: "0.4rem 0.6rem", background: "none", border: "1px solid rgb(var(--color-card-border))", borderRadius: "0.375rem", color: "rgb(var(--color-text-muted))" }}>
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1); }}
+                aria-label="Filter departments"
+                className="form-select"
+                style={{ width: "auto", padding: "0.3rem 0.5rem", fontSize: "0.78rem" }}
+              >
+                <option value="ALL">All departments</option>
+                <option value="ACTIVE">Active only</option>
+                <option value="AT_RISK">At risk ({AT_RISK_PCT}%+ used)</option>
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.78rem", color: "rgb(var(--color-text-muted))" }}>
               <Icons.ListFilter size={14} />
-            </button>
+              <select
+                value={sortBy}
+                onChange={(e) => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
+                aria-label="Sort departments"
+                className="form-select"
+                style={{ width: "auto", padding: "0.3rem 0.5rem", fontSize: "0.78rem" }}
+              >
+                <option value="NAME">Sort: Name</option>
+                <option value="UTILISATION">Sort: Utilisation</option>
+              </select>
+            </label>
           </div>
         </div>
 

@@ -12,6 +12,7 @@
 import React, { useEffect, useState } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
+import { SubmitButton } from "../../ui/SubmitButton";
 import { humanizeStatus } from "../../ui/format";
 import {
   PermissionAction,
@@ -80,15 +81,9 @@ export const AdminEditRoleModal: React.FC<AdminEditRoleModalProps> = ({
           <button type="button" onClick={onClose} className="btn btn-secondary">
             Cancel
           </button>
-          <button
-            type="submit"
-            form="edit-role-form"
-            disabled={busy}
-            className="btn btn-primary"
-            style={{ opacity: busy ? 0.6 : 1 }}
-          >
-            {busy ? "Saving…" : "Save Changes"}
-          </button>
+          <SubmitButton type="submit" form="edit-role-form" loading={busy} loadingLabel="Saving…">
+            Save Changes
+          </SubmitButton>
         </>
       }
     >

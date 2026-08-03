@@ -3,6 +3,7 @@ import { EmailService } from "../email/email.service";
 import { LoggerService } from "../logs/logger.service";
 import { RequestStatus } from "../../enums/statuses";
 import { humanizeRequestStatus } from "./status-labels";
+import { isNotifiableStatus } from "./notifiable-events";
 
 /**
  * Sends the initiator an email when their request changes hands.
@@ -10,19 +11,10 @@ import { humanizeRequestStatus } from "./status-labels";
  * `EmailService.sendExpenseNotification` and its templates already existed but
  * were never called, so nobody was told their request had been approved,
  * returned or paid. Wired into `ExpenseService` at each transition.
+ *
+ * Which transitions qualify is defined once in `notifiable-events` and shared
+ * with the in-app bell, so the two channels cannot report different events.
  */
-
-/** Transitions worth emailing about. Intermediate machine states are skipped. */
-const NOTIFIABLE: RequestStatus[] = [
-  RequestStatus.PENDING_APPROVAL,
-  RequestStatus.PENDING_EXCEPTIONAL,
-  RequestStatus.SENT_TO_FINANCE,
-  RequestStatus.UPLOADED_TO_BANK,
-  RequestStatus.PAID,
-  RequestStatus.CLOSED,
-  RequestStatus.REJECTED,
-  RequestStatus.RETURNED,
-];
 
 export class RequestNotifier {
   /**
@@ -41,7 +33,7 @@ export class RequestNotifier {
     origin?: string
   ): Promise<void> {
     try {
-      if (!NOTIFIABLE.includes(request.status)) return;
+      if (!isNotifiableStatus(request.status)) return;
 
       const initiatorId =
         (request.initiatorId as { _id?: unknown })?._id ?? request.initiatorId;

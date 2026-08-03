@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { isDepartmentScopedRole } from "../../../enums/roles";
+import { SubmitButton } from "../../ui/SubmitButton";
 
 interface AdminEditUserProfileModalProps {
   isOpen: boolean;
@@ -10,6 +11,8 @@ interface AdminEditUserProfileModalProps {
   onUpdateUser: (userData: any) => void;
   /** Ends every active session for this user. */
   onForceLogOut?: (userId: string, name: string) => void;
+  /** True while the profile change is being persisted. */
+  busy?: boolean;
 }
 
 export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps> = ({
@@ -18,7 +21,8 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
   user,
   departments,
   onUpdateUser,
-  onForceLogOut
+  onForceLogOut,
+  busy = false
 }) => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -326,22 +330,19 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
             >
               Cancel
             </button>
-            <button
+            <SubmitButton
               type="submit"
+              loading={busy}
+              loadingLabel="Updating…"
               style={{
                 padding: "0.65rem 1.25rem",
-                borderRadius: "0.5rem",
-                border: "none",
-                backgroundColor: "#2563eb",
-                color: "#ffffff",
-                fontWeight: "600",
                 fontSize: "0.85rem",
-                cursor: "pointer",
+                fontWeight: 600,
                 boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
               }}
             >
               Update User
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

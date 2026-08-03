@@ -1,19 +1,23 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { isDepartmentScopedRole } from "../../../enums/roles";
+import { SubmitButton } from "../../ui/SubmitButton";
 
 interface AdminAddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   departments: any[];
   onSaveUser: (userData: any) => void;
+  /** True while the invite is in flight; blocks the duplicate submit. */
+  busy?: boolean;
 }
 
 export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
   isOpen,
   onClose,
   departments,
-  onSaveUser
+  onSaveUser,
+  busy = false
 }) => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -271,22 +275,19 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
             >
               Cancel
             </button>
-            <button
+            <SubmitButton
               type="submit"
+              loading={busy}
+              loadingLabel="Sending invite…"
               style={{
                 padding: "0.65rem 1.25rem",
-                borderRadius: "0.5rem",
-                border: "none",
-                backgroundColor: "#2563eb",
-                color: "#ffffff",
-                fontWeight: "600",
                 fontSize: "0.85rem",
-                cursor: "pointer",
+                fontWeight: 600,
                 boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
               }}
             >
               Save User
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

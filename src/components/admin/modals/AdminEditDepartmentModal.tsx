@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
+import { DEPARTMENT_SCOPED_ROLES } from "../../../enums/roles";
 import { formatNairaPrecise, formatNairaCompact } from "../../ui/format";
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
 
@@ -26,6 +27,12 @@ interface AdminEditDepartmentModalProps {
   /** Optional pick-list for the Department Head selector. */
   departmentHeads?: string[];
   onUpdateDepartment: (deptData: any) => void;
+  /**
+   * Moves a user into this department. Without it the "Add User" button in the
+   * Assigned Users header had no handler at all — an admin could search for
+   * someone, press it, and nothing whatsoever happened.
+   */
+  onAssignUser?: (userId: string) => Promise<boolean | void> | void;
 }
 
 // Utilisation at or above this share is flagged so admins can react before an overrun.
@@ -37,13 +44,16 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
   department,
   users,
   departmentHeads,
-  onUpdateDepartment
+  onUpdateDepartment,
+  onAssignUser
 }) => {
   const [deptName, setDeptName] = useState("");
   const [head, setHead] = useState("");
   const [totalBudget, setTotalBudget] = useState<number>(0);
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [userSearch, setUserSearch] = useState("");
+  // The candidate picked out of the search results, awaiting "Add User".
+  const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [showAddCategory, setShowAddCategory] = useState(false);
 
   useEffect(() => {
@@ -61,10 +71,15 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
 
   if (!isOpen || !department) return null;
 
-  // Only staff assigned to this department belong on its roster.
-  const roster: any[] = (users || department.members || []).filter(
-    (u: any) => !u.department || u.department.id === (department.id || department._id)
-  );
+  const departmentId = String(department.id || department._id || "");
+  const deptIdOf = (u: any) => String(u.department?.id ?? u.departmentId ?? "");
+
+  // Only staff actually assigned to this department belong on its roster. The
+  // filter also admitted anyone with *no* department, so every enterprise-wide
+  // account (admin, finance officer/manager/head) was listed as a member of
+  // every department, and the headcount counted them.
+  const allUsers: any[] = users || department.members || [];
+  const roster: any[] = allUsers.filter((u) => deptIdOf(u) === departmentId);
   const headcount = department.usersCount ?? roster.length;
   const spentToDate = department.utilised ?? department.utilized ?? 0;
 
@@ -73,9 +88,33 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
     ? departmentHeads
     : Array.from(new Set([head, ...roster.map((u) => u.name || u.fullName)].filter(Boolean))) as string[];
 
-  const visibleUsers = roster.filter((u) =>
-    (u.name || u.fullName || "").toLowerCase().includes(userSearch.toLowerCase())
-  );
+  const matchesSearch = (u: any) =>
+    `${u.name || u.fullName || ""} ${u.email || ""}`.toLowerCase().includes(userSearch.trim().toLowerCase());
+
+  const visibleUsers = roster.filter(matchesSearch);
+
+  /**
+   * Staff who could be moved into this department. Only the two
+   * department-scoped roles are offered: assigning a finance or admin account to
+   * a department would silently narrow the work it can see.
+   */
+  const candidates: any[] = userSearch.trim()
+    ? allUsers.filter(
+        (u) =>
+          deptIdOf(u) !== departmentId &&
+          DEPARTMENT_SCOPED_ROLES.includes(u.role) &&
+          matchesSearch(u)
+      )
+    : [];
+
+  const selectedCandidate = candidates.find((u) => String(u.id ?? u._id) === selectedCandidateId) ?? null;
+
+  const handleAddUser = async () => {
+    if (!selectedCandidate || !onAssignUser) return;
+    await onAssignUser(String(selectedCandidate.id ?? selectedCandidate._id));
+    setSelectedCandidateId("");
+    setUserSearch("");
+  };
 
   const handleAddLine = (item: BudgetItemPayload) => {
     setLines([...lines, { category: item.category, amount: item.amount, utilization: 0, description: item.description }]);
@@ -265,16 +304,88 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
                 type="text"
                 className="form-input"
                 value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
+                onChange={(e) => { setUserSearch(e.target.value); setSelectedCandidateId(""); }}
                 placeholder="Search users..."
                 style={{ paddingLeft: "2rem", minWidth: "210px" }}
               />
             </div>
-            <button type="button" className="btn btn-primary" style={{ background: "#2563EB", border: "none", whiteSpace: "nowrap" }}>
+            <button
+              type="button"
+              onClick={handleAddUser}
+              disabled={!selectedCandidate || !onAssignUser}
+              title={selectedCandidate ? undefined : "Search for a user, then pick them from the results"}
+              className="btn btn-primary"
+              style={{
+                whiteSpace: "nowrap",
+                opacity: selectedCandidate && onAssignUser ? 1 : 0.5,
+                cursor: selectedCandidate && onAssignUser ? "pointer" : "not-allowed",
+              }}
+            >
               Add User
             </button>
           </div>
         </div>
+
+        {/* Search results for staff not yet in this department. Pick one, then
+            "Add User" moves them across. Only initiators and approvers appear —
+            the other roles are enterprise-wide by design. */}
+        {userSearch.trim() && (
+          <div
+            style={{
+              border: "1px solid rgb(var(--color-card-border))",
+              borderRadius: "0.65rem",
+              padding: "0.5rem",
+              marginBottom: "0.85rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.25rem",
+              maxHeight: "170px",
+              overflowY: "auto",
+            }}
+          >
+            {candidates.length === 0 ? (
+              <span style={{ fontSize: "0.82rem", color: "rgb(var(--color-text-dim))", padding: "0.4rem 0.5rem" }}>
+                No unassigned initiators or approvers match &quot;{userSearch.trim()}&quot;.
+              </span>
+            ) : (
+              candidates.map((u: any) => {
+                const id = String(u.id ?? u._id);
+                const picked = id === selectedCandidateId;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setSelectedCandidateId(picked ? "" : id)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "0.75rem",
+                      padding: "0.5rem 0.65rem",
+                      borderRadius: "0.5rem",
+                      border: `1px solid ${picked ? "rgb(var(--color-primary))" : "transparent"}`,
+                      background: picked ? "rgba(var(--color-primary), 0.1)" : "transparent",
+                      color: "rgb(var(--color-text))",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      font: "inherit",
+                    }}
+                  >
+                    <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>
+                      {u.name || u.fullName}
+                      <span style={{ fontWeight: 400, color: "rgb(var(--color-text-muted))", marginLeft: "0.4rem" }}>
+                        {u.email}
+                      </span>
+                    </span>
+                    <span style={{ fontSize: "0.72rem", color: "rgb(var(--color-text-dim))", whiteSpace: "nowrap" }}>
+                      {u.department?.name ? `in ${u.department.name}` : "Unassigned"}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "0.85rem" }}>
           {visibleUsers.map((user: any, index: number) => {

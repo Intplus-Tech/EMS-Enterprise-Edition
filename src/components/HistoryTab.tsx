@@ -13,10 +13,18 @@ import { isOwnRequest } from "../domains/identity/reference";
 import { StatCard } from "./ui/StatCard";
 import { Pagination } from "./ui/Pagination";
 import { EmptyState } from "./ui/EmptyState";
+import { RequestStatus } from "../enums/statuses";
 import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, statusBadgeClass } from "./ui/format";
 
 /** Design shows five rows per page in the history table. */
 const ROWS_PER_PAGE = 5;
+
+/**
+ * Status filter options, derived from the lifecycle enum rather than retyped, so
+ * a new status cannot appear in the table with no way to filter for it. DRAFT is
+ * omitted because `scoped` never admits drafts.
+ */
+const SELECTABLE_STATUSES = Object.values(RequestStatus).filter(s => s !== RequestStatus.DRAFT);
 
 interface HistoryTabProps {
   currentUser: any;
@@ -58,8 +66,14 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
   // Requests visible to this user, before any UI filter is applied. Kept separate
   // so the KPI tiles always describe the full history, not the filtered slice.
   const scoped = useMemo(() => expenses.filter(e => {
-    const isHistory = ["PAID", "CLOSED", "REJECTED", "CANCELLED", "APPROVED"].includes(e.status);
-    if (!isHistory) return false;
+    // History is the complete log: `designs/initiator/History.png` lists PENDING
+    // and CLARIFICATION NEEDED rows beside PAID/APPROVED/REJECTED, and the KPI
+    // reads "Total Request — across all statuses". This previously whitelisted
+    // only finalised statuses, so a request an initiator had just raised was
+    // missing from their own history until somebody approved it.
+    // DRAFT is the one exclusion: an unsubmitted draft is not yet part of the
+    // record, and it already has an edit affordance on the Requests screen.
+    if (e.status === "DRAFT") return false;
 
     return currentUser?.role === "INITIATOR"
       ? isOwnRequest(e, currentUser)
@@ -183,11 +197,9 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
             <label className="form-label" style={{ fontSize: "0.78rem" }}>Status</label>
             <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value)} className="form-select">
               <option value="ALL">All Statuses</option>
-              <option value="APPROVED">Approved</option>
-              <option value="PAID">Paid</option>
-              <option value="CLOSED">Closed</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="CANCELLED">Cancelled</option>
+              {SELECTABLE_STATUSES.map(status => (
+                <option key={status} value={status}>{humanizeStatus(status)}</option>
+              ))}
             </select>
           </div>
 
@@ -286,8 +298,8 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
         ) : (
           <EmptyState
             icon={<Icons.Archive size={20} />}
-            title="No completed requests found in history"
-            description="Requests appear here once they have been approved, paid, rejected or cancelled."
+            title="No requests found in history"
+            description="Every request you submit appears here — in review, approved, paid, rejected or cancelled. Unsubmitted drafts stay on the Requests screen."
           />
         )}
       </div>

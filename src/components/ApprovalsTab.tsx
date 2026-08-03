@@ -13,6 +13,7 @@ import { RequestQueueTable } from "./approvals/RequestQueueTable";
 import { AttachmentList } from "./ui/AttachmentList";
 import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
 import { ModalShell } from "./ui/ModalShell";
+import { SubmitButton } from "./ui/SubmitButton";
 import { Pagination } from "./ui/Pagination";
 import { StatCard } from "./ui/StatCard";
 import { EmptyState } from "./ui/EmptyState";
@@ -827,9 +828,15 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       className="form-input"
                       style={{ flexGrow: 1, padding: "0.6rem 0.75rem", fontSize: "0.85rem" }}
                     />
-                    <button type="submit" disabled={threadSending || !newComment.trim()} className="btn btn-primary" style={{ padding: "0.6rem 1.2rem", background: "#2563EB", border: "none", opacity: threadSending || !newComment.trim() ? 0.6 : 1 }}>
-                      {threadSending ? "Sending…" : "Send"}
-                    </button>
+                    <SubmitButton
+                      type="submit"
+                      loading={threadSending}
+                      loadingLabel="Sending…"
+                      disabled={!newComment.trim()}
+                      style={{ padding: "0.6rem 1.2rem", background: "#2563EB", border: "none" }}
+                    >
+                      Send
+                    </SubmitButton>
                   </form>
                 </div>
               )}

@@ -4,6 +4,7 @@ import { User } from "../../models/User";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
 import { LoggerService, ILogActor } from "../logs/logger.service";
 import { BudgetService } from "../budget/budget.service";
+import { RequestNotifier } from "../notifications/request-notifier";
 import { AuditAction } from "../../enums/auditActions";
 import { RequestStatus } from "../../enums/statuses";
 import { DepartmentDto } from "../../types/api";
@@ -225,6 +226,15 @@ export class DepartmentService {
         { requestId: request._id, previousStatus },
         actor
       );
+
+      // Tell the initiator their in-flight request was cancelled for them.
+      //
+      // Email is the only channel that can reach them here: requests belonging
+      // to a deleted department are excluded from `GET /api/expenses`, and the
+      // in-app bell is derived from that list — so the request, and any
+      // notification derived from it, disappear from their dashboard at the
+      // same moment. Silently losing a submitted request is not acceptable.
+      await RequestNotifier.notifyInitiator(request);
     }
 
     // 2. Revoke department-scoped access by clearing the assignment.

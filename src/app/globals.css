@@ -882,5 +882,222 @@ option {
   justify-content: center;
 }
 
+/* ==========================================================================
+   Motion & loading states
+   --------------------------------------------------------------------------
+   This project has no Tailwind, yet three screens shipped `className=
+   "animate-spin"` — a class that never existed here, so no loader in the app
+   has ever actually moved. The keyframes below back that class and every
+   loading primitive in `src/components/ui/`.
+   ========================================================================== */
+
+@keyframes ems-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Travelling highlight for skeleton placeholders. */
+@keyframes ems-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Indeterminate bar that sweeps while a route segment streams in. */
+@keyframes ems-progress {
+  0%   { transform: translateX(-100%) scaleX(0.4); }
+  50%  { transform: translateX(0%) scaleX(0.7); }
+  100% { transform: translateX(100%) scaleX(0.4); }
+}
+
+@keyframes ems-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Breathing pulse behind the full-page mark. */
+@keyframes ems-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.94); }
+  50%      { opacity: 0.75; transform: scale(1.06); }
+}
+
+.animate-spin {
+  animation: ems-spin 0.9s linear infinite;
+}
+
+/* --- Ring spinner -------------------------------------------------------
+   A conic sweep masked into a ring, so the trail fades into the track
+   instead of the hard-edged border trick. Colour is inherited from
+   `currentColor` via --spinner-rgb, letting one element sit on a button, a
+   card or the page backdrop without a variant per surface. */
+.spinner {
+  --spinner-size: 1.25rem;
+  --spinner-thickness: 2px;
+  --spinner-rgb: var(--color-primary);
+  --spinner-speed: 0.7s;
+  display: inline-block;
+  flex-shrink: 0;
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  border-radius: 50%;
+  /* Alpha uses the `rgb(<channels> / <alpha>)` form deliberately: the
+     `rgba(var(--token), 0.5)` spelling used elsewhere in this file is invalid
+     CSS — space-separated channels cannot take a comma'd alpha — and computes
+     to transparent, which would erase the whole trail. */
+  background: conic-gradient(
+    from 0deg,
+    rgb(var(--spinner-rgb) / 0) 0%,
+    rgb(var(--spinner-rgb) / 0.08) 35%,
+    rgb(var(--spinner-rgb) / 0.45) 70%,
+    rgb(var(--spinner-rgb) / 1) 100%
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--spinner-thickness)), #000 calc(100% - var(--spinner-thickness)));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--spinner-thickness)), #000 calc(100% - var(--spinner-thickness)));
+  animation: ems-spin var(--spinner-speed) linear infinite;
+}
+
+/* On a filled button the ring must read against the brand fill, not the page. */
+.spinner-on-fill {
+  --spinner-rgb: 255 255 255;
+}
+
+.spinner-sm { --spinner-size: 0.9rem;  --spinner-thickness: 2px; }
+.spinner-md { --spinner-size: 1.25rem; --spinner-thickness: 2px; }
+.spinner-lg { --spinner-size: 2rem;    --spinner-thickness: 3px; }
+.spinner-xl { --spinner-size: 3.25rem; --spinner-thickness: 4px; }
+
+/* --- Button busy state --------------------------------------------------
+   `.btn` already animates its colours; these rules cover the disabled and
+   in-flight cases uniformly so no caller re-implements opacity by hand. */
+.btn:disabled,
+.btn[aria-busy="true"] {
+  cursor: not-allowed;
+  opacity: 0.75;
+}
+
+.btn[aria-busy="true"] {
+  /* Width is held by the label staying mounted (see SubmitButton), so the
+     button must not also shift on press. */
+  pointer-events: none;
+}
+
+.btn:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+/* --- Skeleton placeholder ----------------------------------------------- */
+.skeleton {
+  border-radius: var(--radius-sm);
+  background-image: linear-gradient(
+    90deg,
+    rgb(var(--color-text-dim) / 0.10) 25%,
+    rgb(var(--color-text-dim) / 0.20) 37%,
+    rgb(var(--color-text-dim) / 0.10) 63%
+  );
+  background-size: 200% 100%;
+  animation: ems-shimmer 1.4s ease-in-out infinite;
+}
+
+/* --- Route-level progress bar ------------------------------------------- */
+.route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  overflow: hidden;
+  background: rgb(var(--color-primary) / 0.12);
+  z-index: 2000;
+}
+
+.route-progress::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgb(var(--color-primary) / 0) 0%,
+    rgb(var(--color-primary) / 1) 50%,
+    rgb(var(--color-primary) / 0) 100%
+  );
+  animation: ems-progress 1.1s ease-in-out infinite;
+}
+
+/* --- Full-page loader ---------------------------------------------------- */
+.page-loader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  min-height: 60vh;
+  animation: ems-fade-in 0.3s ease both;
+}
+
+/* Fills the viewport when it stands in for the whole shell rather than a panel. */
+.page-loader-full {
+  min-height: 100vh;
+  background: rgb(var(--color-background));
+}
+
+.page-loader-mark {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+}
+
+/* Halo sits behind the ring so the mark has depth while it waits. */
+.page-loader-mark::before {
+  content: "";
+  position: absolute;
+  inset: -0.55rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(var(--color-primary) / 0.35) 0%, rgb(var(--color-primary) / 0) 70%);
+  animation: ems-pulse 1.8s ease-in-out infinite;
+}
+
+/* --- Blocking overlay for in-place work (modals, tables) ----------------- */
+.busy-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: rgb(var(--color-surface) / 0.72);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  border-radius: inherit;
+  z-index: 5;
+  animation: ems-fade-in 0.18s ease both;
+}
+
+/* Respect users who have asked the OS to limit motion: keep the affordance,
+   drop the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .spinner,
+  .skeleton,
+  .route-progress::after,
+  .page-loader-mark::before {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
+
+  .spinner {
+    border: var(--spinner-thickness) solid rgb(var(--spinner-rgb) / 0.35);
+    border-top-color: rgb(var(--spinner-rgb) / 1);
+    background: none;
+    -webkit-mask: none;
+    mask: none;
+  }
+
+  .page-loader,
+  .busy-overlay {
+    animation: none;
+  }
+}
+
 
 

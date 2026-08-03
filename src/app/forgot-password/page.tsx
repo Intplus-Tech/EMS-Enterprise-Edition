@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
+import { SubmitButton } from "../../components/ui/SubmitButton";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -191,36 +192,16 @@ export default function ForgotPasswordPage() {
               />
             </div>
 
-            {/* Submit Button */}
-            <button 
-              type="submit" 
-              disabled={loading || sent}
-              style={{ 
-                width: "100%", 
-                background: "rgb(var(--color-primary))", 
-                color: "#FFFFFF", 
-                border: "none", 
-                borderRadius: "8px", 
-                padding: "0.875rem", 
-                fontWeight: "600", 
-                fontSize: "1rem",
-                cursor: (loading || sent) ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-                opacity: (loading || sent) ? 0.7 : 1,
-                transition: "background-color 0.2s"
-              }}
-              onMouseOver={(e) => !(loading || sent) && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary-hover))")}
-              onMouseOut={(e) => !(loading || sent) && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary))")}
+            {/* Submit Button — stays disabled after `sent` so the code is not re-requested */}
+            <SubmitButton
+              type="submit"
+              loading={loading}
+              loadingLabel="Sending…"
+              disabled={sent}
+              style={{ width: "100%", padding: "0.875rem", fontSize: "1rem", fontWeight: 600 }}
             >
-              {loading ? "Sending..." : (
-                <>
-                  Send Verification Code <Icons.ArrowRight size={18} />
-                </>
-              )}
-            </button>
+              Send Verification Code <Icons.ArrowRight size={18} />
+            </SubmitButton>
           </form>
 
           {/* Back to Login Link */}

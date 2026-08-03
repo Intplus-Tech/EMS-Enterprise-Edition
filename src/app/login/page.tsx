@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
+import { SubmitButton } from "../../components/ui/SubmitButton";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -300,28 +301,15 @@ export default function LoginPage() {
               </label>
             </div>
 
-            {/* Sign in Button */}
-            <button 
-              type="submit" 
-              disabled={loading}
-              style={{ 
-                width: "100%", 
-                background: "rgb(var(--color-primary))", 
-                color: "#FFFFFF", 
-                border: "none", 
-                borderRadius: "8px", 
-                padding: "0.875rem", 
-                fontWeight: "600", 
-                fontSize: "1rem",
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.7 : 1,
-                transition: "background-color 0.2s"
-              }}
-              onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary-hover))")}
-              onMouseOut={(e) => !loading && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary))")}
+            {/* Sign in Button — SubmitButton owns the spinner and disabled state */}
+            <SubmitButton
+              type="submit"
+              loading={loading}
+              loadingLabel="Signing in…"
+              style={{ width: "100%", padding: "0.875rem", fontSize: "1rem", fontWeight: 600 }}
             >
-              {loading ? "Signing in..." : "Sign in"}
-            </button>
+              Sign in
+            </SubmitButton>
           </form>
 
           {/* Forgot Password Link */}

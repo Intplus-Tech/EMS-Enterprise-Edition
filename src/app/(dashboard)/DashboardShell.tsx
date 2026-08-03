@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { useTransition } from "react";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
 
 import { DynamicIcon } from "../../components/DynamicIcon";
 import { NotificationsPanel } from "../../components/NotificationsPanel";
 import { SidebarNavItem } from "../../components/ui/SidebarNavItem";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { getNavItemsForRole } from "./navItems";
 
 // Modular Dialog Modals
@@ -109,6 +111,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     inviteUser, updateUser, setUserActive, deleteUser, revokeUserSessions,
     saveBudgetPeriod, saveRolePermissions,
     adminNotice, setAdminNotice, adminBusy,
+    accountBusy,
     showAdminAddUserModal, setShowAdminAddUserModal,
     showAdminEditUserProfileModal, setShowAdminEditUserProfileModal,
     selectedAdminUser,
@@ -124,7 +127,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     alertDialog, setAlertDialog,
   } = useDashboard();
 
-  const navTo = (route: string) => router.push(route);
+  // Sidebar navigation runs inside a transition so the shell can show the top
+  // progress bar while the next segment loads. Without this the sidebar simply
+  // froze on click with no indication anything was happening — the pages are
+  // client components, so `loading.tsx` alone does not cover the fetch that
+  // follows.
+  const [isNavigating, startNavigation] = useTransition();
+  const navTo = (route: string) => startNavigation(() => router.push(route));
   const isActive = (route: string) => pathname === route;
 
   // Only these roles may raise a request — `POST /api/expenses` accepts nobody
@@ -181,17 +190,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "rgb(var(--color-background))", color: "rgb(var(--color-text))" }}>
-        <div style={{ textAlign: "center" }}>
-          <Icons.Loader className="animate-spin" size={48} style={{ color: "rgb(var(--color-primary))", margin: "0 auto 1rem" }} />
-          <p>Initialising spend management dashboard...</p>
-        </div>
-      </div>
+      <PageLoader
+        fullScreen
+        message="Initialising spend management dashboard"
+        hint="Loading your session, requests and approvals…"
+      />
     );
   }
 
   return (
     <div className="app-container">
+      {/* Route transition indicator — spans the viewport while a sidebar
+          destination resolves, so the chrome stays usable meanwhile. */}
+      {isNavigating && <div className="route-progress" role="progressbar" aria-label="Loading page" />}
+
       {/* Sidebar navigation */}
       <div className="sidebar">
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "2rem", padding: "0 0.5rem" }}>
@@ -481,6 +493,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           setShowEditProfileModal(false);
           setShowUpdatePhotoModal(true);
         }}
+        busy={accountBusy}
       />
 
       <UpdatePhotoModal
@@ -506,6 +519,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         showPasswordNewToggle={showPasswordNewToggle}
         setShowPasswordNewToggle={setShowPasswordNewToggle}
         handleChangePassword={handleChangePassword}
+        busy={accountBusy}
       />
 
       {/* SYSTEM ADMIN MODALS — every action persists via useAdminAdministration
@@ -522,6 +536,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             departmentId: userData.departmentId || undefined,
           })
         }
+        busy={adminBusy}
       />
 
       <AdminEditUserProfileModal
@@ -539,6 +554,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           })
         }
         onForceLogOut={(userId: string, name: string) => revokeUserSessions(userId, name)}
+        busy={adminBusy}
       />
 
       <AdminCreateDepartmentModal
@@ -556,6 +572,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             })),
           })
         }
+        busy={adminBusy}
       />
 
       <AdminEditDepartmentModal
@@ -563,6 +580,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onClose={() => setShowAdminEditDeptModal(false)}
         department={selectedAdminDept}
         users={systemUsers}
+        // Assignment is a user mutation, not a department one, so it goes
+        // through the same persisted path the directory's role select uses.
+        onAssignUser={(userId: string) =>
+          updateUser(userId, { departmentId: selectedAdminDept?.id ?? selectedAdminDept?._id })
+        }
         onUpdateDepartment={(updatedDept: any) =>
           updateDepartment(updatedDept.id || updatedDept._id, {
             name: updatedDept.name,

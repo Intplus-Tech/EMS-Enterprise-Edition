@@ -95,6 +95,10 @@ function useDashboardState() {
   const [inviteError, setInviteError] = useState("");
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
 
+  // Covers both "my account" writes (profile edit, password change). They are
+  // never in flight at the same time, so one flag drives both dialogs' buttons.
+  const [accountBusy, setAccountBusy] = useState(false);
+
   // System Admin Modal States
   const [showAdminAddUserModal, setShowAdminAddUserModal] = useState(false);
   const [showAdminEditUserProfileModal, setShowAdminEditUserProfileModal] = useState(false);
@@ -599,12 +603,15 @@ function useDashboardState() {
       return;
     }
 
+    setAccountBusy(true);
     try {
       await AuthClient.changePassword(settingsForm.currentPassword, settingsForm.newPassword);
       setSettingsMessage("Password successfully updated!");
       setSettingsForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err) {
       setSettingsError(toErrorMessage(err, "Failed to update password."));
+    } finally {
+      setAccountBusy(false);
     }
   };
 
@@ -631,6 +638,7 @@ function useDashboardState() {
       return;
     }
 
+    setAccountBusy(true);
     try {
       const user = await AuthClient.updateProfile({
         name: form.name,
@@ -645,6 +653,8 @@ function useDashboardState() {
       notifySuccess("Profile updated.");
     } catch (err) {
       notifyError(toErrorMessage(err, "Failed to update profile."));
+    } finally {
+      setAccountBusy(false);
     }
   };
 
@@ -784,6 +794,7 @@ function useDashboardState() {
     inviteForm, setInviteForm,
     inviteError, setInviteError,
     inviteSubmitting, setInviteSubmitting,
+    accountBusy,
     showAdminAddUserModal, setShowAdminAddUserModal,
     showAdminEditUserProfileModal, setShowAdminEditUserProfileModal,
     selectedAdminUser, setSelectedAdminUser,

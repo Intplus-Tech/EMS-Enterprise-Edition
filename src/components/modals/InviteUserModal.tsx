@@ -3,6 +3,7 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { isDepartmentScopedRole } from "../../enums/roles";
+import { SubmitButton } from "../ui/SubmitButton";
 
 interface InviteUserModalProps {
   isOpen: boolean;
@@ -127,9 +128,9 @@ export const InviteUserModal: React.FC<InviteUserModalProps> = ({
             <button type="button" onClick={onClose} className="btn btn-secondary">
               Cancel
             </button>
-            <button type="submit" disabled={inviteSubmitting} className="btn btn-primary">
-              {inviteSubmitting ? "Inviting..." : "Send Invitation"}
-            </button>
+            <SubmitButton type="submit" loading={inviteSubmitting} loadingLabel="Sending invitation…">
+              Send Invitation
+            </SubmitButton>
           </div>
         </form>
       </div>

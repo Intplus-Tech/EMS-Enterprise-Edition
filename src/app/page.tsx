@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import * as Icons from "lucide-react";
+import { PageLoader } from "../components/ui/PageLoader";
 import { getDefaultRouteForRole } from "./(dashboard)/roleRoutes";
 
 export default function Home() {
@@ -34,12 +34,7 @@ export default function Home() {
     };
   }, [router]);
 
-  return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "rgb(var(--color-background))", color: "rgb(var(--color-text))" }}>
-      <div style={{ textAlign: "center" }}>
-        <Icons.Loader className="animate-spin" size={48} style={{ color: "rgb(var(--color-primary))", margin: "0 auto 1rem" }} />
-        <p>Loading your workspace...</p>
-      </div>
-    </div>
-  );
+  // This route only resolves the session and redirects, so the loader *is* the
+  // screen — it stays up until `router.replace` lands.
+  return <PageLoader fullScreen message="Loading your workspace" hint="Checking your session…" />;
 }

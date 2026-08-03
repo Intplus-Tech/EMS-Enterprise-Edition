@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { SubmitButton } from "../../ui/SubmitButton";
 
 interface LineItem {
   id: string;
@@ -12,12 +13,15 @@ interface AdminCreateDepartmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateDepartment: (deptData: any) => void;
+  /** True while the department (and its opening budget) is being persisted. */
+  busy?: boolean;
 }
 
 export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProps> = ({
   isOpen,
   onClose,
-  onCreateDepartment
+  onCreateDepartment,
+  busy = false
 }) => {
   const [deptName, setDeptName] = useState("");
   // Starts empty: the modal used to pre-fill three invented allocation lines
@@ -266,22 +270,19 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             >
               Cancel
             </button>
-            <button
+            <SubmitButton
               type="submit"
+              loading={busy}
+              loadingLabel="Creating…"
               style={{
                 padding: "0.65rem 1.25rem",
-                borderRadius: "0.5rem",
-                border: "none",
-                backgroundColor: "#2563eb",
-                color: "#ffffff",
-                fontWeight: "600",
                 fontSize: "0.85rem",
-                cursor: "pointer",
+                fontWeight: 600,
                 boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
               }}
             >
               Create Department
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

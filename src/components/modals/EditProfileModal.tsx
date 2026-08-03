@@ -2,6 +2,7 @@
 
 import React from "react";
 import * as Icons from "lucide-react";
+import { SubmitButton } from "../ui/SubmitButton";
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface EditProfileModalProps {
   setEditProfileForm: React.Dispatch<React.SetStateAction<any>>;
   handleUpdateProfile: (e: React.FormEvent) => Promise<void>;
   onOpenUpdatePhotoModal: () => void;
+  /** True while the profile save is in flight. */
+  busy?: boolean;
 }
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({
@@ -21,6 +24,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   setEditProfileForm,
   handleUpdateProfile,
   onOpenUpdatePhotoModal,
+  busy = false,
 }) => {
   if (!isOpen) return null;
 
@@ -181,9 +185,14 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <button type="button" onClick={onClose} className="btn btn-secondary" style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))" }}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" style={{ padding: "0.55rem 1.25rem", borderRadius: "8px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <SubmitButton
+              type="submit"
+              loading={busy}
+              loadingLabel="Saving…"
+              style={{ padding: "0.55rem 1.25rem", borderRadius: "8px", fontWeight: 600 }}
+            >
               Save Changes <Icons.CheckCircle size={16} />
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

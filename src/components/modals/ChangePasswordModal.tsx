@@ -2,6 +2,7 @@
 
 import React from "react";
 import * as Icons from "lucide-react";
+import { SubmitButton } from "../ui/SubmitButton";
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface ChangePasswordModalProps {
   showPasswordNewToggle: boolean;
   setShowPasswordNewToggle: (show: boolean) => void;
   handleChangePassword: (e: React.FormEvent) => Promise<void>;
+  /** True while the password change is in flight. */
+  busy?: boolean;
 }
 
 export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
@@ -29,6 +32,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
   showPasswordNewToggle,
   setShowPasswordNewToggle,
   handleChangePassword,
+  busy = false,
 }) => {
   if (!isOpen) return null;
 
@@ -111,9 +115,14 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             <button type="button" onClick={onClose} className="btn btn-secondary" style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))" }}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" style={{ padding: "0.55rem 1.25rem", borderRadius: "8px", fontWeight: "600" }}>
+            <SubmitButton
+              type="submit"
+              loading={busy}
+              loadingLabel="Updating…"
+              style={{ padding: "0.55rem 1.25rem", borderRadius: "8px", fontWeight: 600 }}
+            >
               Update Password
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

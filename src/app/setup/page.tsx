@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
+import { SubmitButton } from "../../components/ui/SubmitButton";
 
 function SetupContent() {
   const router = useRouter();
@@ -345,35 +346,14 @@ function SetupContent() {
           </div>
 
           {/* Activate Account Button */}
-          <button 
-            type="submit" 
-            disabled={submitting}
-            style={{ 
-              width: "100%", 
-              background: "rgb(var(--color-primary))", 
-              color: "#FFFFFF", 
-              border: "none", 
-              borderRadius: "8px", 
-              padding: "0.875rem", 
-              fontWeight: "600", 
-              fontSize: "1rem",
-              cursor: submitting ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "0.5rem",
-              opacity: submitting ? 0.7 : 1,
-              transition: "background-color 0.2s"
-            }}
-            onMouseOver={(e) => !submitting && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary-hover))")}
-            onMouseOut={(e) => !submitting && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary))")}
+          <SubmitButton
+            type="submit"
+            loading={submitting}
+            loadingLabel="Activating account…"
+            style={{ width: "100%", padding: "0.875rem", fontSize: "1rem", fontWeight: 600 }}
           >
-            {submitting ? "Activating Account..." : (
-              <>
-                Activate Account <Icons.ArrowRight size={18} />
-              </>
-            )}
-          </button>
+            Activate Account <Icons.ArrowRight size={18} />
+          </SubmitButton>
         </form>
       </div>
     </div>

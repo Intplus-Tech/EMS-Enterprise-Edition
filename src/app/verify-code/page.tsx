@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
+import { SubmitButton } from "../../components/ui/SubmitButton";
 
 function VerifyCodeContent() {
   const router = useRouter();
@@ -258,27 +259,25 @@ function VerifyCodeContent() {
             ))}
           </div>
 
-          {/* Outline styled Verify Button */}
-          <button 
-            type="submit" 
-            disabled={loading}
-            style={{ 
-              width: "100%", 
-              background: "rgb(var(--color-surface))", 
-              color: "#2563EB", 
-              border: "1px solid rgba(var(--color-card-border), 0.6)", 
-              borderRadius: "8px", 
-              padding: "0.875rem", 
-              fontWeight: "600", 
+          {/* Outline styled Verify Button — the design keeps this one ghosted,
+              so it stays a bordered surface rather than a filled primary. */}
+          <SubmitButton
+            type="submit"
+            variant="secondary"
+            loading={loading}
+            loadingLabel="Verifying…"
+            style={{
+              width: "100%",
+              background: "rgb(var(--color-surface))",
+              color: "#2563EB",
+              border: "1px solid rgba(var(--color-card-border), 0.6)",
+              padding: "0.875rem",
               fontSize: "1rem",
-              cursor: loading ? "not-allowed" : "pointer",
-              transition: "all 0.2s"
+              fontWeight: 600,
             }}
-            onMouseOver={(e) => !loading && (e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)")}
-            onMouseOut={(e) => !loading && (e.currentTarget.style.background = "rgb(var(--color-card))")}
           >
-            {loading ? "Verifying..." : "Verify Code"}
-          </button>
+            Verify Code
+          </SubmitButton>
         </form>
 
         {/* Resend Link */}

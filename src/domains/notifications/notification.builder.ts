@@ -1,13 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
+import { NotificationType, notificationTypeFor } from "./notifiable-events";
+import { humanizeRequestStatus } from "./status-labels";
+import { idOf } from "../identity/reference";
 
-export type NotificationType =
-  | "RETURNED"
-  | "REJECTED"
-  | "APPROVED"
-  | "PAID"
-  | "ACTION_REQUIRED";
+export type { NotificationType };
 
 export interface AppNotification {
   id: string;
@@ -23,12 +21,6 @@ const NAIRA = "\u20A6";
 
 function money(amount: number | undefined): string {
   return `${NAIRA}${Number(amount || 0).toLocaleString()}`;
-}
-
-function idOf(value: any): string {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  return String(value._id ?? value.id ?? value);
 }
 
 /**
@@ -56,26 +48,6 @@ export function formatRelativeTime(timestamp: string | Date | undefined): string
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-/**
- * Maps a workflow transition onto the notification category shown to the initiator.
- * Returns null for transitions that are not worth surfacing.
- */
-function typeForTransition(statusAfter: string): NotificationType | null {
-  switch (statusAfter) {
-    case RequestStatus.RETURNED:
-      return "RETURNED";
-    case RequestStatus.REJECTED:
-      return "REJECTED";
-    case RequestStatus.PAID:
-      return "PAID";
-    case RequestStatus.PENDING_APPROVAL:
-    case RequestStatus.SENT_TO_FINANCE:
-      return "APPROVED";
-    default:
-      return null;
-  }
-}
-
 function titleFor(type: NotificationType, requestNumber: string): string {
   switch (type) {
     case "RETURNED":
@@ -86,6 +58,10 @@ function titleFor(type: NotificationType, requestNumber: string): string {
       return `Payment Completed: ${requestNumber}`;
     case "APPROVED":
       return `Request Approved: ${requestNumber}`;
+    case "CANCELLED":
+      return `Request Cancelled: ${requestNumber}`;
+    case "IN_PROGRESS":
+      return `Status Update: ${requestNumber}`;
     default:
       return `Awaiting Your Review: ${requestNumber}`;
   }
@@ -95,22 +71,34 @@ function messageFor(type: NotificationType, expense: any, entry: any): string {
   const category = expense.category || "expense";
   const amount = money(expense.amount);
   const actor = entry?.actorName || "an approver";
+  const reason = entry?.comment ? ` Reason: ${entry.comment}` : "";
 
   switch (type) {
     case "RETURNED":
-      return `Your ${category} request for ${amount} was returned by ${actor}.` +
-        (entry?.comment ? ` Reason: ${entry.comment}` : "");
+      return `Your ${category} request for ${amount} was returned by ${actor}.${reason}`;
     case "REJECTED":
-      return `Your ${category} request for ${amount} was rejected by ${actor}.` +
-        (entry?.comment ? ` Reason: ${entry.comment}` : "");
+      return `Your ${category} request for ${amount} was rejected by ${actor}.${reason}`;
     case "PAID":
-      return `Your ${category} request for ${amount} has been paid.` +
-        (expense.paymentReference ? ` Bank Ref: ${expense.paymentReference}` : "");
+      return entry?.statusAfter === RequestStatus.CLOSED
+        ? `Your ${category} request for ${amount} has been closed and the ledger updated.`
+        : `Your ${category} request for ${amount} has been paid.` +
+          (expense.paymentReference ? ` Bank Ref: ${expense.paymentReference}` : "");
     case "APPROVED":
       return `Your ${category} request for ${amount} was approved by ${actor}.` +
         (entry?.statusAfter === RequestStatus.SENT_TO_FINANCE
           ? " Moving to Finance for payment."
           : "");
+    // A request the initiator did not withdraw themselves — the builder skips a
+    // user's own actions, so reaching here means someone else cancelled it,
+    // which in practice means their department was deleted.
+    case "CANCELLED":
+      return `Your ${category} request for ${amount} was cancelled by ${actor}.${reason}`;
+    // Progress the initiator can watch but not act on. Each of these used to be
+    // emailed and shown nowhere in the app.
+    case "IN_PROGRESS":
+      return `Your ${category} request for ${amount} is now ${humanizeRequestStatus(
+        entry?.statusAfter
+      ).toLowerCase()}.${reason}`;
     default:
       return "";
   }
@@ -146,7 +134,7 @@ function buildOwnRequestNotifications(expenses: any[], userId: string): AppNotif
       // Never notify a user about their own action.
       if (idOf(entry.actorId) === userId) return;
 
-      const type = typeForTransition(entry.statusAfter);
+      const type = notificationTypeFor(entry.statusAfter);
       if (!type) return;
 
       const requestNumber = expense.requestNumber || "Request";
