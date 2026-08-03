@@ -31,7 +31,7 @@ export const InviteResultModal: React.FC<InviteResultModalProps> = ({
           The user record has been created. An invitation email was simulated. You can preview the email template and copy the setup URL below.
         </p>
 
-        <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-dim))", textTransform: "uppercase", fontWeight: "bold" }}>Setup Activation Link</span>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <input 

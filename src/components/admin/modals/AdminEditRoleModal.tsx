@@ -212,7 +212,7 @@ export const AdminEditRoleModal: React.FC<AdminEditRoleModalProps> = ({
                 <div
                   key={resource}
                   style={{
-                    backgroundColor: granted ? "rgba(37, 99, 235, 0.15)" : "rgba(var(--color-text-dim), 0.12)",
+                    backgroundColor: granted ? "rgba(37, 99, 235, 0.15)" : "rgb(var(--color-text-dim) / 0.12)",
                     color: granted ? "rgb(var(--color-primary))" : "rgb(var(--color-text-dim))",
                     borderRadius: "0.375rem",
                     padding: "0.5rem 0.75rem",

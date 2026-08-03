@@ -73,7 +73,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
           alignItems: "center",
           justifyContent: "space-between",
           padding: "1rem 1.15rem",
-          borderBottom: "1px solid rgba(var(--color-card-border), 0.6)",
+          borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)",
           position: "sticky",
           top: 0,
           background: "rgb(var(--color-surface))",
@@ -108,7 +108,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
                 display: "flex",
                 gap: "0.75rem",
                 padding: "1rem 1.15rem",
-                borderBottom: "1px solid rgba(var(--color-card-border), 0.4)",
+                borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)",
                 background: notification.read ? "transparent" : `${style.background.replace("0.12", "0.06")}`,
               }}
             >

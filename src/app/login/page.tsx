@@ -80,7 +80,7 @@ export default function LoginPage() {
         justifyContent: "space-between", 
         alignItems: "center", 
         background: "rgb(var(--color-surface))",
-        borderBottom: "1px solid rgba(var(--color-card-border), 0.5)",
+        borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)",
         transition: "background var(--transition-normal), border var(--transition-normal)"
       }}>
         {/* Brand logo & text */}
@@ -88,7 +88,7 @@ export default function LoginPage() {
           <div style={{ 
             padding: "0.4rem", 
             borderRadius: "50%", 
-            background: "rgba(var(--color-primary), 0.15)",
+            background: "rgb(var(--color-primary) / 0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
@@ -101,7 +101,7 @@ export default function LoginPage() {
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 
-                background: "rgba(var(--color-card-border), 0.3)", 
+                background: "rgb(var(--color-card-border) / 0.3)", 
                 color: "rgb(var(--color-text-muted))", 
                 padding: "0.15rem 0.35rem", 
                 borderRadius: "4px" 
@@ -125,18 +125,18 @@ export default function LoginPage() {
               width: "36px",
               height: "36px",
               borderRadius: "8px",
-              border: "1px solid rgba(var(--color-card-border), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.6)",
               background: "rgb(var(--color-card))",
               color: "rgb(var(--color-text))",
               cursor: "pointer",
               transition: "all 0.15s ease"
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
-              e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
+              e.currentTarget.style.borderColor = "rgb(var(--color-primary) / 0.5)";
+              e.currentTarget.style.background = "rgb(var(--color-primary) / 0.05)";
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+              e.currentTarget.style.borderColor = "rgb(var(--color-card-border) / 0.6)";
               e.currentTarget.style.background = "rgb(var(--color-card))";
             }}
           >
@@ -152,7 +152,7 @@ export default function LoginPage() {
               gap: "0.5rem", 
               padding: "0.5rem 1rem", 
               borderRadius: "8px", 
-              border: "1px solid rgba(var(--color-card-border), 0.6)", 
+              border: "1px solid rgb(var(--color-card-border) / 0.6)", 
               background: "rgb(var(--color-card))",
               color: "rgb(var(--color-text-muted))",
               fontSize: "0.85rem",
@@ -161,12 +161,12 @@ export default function LoginPage() {
               transition: "all 0.15s ease"
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
-              e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
+              e.currentTarget.style.borderColor = "rgb(var(--color-primary) / 0.5)";
+              e.currentTarget.style.background = "rgb(var(--color-primary) / 0.05)";
               e.currentTarget.style.color = "rgb(var(--color-text))";
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+              e.currentTarget.style.borderColor = "rgb(var(--color-card-border) / 0.6)";
               e.currentTarget.style.background = "rgb(var(--color-card))";
               e.currentTarget.style.color = "rgb(var(--color-text-muted))";
             }}
@@ -182,7 +182,7 @@ export default function LoginPage() {
           maxWidth: "480px", 
           width: "100%", 
           background: "rgb(var(--color-surface))", 
-          border: "1px solid rgba(var(--color-card-border), 0.4)", 
+          border: "1px solid rgb(var(--color-card-border) / 0.4)", 
           borderRadius: "16px", 
           padding: "2.5rem", 
           boxShadow: "var(--shadow-lg)",
@@ -227,7 +227,7 @@ export default function LoginPage() {
                   width: "100%", 
                   padding: "0.75rem 1rem", 
                   background: "rgb(var(--color-background))", 
-                  border: "1px solid rgba(var(--color-card-border), 0.6)", 
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)", 
                   borderRadius: "8px", 
                   color: "rgb(var(--color-text))", 
                   fontSize: "0.95rem",
@@ -252,7 +252,7 @@ export default function LoginPage() {
                     width: "100%", 
                     padding: "0.75rem 2.75rem 0.75rem 1rem", 
                     background: "rgb(var(--color-background))", 
-                    border: "1px solid rgba(var(--color-card-border), 0.6)", 
+                    border: "1px solid rgb(var(--color-card-border) / 0.6)", 
                     borderRadius: "8px", 
                     color: "rgb(var(--color-text))", 
                     fontSize: "0.95rem",
@@ -291,7 +291,7 @@ export default function LoginPage() {
                   width: "16px", 
                   height: "16px", 
                   borderRadius: "4px", 
-                  border: "1px solid rgba(var(--color-card-border), 0.6)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)",
                   background: "rgb(var(--color-background))",
                   cursor: "pointer"
                 }} 

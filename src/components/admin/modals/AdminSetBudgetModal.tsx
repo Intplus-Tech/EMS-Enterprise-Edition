@@ -114,7 +114,7 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1rem" }}>
                 {lineItems.map(item => (
                   <div key={item.id} style={{
-                    background: "rgba(var(--color-surface-secondary), 0.5)",
+                    background: "rgb(var(--color-surface-secondary) / 0.5)",
                     border: "1px solid rgb(var(--color-card-border))",
                     borderRadius: "0.5rem",
                     padding: "0.65rem 0.85rem",

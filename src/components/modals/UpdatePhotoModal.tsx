@@ -33,7 +33,7 @@ export const UpdatePhotoModal: React.FC<UpdatePhotoModalProps> = ({
           </button>
         </div>
 
-        <hr style={{ border: "none", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", margin: 0 }} />
+        <hr style={{ border: "none", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", margin: 0 }} />
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem", margin: "1rem 0" }}>
           <img 
@@ -90,7 +90,7 @@ export const UpdatePhotoModal: React.FC<UpdatePhotoModalProps> = ({
           <span>Max file size 5MB. Recommended square dimensions (1:1 ratio) for best results in the Precision dashboard and reports.</span>
         </div>
 
-        <hr style={{ border: "none", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", margin: 0 }} />
+        <hr style={{ border: "none", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", margin: 0 }} />
 
         <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
           <button 

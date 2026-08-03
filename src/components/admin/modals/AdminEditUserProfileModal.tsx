@@ -71,7 +71,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(var(--color-overlay), 0.75)",
+      backgroundColor: "rgb(var(--color-overlay) / 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -158,7 +158,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
                   border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
@@ -183,7 +183,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
                   border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
@@ -203,7 +203,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
                   border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
@@ -228,7 +228,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                   style={{
                     width: "100%",
                     padding: "0.65rem 0.85rem",
-                    backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                    backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
                     border: "1px solid rgb(var(--color-card-border))",
                     borderRadius: "0.5rem",
                     color: "rgb(var(--color-text))",
@@ -259,7 +259,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
                   border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",

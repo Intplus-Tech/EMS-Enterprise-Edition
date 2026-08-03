@@ -104,7 +104,7 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
               gap: "1rem",
               padding: "0.9rem 1.25rem",
               borderTop: "1px solid rgb(var(--color-card-border))",
-              background: "rgba(var(--color-surface-secondary), 0.4)",
+              background: "rgb(var(--color-surface-secondary) / 0.4)",
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", minWidth: 0 }}>
@@ -138,7 +138,7 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
                 gap: "1rem",
                 padding: "1rem",
                 borderRadius: "0.75rem",
-                background: "rgba(var(--color-surface-secondary), 0.45)",
+                background: "rgb(var(--color-surface-secondary) / 0.45)",
                 border: "1px solid rgb(var(--color-card-border))",
               }}
             >
@@ -214,7 +214,7 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
                   flex: 1,
                   padding: "0.85rem 1rem",
                   borderRadius: "0.6rem",
-                  background: "rgba(var(--color-surface-secondary), 0.45)",
+                  background: "rgb(var(--color-surface-secondary) / 0.45)",
                   border: "1px solid rgb(var(--color-card-border))",
                 }}
               >
@@ -257,7 +257,7 @@ const DetailRow: React.FC<{ icon: React.ReactNode; label: string; value: string 
         width: "34px",
         height: "34px",
         borderRadius: "0.5rem",
-        background: "rgba(var(--color-surface-secondary), 0.6)",
+        background: "rgb(var(--color-surface-secondary) / 0.6)",
         color: "rgb(var(--color-text-muted))",
         display: "flex",
         alignItems: "center",

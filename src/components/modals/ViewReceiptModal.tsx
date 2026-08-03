@@ -26,7 +26,7 @@ export const ViewReceiptModal: React.FC<ViewReceiptModalProps> = ({
           </button>
         </div>
 
-        <div style={{ padding: "1.5rem", background: "rgba(var(--color-card-border), 0.1)", borderRadius: "12px", border: "1px solid rgba(var(--color-card-border), 0.2)", display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
+        <div style={{ padding: "1.5rem", background: "rgb(var(--color-card-border) / 0.1)", borderRadius: "12px", border: "1px solid rgb(var(--color-card-border) / 0.2)", display: "flex", flexDirection: "column", gap: "1rem", alignItems: "center" }}>
           <div style={{ width: 48, height: 48, borderRadius: "50%", background: "rgba(16,185,129,0.15)", color: "#10B981", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "0.5rem" }}>
             <Icons.CheckCircle size={28} />
           </div>
@@ -35,7 +35,7 @@ export const ViewReceiptModal: React.FC<ViewReceiptModalProps> = ({
             <p style={{ color: "#10B981", fontSize: "0.85rem", margin: "0.25rem 0 0" }}><span className="badge badge-paid">PAID</span></p>
           </div>
 
-          <div style={{ width: "100%", borderTop: "1px dashed rgba(var(--color-card-border), 0.4)", margin: "0.5rem 0" }} />
+          <div style={{ width: "100%", borderTop: "1px dashed rgb(var(--color-card-border) / 0.4)", margin: "0.5rem 0" }} />
 
           <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "0.75rem", fontSize: "0.85rem", textAlign: "left" }}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>

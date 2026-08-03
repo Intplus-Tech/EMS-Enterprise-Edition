@@ -41,7 +41,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           </button>
         </div>
 
-        <hr style={{ border: "none", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", margin: 0 }} />
+        <hr style={{ border: "none", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", margin: 0 }} />
 
         <form onSubmit={handleUpdateProfile} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {/* Profile Photo Row */}
@@ -179,7 +179,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <span>Some fields are managed by your organization's directory service and cannot be changed manually. Contact HR for department or role updates.</span>
           </div>
 
-          <hr style={{ border: "none", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", margin: 0 }} />
+          <hr style={{ border: "none", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", margin: 0 }} />
 
           <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose} className="btn btn-secondary" style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))" }}>

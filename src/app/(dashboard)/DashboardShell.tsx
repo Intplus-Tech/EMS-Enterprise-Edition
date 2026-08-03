@@ -210,7 +210,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <div style={{
             padding: "0.5rem",
             borderRadius: "0.5rem",
-            background: "rgba(var(--color-primary), 0.2)",
+            background: "rgb(var(--color-primary) / 0.2)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -245,13 +245,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* User profile card at bottom of sidebar */}
-        <div style={{ marginTop: "auto", paddingTop: "0.75rem", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <div style={{ marginTop: "auto", paddingTop: "0.75rem", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           <div
             style={{
               padding: "0.6rem 0.75rem",
               borderRadius: "10px",
-              background: "rgba(var(--color-surface), 0.5)",
-              border: "1px solid rgba(var(--color-card-border), 0.3)",
+              background: "rgb(var(--color-surface) / 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.3)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -339,8 +339,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 paddingBottom: "0.55rem",
                 fontSize: "0.85rem",
                 borderRadius: "8px",
-                background: "rgba(var(--color-surface), 0.5)",
-                border: "1px solid rgba(var(--color-card-border), 0.5)"
+                background: "rgb(var(--color-surface) / 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)"
               }}
             />
           </div>

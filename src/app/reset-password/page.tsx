@@ -96,7 +96,7 @@ function ResetPasswordContent() {
         maxWidth: "480px", 
         width: "100%", 
         background: "rgb(var(--color-surface))", 
-        border: "1px solid rgba(var(--color-card-border), 0.5)", 
+        border: "1px solid rgb(var(--color-card-border) / 0.5)", 
         borderRadius: "16px", 
         padding: "2.5rem", 
         boxShadow: "var(--shadow-lg)" 
@@ -141,7 +141,7 @@ function ResetPasswordContent() {
                   width: "100%", 
                   padding: "0.75rem 2.75rem 0.75rem 1rem", 
                   background: "rgb(var(--color-surface))", 
-                  border: "1px solid rgba(var(--color-card-border), 0.6)", 
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)", 
                   borderRadius: "8px", 
                   color: "rgb(var(--color-text))", 
                   fontSize: "0.95rem",
@@ -185,7 +185,7 @@ function ResetPasswordContent() {
                   width: "100%", 
                   padding: "0.75rem 2.75rem 0.75rem 1rem", 
                   background: "rgb(var(--color-surface))", 
-                  border: "1px solid rgba(var(--color-card-border), 0.6)", 
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)", 
                   borderRadius: "8px", 
                   color: "rgb(var(--color-text))", 
                   fontSize: "0.95rem",
@@ -238,14 +238,14 @@ export default function ResetPasswordPage() {
         justifyContent: "space-between", 
         alignItems: "center", 
         background: "rgb(var(--color-surface))",
-        borderBottom: "1px solid rgba(var(--color-card-border), 0.5)"
+        borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)"
       }}>
         {/* Brand logo & text */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ 
             padding: "0.4rem", 
             borderRadius: "50%", 
-            background: "rgba(var(--color-primary), 0.15)",
+            background: "rgb(var(--color-primary) / 0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
@@ -258,7 +258,7 @@ export default function ResetPasswordPage() {
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 
-                background: "rgba(var(--color-card-border), 0.4)", 
+                background: "rgb(var(--color-card-border) / 0.4)", 
                 color: "rgb(var(--color-text-muted))", 
                 padding: "0.15rem 0.35rem", 
                 borderRadius: "4px" 
@@ -280,7 +280,7 @@ export default function ResetPasswordPage() {
             gap: "0.5rem", 
             padding: "0.5rem 1rem", 
             borderRadius: "8px", 
-            border: "1px solid rgba(var(--color-card-border), 0.5)", 
+            border: "1px solid rgb(var(--color-card-border) / 0.5)", 
             background: "rgb(var(--color-surface))",
             color: "rgb(var(--color-text-muted))",
             fontSize: "0.85rem",
@@ -289,11 +289,11 @@ export default function ResetPasswordPage() {
             transition: "all 0.15s ease"
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
-            e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
+            e.currentTarget.style.borderColor = "rgb(var(--color-primary) / 0.5)";
+            e.currentTarget.style.background = "rgb(var(--color-primary) / 0.05)";
           }}
           onMouseOut={(e) => {
-            e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+            e.currentTarget.style.borderColor = "rgb(var(--color-card-border) / 0.6)";
             e.currentTarget.style.background = "rgb(var(--color-card))";
           }}
         >

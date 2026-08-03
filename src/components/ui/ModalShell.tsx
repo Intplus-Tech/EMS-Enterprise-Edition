@@ -42,7 +42,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(var(--color-overlay), 0.6)",
+        backgroundColor: "rgb(var(--color-overlay) / 0.6)",
         backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
@@ -115,7 +115,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
               gap: "0.75rem",
               padding: "1.15rem 1.75rem",
               borderTop: "1px solid rgb(var(--color-card-border))",
-              background: "rgba(var(--color-surface-secondary), 0.35)",
+              background: "rgb(var(--color-surface-secondary) / 0.35)",
             }}
           >
             {footer}

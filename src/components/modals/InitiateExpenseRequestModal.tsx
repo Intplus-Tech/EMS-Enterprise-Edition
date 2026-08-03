@@ -58,7 +58,7 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
       <div className="glass-panel" style={{ width: "100%", maxWidth: "640px", maxHeight: "88vh", overflowY: "auto", padding: 0, margin: "auto", display: "flex", flexDirection: "column" }}>
 
         {/* Header band, matching the tinted header in the design */}
-        <div style={{ padding: "1.75rem 2rem 1.25rem", background: "rgba(37, 99, 235, 0.06)", borderBottom: "1px solid rgba(var(--color-card-border), 0.5)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+        <div style={{ padding: "1.75rem 2rem 1.25rem", background: "rgba(37, 99, 235, 0.06)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
           <div>
             <h3 style={{ fontWeight: 700, fontSize: "1.25rem", margin: 0 }}>Expense Request Details</h3>
             <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.85rem", margin: "0.25rem 0 0" }}>
@@ -276,7 +276,7 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
         </form>
 
         {/* Footer band — Save Draft and Submit Request, as in the design */}
-        <div style={{ padding: "1.25rem 2rem", background: "rgba(37, 99, 235, 0.05)", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
+        <div style={{ padding: "1.25rem 2rem", background: "rgba(37, 99, 235, 0.05)", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
           <button type="button" onClick={(e) => handleCreateRequest(e, false)} className="btn btn-secondary">
             Save Draft
           </button>

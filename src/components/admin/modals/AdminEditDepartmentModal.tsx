@@ -185,7 +185,7 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
             minWidth: "170px",
             padding: "0.85rem 1rem",
             borderRadius: "0.65rem",
-            background: "rgba(var(--color-surface-secondary), 0.5)",
+            background: "rgb(var(--color-surface-secondary) / 0.5)",
             border: "1px solid rgb(var(--color-card-border))"
           }}>
             <div style={{ fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.05em", color: "rgb(var(--color-text-muted))" }}>
@@ -251,7 +251,7 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
                     <td style={{ textAlign: "right" }}>{formatNairaPrecise(line.amount)}</td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        <div style={{ width: "62px", height: "6px", borderRadius: "3px", background: "rgba(var(--color-surface-secondary), 0.8)", overflow: "hidden" }}>
+                        <div style={{ width: "62px", height: "6px", borderRadius: "3px", background: "rgb(var(--color-surface-secondary) / 0.8)", overflow: "hidden" }}>
                           <div style={{
                             width: `${Math.min(line.utilization, 100)}%`,
                             height: "100%",
@@ -364,7 +364,7 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
                       padding: "0.5rem 0.65rem",
                       borderRadius: "0.5rem",
                       border: `1px solid ${picked ? "rgb(var(--color-primary))" : "transparent"}`,
-                      background: picked ? "rgba(var(--color-primary), 0.1)" : "transparent",
+                      background: picked ? "rgb(var(--color-primary) / 0.1)" : "transparent",
                       color: "rgb(var(--color-text))",
                       cursor: "pointer",
                       textAlign: "left",

@@ -165,8 +165,8 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             style={{
               padding: "0.35rem 0.75rem",
               borderRadius: "8px",
-              background: "rgba(var(--color-surface-secondary), 0.5)",
-              border: "1px solid rgba(var(--color-card-border), 0.4)",
+              background: "rgb(var(--color-surface-secondary) / 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.4)",
               color: "rgb(var(--color-text-muted))",
               fontWeight: "600",
               fontSize: "0.775rem",
@@ -205,7 +205,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             className="glass-card"
             style={{
               background: "rgb(var(--color-card))",
-              border: "1px solid rgba(var(--color-card-border), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.5)",
               borderRadius: "16px",
               padding: "1.75rem",
               display: "flex",
@@ -214,7 +214,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               boxShadow: "var(--shadow-sm)"
             }}
           >
-            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", margin: 0, paddingBottom: "0.75rem", borderBottom: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", margin: 0, paddingBottom: "0.75rem", borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
               Request Details
             </h3>
 
@@ -292,8 +292,8 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                       gap: "0.6rem",
                       padding: "0.5rem 0.85rem",
                       borderRadius: "8px",
-                      border: "1px solid rgba(var(--color-card-border), 0.5)",
-                      background: "rgba(var(--color-surface-secondary), 0.5)",
+                      border: "1px solid rgb(var(--color-card-border) / 0.5)",
+                      background: "rgb(var(--color-surface-secondary) / 0.5)",
                       color: "rgb(var(--color-text))",
                       fontSize: "0.85rem",
                       fontWeight: "600",
@@ -314,7 +314,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             className="glass-card"
             style={{
               background: "rgb(var(--color-card))",
-              border: "1px solid rgba(var(--color-card-border), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.5)",
               borderRadius: "16px",
               padding: "1.75rem",
               display: "flex",
@@ -323,7 +323,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               boxShadow: "var(--shadow-sm)"
             }}
           >
-            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", margin: 0, paddingBottom: "0.75rem", borderBottom: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", margin: 0, paddingBottom: "0.75rem", borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
               History & Communication
             </h3>
 
@@ -340,7 +340,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                           top: "22px",
                           bottom: "-18px",
                           width: "2px",
-                          background: "rgba(var(--color-card-border), 0.4)"
+                          background: "rgb(var(--color-card-border) / 0.4)"
                         }}
                       />
                     )}
@@ -397,7 +397,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             className="glass-card"
             style={{
               background: "rgb(var(--color-card))",
-              border: "1px solid rgba(var(--color-card-border), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.5)",
               borderRadius: "16px",
               padding: "1.75rem",
               display: "flex",
@@ -407,11 +407,11 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             }}
           >
             {/* Header & Dept Badge */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", paddingBottom: "0.75rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", paddingBottom: "0.75rem" }}>
               <h3 style={{ fontSize: "1rem", fontWeight: "800", color: "rgb(var(--color-text))", margin: 0, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                 BUDGET CONTEXT
               </h3>
-              <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", padding: "0.2rem 0.6rem", borderRadius: "4px", background: "rgba(var(--color-surface-secondary), 0.6)" }}>
+              <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", padding: "0.2rem 0.6rem", borderRadius: "4px", background: "rgb(var(--color-surface-secondary) / 0.6)" }}>
                 {budgetContext?.periodLabel || requestDetails.departmentFull}
               </span>
             </div>
@@ -477,7 +477,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                 Budget Item
               </span>
 
-              <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+              <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
                   <thead>
                     <tr style={{ background: "rgba(239, 246, 255, 0.9)", borderBottom: "1px solid #BFDBFE" }}>
@@ -488,7 +488,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   </thead>
                   <tbody>
                     {(budgetContext?.lineItems ?? []).map((item, idx, all) => (
-                      <tr key={item.category} style={{ borderBottom: idx < all.length - 1 ? "1px solid rgba(var(--color-card-border), 0.3)" : "none" }}>
+                      <tr key={item.category} style={{ borderBottom: idx < all.length - 1 ? "1px solid rgb(var(--color-card-border) / 0.3)" : "none" }}>
                         <td style={{ padding: "0.6rem 0.75rem", fontWeight: "600", color: item.isRequestCategory ? "#2563EB" : "rgb(var(--color-text))" }}>{item.category}</td>
                         <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", color: "rgb(var(--color-text-muted))" }}>{formatNaira(item.allocated)}</td>
                         <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", fontWeight: "700", color: item.remaining <= 0 ? "#DC2626" : "#2563EB" }}>
@@ -519,7 +519,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
           bottom: 0,
           right: 0,
           left: "260px",
-          background: "rgba(var(--color-card-border), 1.00)",
+          background: "rgb(var(--color-card-border) / 1.00)",
           backdropFilter: "blur(12px)",
           borderTop: "1px solid #E2E8F0",
           padding: "1rem 2rem",

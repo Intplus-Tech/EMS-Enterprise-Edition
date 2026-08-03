@@ -165,7 +165,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
           className="glass-card"
           style={{
             background: "rgb(var(--color-card))",
-            border: "1px solid rgba(var(--color-card-border), 0.5)",
+            border: "1px solid rgb(var(--color-card-border) / 0.5)",
             borderRadius: "16px",
             padding: "1.6rem 1.75rem",
             display: "flex",
@@ -204,7 +204,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
           className="glass-card"
           style={{
             background: "rgb(var(--color-card))",
-            border: "1px solid rgba(var(--color-card-border), 0.5)",
+            border: "1px solid rgb(var(--color-card-border) / 0.5)",
             borderRadius: "16px",
             padding: "1.6rem 1.75rem",
             display: "flex",
@@ -247,7 +247,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         className="glass-panel"
         style={{
           background: "rgb(var(--color-card))",
-          border: "1px solid rgba(var(--color-card-border), 0.5)",
+          border: "1px solid rgb(var(--color-card-border) / 0.5)",
           borderRadius: "14px",
           padding: "1.15rem 1.5rem",
           display: "flex",
@@ -272,8 +272,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                 minWidth: "170px",
                 padding: "0.55rem 0.85rem",
                 borderRadius: "8px",
-                border: "1px solid rgba(var(--color-card-border), 0.8)",
-                background: "rgba(var(--color-surface), 0.6)",
+                border: "1px solid rgb(var(--color-card-border) / 0.8)",
+                background: "rgb(var(--color-surface) / 0.6)",
                 fontSize: "0.85rem",
                 fontWeight: "600",
                 color: "rgb(var(--color-text))"
@@ -299,8 +299,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                 minWidth: "170px",
                 padding: "0.55rem 0.85rem",
                 borderRadius: "8px",
-                border: "1px solid rgba(var(--color-card-border), 0.8)",
-                background: "rgba(var(--color-surface), 0.6)",
+                border: "1px solid rgb(var(--color-card-border) / 0.8)",
+                background: "rgb(var(--color-surface) / 0.6)",
                 fontSize: "0.85rem",
                 fontWeight: "600",
                 color: "rgb(var(--color-text))"
@@ -335,8 +335,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                   width: "100%",
                   padding: "0.55rem 0.85rem 0.55rem 2.35rem",
                   borderRadius: "8px",
-                  border: "1px solid rgba(var(--color-card-border), 0.8)",
-                  background: "rgba(var(--color-surface), 0.6)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.8)",
+                  background: "rgb(var(--color-surface) / 0.6)",
                   fontSize: "0.85rem",
                   color: "rgb(var(--color-text))",
                   outline: "none"
@@ -359,8 +359,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
               fontSize: "0.85rem",
               fontWeight: "600",
               borderRadius: "8px",
-              border: "1px solid rgba(var(--color-card-border), 0.8)",
-              background: "rgba(var(--color-surface), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.8)",
+              background: "rgb(var(--color-surface) / 0.6)",
               color: "rgb(var(--color-text))",
               cursor: "pointer"
             }}
@@ -376,7 +376,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         style={{
           borderRadius: "14px",
           overflow: "hidden",
-          border: "1px solid rgba(var(--color-card-border), 0.5)",
+          border: "1px solid rgb(var(--color-card-border) / 0.5)",
           background: "rgb(var(--color-card))",
           boxShadow: "var(--shadow-sm)"
         }}
@@ -384,7 +384,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         <div className="table-container" style={{ overflowX: "auto" }}>
           <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
-              <tr style={{ background: "rgba(var(--color-surface-secondary), 0.5)", borderBottom: "1px solid rgba(var(--color-card-border), 0.6)" }}>
+              <tr style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)" }}>
                 <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEFICIT</th>
                 <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQ ID</th>
                 <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQUEST TITLE</th>
@@ -403,7 +403,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                     <tr
                       key={r.id}
                       style={{
-                        borderBottom: "1px solid rgba(var(--color-card-border), 0.3)",
+                        borderBottom: "1px solid rgb(var(--color-card-border) / 0.3)",
                         transition: "background 0.15s ease"
                       }}
                     >
@@ -522,8 +522,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         <div
           style={{
             padding: "0.5rem 1.5rem 1rem",
-            background: "rgba(var(--color-surface-secondary), 0.4)",
-            borderTop: "1px solid rgba(var(--color-card-border), 0.4)",
+            background: "rgb(var(--color-surface-secondary) / 0.4)",
+            borderTop: "1px solid rgb(var(--color-card-border) / 0.4)",
             display: "flex",
             flexDirection: "column",
             gap: "0.5rem"

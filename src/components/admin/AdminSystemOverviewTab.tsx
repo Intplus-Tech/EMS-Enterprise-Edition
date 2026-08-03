@@ -225,7 +225,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(var(--color-card-border), 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -260,7 +260,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(var(--color-card-border), 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -295,7 +295,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(var(--color-card-border), 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -328,7 +328,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
           <div className="glass-panel" style={{ backgroundColor: "rgb(var(--color-surface))", borderRadius: "0.75rem", overflow: "hidden" }}>
             <table className="data-table" style={{ width: "100%" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", backgroundColor: "rgba(var(--color-background), 0.5)" }}>
+                <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", backgroundColor: "rgb(var(--color-background) / 0.5)" }}>
                   <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>TIMESTAMP</th>
                   <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>ACTION DESCRIPTION</th>
                   <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>INITIATOR / CONTEXT</th>
@@ -336,7 +336,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               </thead>
               <tbody>
                 {recentActivities.map((act) => (
-                  <tr key={act.id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.2)" }}>
+                  <tr key={act.id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.2)" }}>
                     <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.85rem", color: "rgb(var(--color-text))", fontWeight: "600" }}>
                       {act.timestamp}
                     </td>
@@ -351,7 +351,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                             width: "28px",
                             height: "28px",
                             borderRadius: "50%",
-                            backgroundColor: "rgba(var(--color-card-border), 0.3)",
+                            backgroundColor: "rgb(var(--color-card-border) / 0.3)",
                             color: "rgb(var(--color-text))",
                             fontSize: "0.7rem",
                             fontWeight: "700",

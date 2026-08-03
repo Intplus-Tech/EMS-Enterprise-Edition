@@ -170,7 +170,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
           className="glass-card"
           style={{
             background: "rgb(var(--color-card))",
-            border: "1px solid rgba(var(--color-card-border), 0.5)",
+            border: "1px solid rgb(var(--color-card-border) / 0.5)",
             borderRadius: "16px",
             padding: "1.75rem",
             display: "flex",
@@ -210,7 +210,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
           className="glass-card"
           style={{
             background: "rgb(var(--color-card))",
-            border: "1px solid rgba(var(--color-card-border), 0.5)",
+            border: "1px solid rgb(var(--color-card-border) / 0.5)",
             borderRadius: "16px",
             padding: "1.75rem",
             display: "flex",
@@ -251,7 +251,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
         className="glass-card"
         style={{
           background: "rgb(var(--color-card))",
-          border: "1px solid rgba(var(--color-card-border), 0.5)",
+          border: "1px solid rgb(var(--color-card-border) / 0.5)",
           borderRadius: "12px",
           padding: "1.25rem 1.5rem",
           display: "flex",
@@ -287,8 +287,8 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
                 padding: "0.55rem 0.85rem",
                 fontSize: "0.85rem",
                 borderRadius: "8px",
-                background: "rgba(var(--color-surface-secondary), 0.5)",
-                border: "1px solid rgba(var(--color-card-border), 0.6)",
+                background: "rgb(var(--color-surface-secondary) / 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.6)",
                 fontWeight: "500"
               }}
             >
@@ -326,8 +326,8 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
                   paddingTop: "0.55rem",
                   paddingBottom: "0.55rem",
                   borderRadius: "8px",
-                  background: "rgba(var(--color-surface-secondary), 0.5)",
-                  border: "1px solid rgba(var(--color-card-border), 0.6)"
+                  background: "rgb(var(--color-surface-secondary) / 0.5)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)"
                 }}
               />
             </div>
@@ -347,8 +347,8 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
               fontSize: "0.85rem",
               fontWeight: "600",
               borderRadius: "8px",
-              border: "1px solid rgba(var(--color-card-border), 0.8)",
-              background: "rgba(var(--color-surface), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.8)",
+              background: "rgb(var(--color-surface) / 0.6)",
               color: "rgb(var(--color-text))",
               cursor: "pointer"
             }}
@@ -364,7 +364,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
         style={{
           borderRadius: "12px",
           overflow: "hidden",
-          border: "1px solid rgba(var(--color-card-border), 0.5)",
+          border: "1px solid rgb(var(--color-card-border) / 0.5)",
           background: "rgb(var(--color-card))",
           boxShadow: "var(--shadow-sm)"
         }}
@@ -372,7 +372,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
         <div className="table-container" style={{ overflowX: "auto" }}>
           <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
-              <tr style={{ background: "rgba(var(--color-surface-secondary), 0.5)", borderBottom: "1px solid rgba(var(--color-card-border), 0.6)" }}>
+              <tr style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)" }}>
                 <th style={{ padding: "0.9rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEPT</th>
                 <th style={{ padding: "0.9rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>TOTAL BUDGET</th>
                 <th style={{ padding: "0.9rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>UTILIZED</th>
@@ -388,7 +388,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
                   <tr
                     key={row.id}
                     style={{
-                      borderBottom: "1px solid rgba(var(--color-card-border), 0.3)",
+                      borderBottom: "1px solid rgb(var(--color-card-border) / 0.3)",
                       transition: "background 0.15s ease"
                     }}
                   >
@@ -418,7 +418,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
                     {/* % USED with Progress Bar */}
                     <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.85rem", width: "180px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                        <div style={{ flexGrow: 1, height: "6px", background: "rgba(var(--color-card-border), 0.3)", borderRadius: "999px", overflow: "hidden" }}>
+                        <div style={{ flexGrow: 1, height: "6px", background: "rgb(var(--color-card-border) / 0.3)", borderRadius: "999px", overflow: "hidden" }}>
                           <div style={{ width: `${row.percentUsed}%`, height: "100%", backgroundColor: row.barColor, borderRadius: "999px" }} />
                         </div>
                         <span style={{ fontSize: "0.75rem", fontWeight: "700", color: row.barColor, minWidth: "28px" }}>
@@ -471,8 +471,8 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            borderTop: "1px solid rgba(var(--color-card-border), 0.4)",
-            background: "rgba(var(--color-surface-secondary), 0.3)",
+            borderTop: "1px solid rgb(var(--color-card-border) / 0.4)",
+            background: "rgb(var(--color-surface-secondary) / 0.3)",
             fontSize: "0.85rem",
             color: "rgb(var(--color-text-muted))"
           }}
@@ -530,7 +530,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
             borderRadius: "16px",
             padding: "1.75rem",
             background: "rgb(var(--color-card))",
-            border: "1px solid rgba(var(--color-card-border), 0.5)",
+            border: "1px solid rgb(var(--color-card-border) / 0.5)",
             boxShadow: "var(--shadow-sm)",
             display: "flex",
             flexDirection: "column",
@@ -587,7 +587,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
             borderRadius: "16px",
             padding: "1.75rem",
             background: "rgb(var(--color-card))",
-            border: "1px solid rgba(var(--color-card-border), 0.5)",
+            border: "1px solid rgb(var(--color-card-border) / 0.5)",
             boxShadow: "var(--shadow-sm)",
             display: "flex",
             flexDirection: "column",

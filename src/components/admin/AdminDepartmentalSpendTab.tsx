@@ -251,7 +251,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                 width: "120px",
                 height: "120px",
                 borderRadius: "50%",
-                background: `conic-gradient(${selectedAnalyticsDept.pctUsed > 90 ? "#DC2626" : "#2563EB"} ${Math.min(100, selectedAnalyticsDept.pctUsed) * 3.6}deg, rgba(var(--color-card-border), 0.5) 0deg)`,
+                background: `conic-gradient(${selectedAnalyticsDept.pctUsed > 90 ? "#DC2626" : "#2563EB"} ${Math.min(100, selectedAnalyticsDept.pctUsed) * 3.6}deg, rgb(var(--color-card-border) / 0.5) 0deg)`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -285,7 +285,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                   / {selectedAnalyticsDept.hasBudget ? formatNaira(selectedAnalyticsDept.totalBudget) : "no budget set"}
                 </span>
               </div>
-              <div style={{ width: "100%", height: "8px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "4px", margin: "0.85rem 0" }}>
+              <div style={{ width: "100%", height: "8px", backgroundColor: "rgb(var(--color-card-border) / 0.5)", borderRadius: "4px", margin: "0.85rem 0" }}>
                 <div style={{ width: `${Math.min(100, selectedAnalyticsDept.pctUsed)}%`, height: "100%", backgroundColor: "#2563EB", borderRadius: "4px" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
@@ -354,7 +354,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                       <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>{item.name}</span>
                       <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>{formatNaira(item.amount)}</span>
                     </div>
-                    <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "3px", marginBottom: "0.35rem" }}>
+                    <div style={{ width: "100%", height: "6px", backgroundColor: "rgb(var(--color-card-border) / 0.5)", borderRadius: "3px", marginBottom: "0.35rem" }}>
                       <div style={{ width: `${item.barPct}%`, height: "100%", backgroundColor: "#2563EB", borderRadius: "3px" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
@@ -382,7 +382,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             ) : (
               <table className="data-table" style={{ width: "100%" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)" }}>
+                  <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)" }}>
                     <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>REQUEST DETAILS</th>
                     <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>STATUS</th>
                     <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", textAlign: "right" }}>AMOUNT</th>
@@ -390,7 +390,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                 </thead>
                 <tbody>
                   {analytics!.highValue.map((request) => (
-                    <tr key={request._id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.3)" }}>
+                    <tr key={request._id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.3)" }}>
                       <td style={{ padding: "0.85rem 0" }}>
                         <div style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>{request.description}</div>
                         <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
@@ -542,7 +542,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         <div className="table-container">
           <table className="data-table" style={{ width: "100%" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)" }}>
+              <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)" }}>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</th>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>BUDGET (FY2026)</th>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>UTILIZED</th>
@@ -558,7 +558,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                 const pct = d.pctUsed;
                 const isHighPct = pct > 80;
                 return (
-                  <tr key={d.id || idx} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)" }}>
+                  <tr key={d.id || idx} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)" }}>
                     <td style={{ padding: "1.1rem 0", fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.9rem" }}>
                       {d.name}
                     </td>
@@ -578,7 +578,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                         <span style={{ fontSize: "0.75rem", fontWeight: "700", color: isHighPct ? "#EF4444" : "#2563EB" }}>
                           {pct}%
                         </span>
-                        <div style={{ width: "100%", height: "5px", backgroundColor: "rgba(var(--color-card-border), 0.6)", borderRadius: "2px" }}>
+                        <div style={{ width: "100%", height: "5px", backgroundColor: "rgb(var(--color-card-border) / 0.6)", borderRadius: "2px" }}>
                           <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", backgroundColor: isHighPct ? "#EF4444" : "#2563EB", borderRadius: "2px" }} />
                         </div>
                       </div>
@@ -720,7 +720,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         }}>
           <div>
             <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem" }}>Budget Committed</h3>
-            <p style={{ fontSize: "0.82rem", color: "rgba(var(--color-card-border), 1.00)", lineHeight: "1.4" }}>
+            <p style={{ fontSize: "0.82rem", color: "rgb(var(--color-card-border) / 1.00)", lineHeight: "1.4" }}>
               Utilised plus pending, across every departmental allocation.
             </p>
           </div>
@@ -729,7 +729,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             width: "130px",
             height: "130px",
             borderRadius: "50%",
-            background: `conic-gradient(#FFFFFF ${Math.min(100, utilisationPct) * 3.6}deg, rgba(var(--color-card-border), 1.00) 0deg)`,
+            background: `conic-gradient(#FFFFFF ${Math.min(100, utilisationPct) * 3.6}deg, rgb(var(--color-card-border) / 1.00) 0deg)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -750,7 +750,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
           </div>
 
-          <span style={{ fontSize: "0.8rem", color: "rgba(var(--color-card-border), 1.00)", textAlign: "center" }}>
+          <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-card-border) / 1.00)", textAlign: "center" }}>
             {formatNaira(enterpriseTotals.utilised + enterpriseTotals.pending)} of {formatNaira(enterpriseTotals.allocated)}
           </span>
         </div>

@@ -102,7 +102,7 @@ export const CommunicationThreadModal: React.FC<CommunicationThreadModalProps> =
                   width: 36,
                   height: 36,
                   borderRadius: "50%",
-                  background: "rgba(var(--color-primary), 0.15)",
+                  background: "rgb(var(--color-primary) / 0.15)",
                   color: "rgb(var(--color-primary))",
                   display: "flex",
                   alignItems: "center",
@@ -115,7 +115,7 @@ export const CommunicationThreadModal: React.FC<CommunicationThreadModalProps> =
 
               <div
                 style={{
-                  background: "rgba(var(--color-surface-secondary), 0.6)",
+                  background: "rgb(var(--color-surface-secondary) / 0.6)",
                   border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "12px",
                   padding: "1rem",
@@ -174,7 +174,7 @@ export const CommunicationThreadModal: React.FC<CommunicationThreadModalProps> =
           alignItems: "center",
           gap: "0.5rem",
           padding: "0.6rem 0.85rem",
-          background: "rgba(var(--color-surface-secondary), 0.6)",
+          background: "rgb(var(--color-surface-secondary) / 0.6)",
           border: "1px solid rgb(var(--color-card-border))",
           borderRadius: "8px",
           fontSize: "0.75rem",

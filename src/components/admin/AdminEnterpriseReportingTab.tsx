@@ -103,7 +103,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
 
   // Conic gradient stops, so the ring is proportional to the real counts.
   const donutGradient = (() => {
-    if (statusTotal === 0) return "rgba(var(--color-card-border), 0.5)";
+    if (statusTotal === 0) return "rgb(var(--color-card-border) / 0.5)";
     let cursor = 0;
     const stops = statusSegments.map(seg => {
       const start = (cursor / statusTotal) * 360;
@@ -349,7 +349,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
                       : `${formatNaira(d.spent)} \u2022 no budget set`}
                   </span>
                 </div>
-                <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "3px" }}>
+                <div style={{ width: "100%", height: "6px", backgroundColor: "rgb(var(--color-card-border) / 0.5)", borderRadius: "3px" }}>
                   <div style={{ width: `${d.pct}%`, height: "100%", backgroundColor: d.pct > 90 ? "#ef4444" : "#2563eb", borderRadius: "3px" }} />
                 </div>
               </div>
@@ -421,14 +421,14 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)", textTransform: "uppercase" }}>
+                <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)", textTransform: "uppercase" }}>
                   <th style={{ textAlign: "left", paddingBottom: "0.5rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>DEPT</th>
                   <th style={{ textAlign: "right", paddingBottom: "0.5rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>REMAINING (₦)</th>
                 </tr>
               </thead>
               <tbody>
                 {budgetBalance.map((d) => (
-                  <tr key={d.id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.3)" }}>
+                  <tr key={d.id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.3)" }}>
                     <td style={{ padding: "0.75rem 0", color: "rgb(var(--color-text))", fontWeight: "600" }}>{d.name}</td>
                     <td style={{ textAlign: "right", fontWeight: "700", color: d.remaining <= 0 ? "#EF4444" : "rgb(var(--color-text))" }}>
                       {formatNaira(d.remaining)}
@@ -528,8 +528,8 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
               <div
                 key={requester.name}
                 style={{
-                  backgroundColor: "rgba(var(--color-surface-secondary), 0.5)",
-                  border: "1px solid rgba(var(--color-card-border), 0.5)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.5)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.5)",
                   borderRadius: "0.5rem",
                   padding: "1rem",
                   display: "flex",

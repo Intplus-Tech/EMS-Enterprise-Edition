@@ -63,7 +63,7 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
       <div className="glass-panel" style={{ width: "100%", maxWidth: "900px", maxHeight: "90vh", overflowY: "auto", padding: 0, margin: "auto", display: "flex", flexDirection: "column" }}>
 
         {/* Header */}
-        <div style={{ padding: "1.5rem 2rem", borderBottom: "1px solid rgba(var(--color-card-border), 0.5)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+        <div style={{ padding: "1.5rem 2rem", borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
           <div>
             <h3 style={{ fontWeight: 700, fontSize: "1.25rem", margin: 0 }}>Reply to Clarification Request</h3>
             <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", marginTop: "0.5rem" }}>
@@ -166,12 +166,12 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
                   if (e.dataTransfer.files?.length) handleFileUpload(e.dataTransfer.files, true);
                 }}
                 style={{
-                  border: "2px dashed rgba(var(--color-card-border), 0.9)",
+                  border: "2px dashed rgb(var(--color-card-border) / 0.9)",
                   borderRadius: "10px",
                   padding: "2rem 1rem",
                   textAlign: "center",
                   cursor: "pointer",
-                  background: "rgba(var(--color-surface-secondary), 0.35)",
+                  background: "rgb(var(--color-surface-secondary) / 0.35)",
                 }}
               >
                 <Icons.UploadCloud size={28} style={{ color: "rgb(var(--color-text-muted))", marginBottom: "0.5rem" }} />
@@ -181,7 +181,7 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
                 <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>PDF, PNG, JPG (Max 5MB)</span>
               </div>
 
-              <div style={{ background: "rgba(var(--color-surface-secondary), 0.35)", borderRadius: "10px", padding: "1rem" }}>
+              <div style={{ background: "rgb(var(--color-surface-secondary) / 0.35)", borderRadius: "10px", padding: "1rem" }}>
                 {newDocuments.length > 0 ? (
                   <AttachmentList
                     label="NEW ATTACHMENTS"
@@ -208,7 +208,7 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
         </form>
 
         {/* Footer — Withdraw on the left, Submit / Cancel on the right */}
-        <div style={{ padding: "1.25rem 2rem", background: "rgba(37, 99, 235, 0.05)", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
+        <div style={{ padding: "1.25rem 2rem", background: "rgba(37, 99, 235, 0.05)", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap" }}>
           {/* The design offers withdrawal from this dialog; it was absent, so a
               returned request could only ever be replied to. */}
           <button

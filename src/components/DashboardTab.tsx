@@ -303,23 +303,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 <tbody>
                   {displayedExpenditures.map((exp, idx) => (
                     <tr key={`${exp.requestNumber}-${idx}`} style={{ background: "none" }}>
-                      <td style={{ padding: "1rem 0", borderBottom: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+                      <td style={{ padding: "1rem 0", borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                           <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>{exp.description}</span>
                           <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))", fontWeight: "bold" }}>ID: {exp.requestNumber}</span>
                         </div>
                       </td>
-                      <td style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+                      <td style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
                         <span className="badge badge-submitted">{exp.category}</span>
                       </td>
-                      <td style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", color: "rgb(var(--color-text-muted))" }}>{exp.vendorName || "—"}</td>
-                      <td style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", color: "rgb(var(--color-text-muted))" }}>
+                      <td style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", color: "rgb(var(--color-text-muted))" }}>{exp.vendorName || "—"}</td>
+                      <td style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", color: "rgb(var(--color-text-muted))" }}>
                         {formatDate(exp.createdAt)}
                       </td>
-                      <td style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", textAlign: "right", fontWeight: "700" }}>
+                      <td style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", textAlign: "right", fontWeight: "700" }}>
                         {formatNaira(exp.amount)}
                       </td>
-                      <td style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", textAlign: "right", paddingRight: 0 }}>
+                      <td style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", textAlign: "right", paddingRight: 0 }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "0.35rem" }}>
                           <span className={`dot-indicator ${["PAID", "APPROVED", "CLOSED"].includes(exp.status) ? "dot-approved" : "dot-pending"}`} />
                           <span style={{ fontSize: "0.85rem", fontWeight: "600" }}>

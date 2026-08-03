@@ -180,7 +180,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
               alignItems: "center",
               gap: "0.5rem",
               cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(var(--color-primary), 0.35)"
+              boxShadow: "0 4px 12px rgb(var(--color-primary) / 0.35)"
             }}
           >
             <Icons.UserPlus size={18} /> Add New User
@@ -327,7 +327,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                     : { label: "Suspended", colour: "rgb(var(--color-danger))" };
 
                 return (
-                  <tr key={u.id || idx} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.6)" }}>
+                  <tr key={u.id || idx} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)" }}>
                     {/* NAME */}
                     <td style={{ padding: "1rem 0" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -356,7 +356,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                     {/* DEPARTMENT */}
                     <td>
                       <span style={{
-                        backgroundColor: "rgba(var(--color-primary), 0.12)",
+                        backgroundColor: "rgb(var(--color-primary) / 0.12)",
                         color: "rgb(var(--color-primary))",
                         borderRadius: "2rem",
                         padding: "0.3rem 0.75rem",
@@ -525,7 +525,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                     {dept.userCount} {dept.userCount === 1 ? "User" : "Users"}
                   </span>
                 </div>
-                <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "3px" }}>
+                <div style={{ width: "100%", height: "6px", backgroundColor: "rgb(var(--color-card-border) / 0.5)", borderRadius: "3px" }}>
                   <div style={{ width: `${dept.sharePct}%`, height: "100%", backgroundColor: "rgb(var(--color-primary))", borderRadius: "3px" }} />
                 </div>
               </div>

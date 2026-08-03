@@ -74,6 +74,12 @@ Every non-trivial unit of code carries a short comment explaining **why**, not w
   `--color-card`, `--color-card-border`, `--color-primary`, …). Never hardcode
   `#0f172a`, `#1e293b`, `#f8fafc`, `#94a3b8` — those break light mode. The brand
   accent (`#2563EB`) and semantic status colours are the only acceptable literals.
+- **Token transparency:** to apply alpha to a token, write
+  `rgb(var(--color-primary) / 0.18)`. NEVER `rgba(var(--color-primary), 0.18)` —
+  the tokens hold space-separated channels, which cannot take a comma'd alpha, so
+  that spelling is invalid CSS and computes to fully transparent. It fails
+  silently: no console error, the surface simply disappears. 311 declarations
+  across 47 files were written that way and rendered as nothing.
 - Reuse the existing class names from `globals.css` (`glass-panel`, `glass-card`,
   `data-table`, `table-container`, `badge badge-*`, `form-input`, `form-select`,
   `btn btn-primary`, `btn btn-secondary`) instead of re-styling from scratch.

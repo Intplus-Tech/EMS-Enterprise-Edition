@@ -100,8 +100,8 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({
                 gap: "0.65rem",
                 padding: compact ? "0.5rem 0.65rem" : "0.65rem 0.85rem",
                 borderRadius: "0.5rem",
-                background: "rgba(var(--color-surface-secondary), 0.5)",
-                border: "1px solid rgba(var(--color-card-border), 0.5)",
+                background: "rgb(var(--color-surface-secondary) / 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)",
               }}
             >
               <FileIcon size={compact ? 15 : 17} style={{ color: "#2563EB", flexShrink: 0 }} />
@@ -190,7 +190,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({
             style={{
               marginTop: "0.6rem",
               width: "100%",
-              border: "1px dashed rgba(var(--color-card-border), 0.9)",
+              border: "1px dashed rgb(var(--color-card-border) / 0.9)",
               background: "transparent",
               fontSize: "0.78rem",
               padding: "0.5rem",

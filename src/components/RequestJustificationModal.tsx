@@ -76,7 +76,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "rgba(var(--color-overlay), 0.65)",
+        backgroundColor: "rgb(var(--color-overlay) / 0.65)",
         backdropFilter: "blur(4px)",
         zIndex: 1000,
         display: "flex",
@@ -93,7 +93,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
           maxHeight: "92vh",
           overflowY: "auto",
           background: "rgb(var(--color-card))",
-          border: "1px solid rgba(var(--color-card-border), 0.6)",
+          border: "1px solid rgb(var(--color-card-border) / 0.6)",
           borderRadius: "16px",
           padding: "1.75rem 2rem",
           boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
@@ -149,10 +149,10 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
           {/* Message History Card Container */}
           <div
             style={{
-              border: "1px solid rgba(var(--color-card-border), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.5)",
               borderRadius: "12px",
               padding: "1.25rem",
-              background: "rgba(var(--color-surface-secondary), 0.3)"
+              background: "rgb(var(--color-surface-secondary) / 0.3)"
             }}
           >
             {/* Card Top Sub-Header */}
@@ -216,7 +216,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
                               top: "32px",
                               bottom: "-20px",
                               width: "2px",
-                              background: "rgba(var(--color-card-border), 0.4)"
+                              background: "rgb(var(--color-card-border) / 0.4)"
                             }}
                           />
                         )}
@@ -242,10 +242,10 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
                           style={{
                             flexGrow: 1,
                             minWidth: 0,
-                            background: isApproval ? "rgba(var(--color-secondary), 0.08)" : "rgba(var(--color-surface), 0.5)",
+                            background: isApproval ? "rgb(var(--color-secondary) / 0.08)" : "rgb(var(--color-surface) / 0.5)",
                             border: isApproval
-                              ? "1px solid rgba(var(--color-secondary), 0.25)"
-                              : "1px solid rgba(var(--color-card-border), 0.4)",
+                              ? "1px solid rgb(var(--color-secondary) / 0.25)"
+                              : "1px solid rgb(var(--color-card-border) / 0.4)",
                             borderRadius: "10px",
                             padding: "0.85rem 1.15rem",
                             display: "flex",
@@ -293,8 +293,8 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
         {!readOnly && (
           <div
             style={{
-              background: "rgba(var(--color-primary), 0.08)",
-              border: "1px solid rgba(var(--color-primary), 0.25)",
+              background: "rgb(var(--color-primary) / 0.08)",
+              border: "1px solid rgb(var(--color-primary) / 0.25)",
               borderRadius: "12px",
               padding: "1.25rem",
               display: "flex",
@@ -323,8 +323,8 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
         {/* Section: Audit Info Banner */}
         <div
           style={{
-            background: "rgba(var(--color-surface-secondary), 0.4)",
-            border: "1px solid rgba(var(--color-card-border), 0.4)",
+            background: "rgb(var(--color-surface-secondary) / 0.4)",
+            border: "1px solid rgb(var(--color-card-border) / 0.4)",
             borderRadius: "8px",
             padding: "0.85rem 1.15rem",
             display: "flex",
@@ -369,7 +369,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
               borderRadius: "8px",
               fontSize: "0.875rem",
               fontWeight: "600",
-              border: "1px solid rgba(var(--color-card-border), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.6)",
               background: "transparent",
               color: "rgb(var(--color-text))",
               cursor: "pointer"

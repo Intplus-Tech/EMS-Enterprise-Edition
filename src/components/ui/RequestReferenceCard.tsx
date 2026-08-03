@@ -46,7 +46,7 @@ export const RequestReferenceCard: React.FC<RequestReferenceCardProps> = ({
             width: 38,
             height: 38,
             borderRadius: "0.5rem",
-            background: "rgba(var(--color-text-muted), 0.15)",
+            background: "rgb(var(--color-text-muted) / 0.15)",
             color: "rgb(var(--color-text-muted))",
             display: "flex",
             alignItems: "center",

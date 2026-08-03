@@ -765,7 +765,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#2563EB" }}>
                   <Icons.MessageSquare size={20} />
                   <h3 style={{ fontSize: "1.05rem", fontWeight: "700", margin: 0 }}>Message History</h3>
-                  <span style={{ fontSize: "0.8rem", background: "rgba(var(--color-card-border), 0.32)", padding: "0.15rem 0.5rem", borderRadius: "999px", color: "rgb(var(--color-text-muted))" }}>
+                  <span style={{ fontSize: "0.8rem", background: "rgb(var(--color-card-border) / 0.32)", padding: "0.15rem 0.5rem", borderRadius: "999px", color: "rgb(var(--color-text-muted))" }}>
                     {thread.length} Total Messages
                   </span>
                 </div>
@@ -800,7 +800,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                             {isDept ? <Icons.ShieldCheck size={18} /> : <Icons.User size={18} />}
                           </div>
 
-                          <div style={{ flexGrow: 1, background: "rgba(var(--color-card-border), 0.12)", padding: "0.85rem 1rem", borderRadius: "8px", border: "1px solid rgba(var(--color-card-border), 0.5)" }}>
+                          <div style={{ flexGrow: 1, background: "rgb(var(--color-card-border) / 0.12)", padding: "0.85rem 1rem", borderRadius: "8px", border: "1px solid rgb(var(--color-card-border) / 0.5)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", gap: "0.5rem" }}>
                               <span style={{ fontSize: "0.85rem", fontWeight: "700" }}>
                                 {entry.authorName} ({humanizeStatus(entry.authorRole)})
@@ -930,7 +930,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       width: "3rem",
                       height: "3rem",
                       borderRadius: "50%",
-                      background: "rgba(var(--color-card-border), 0.32)",
+                      background: "rgb(var(--color-card-border) / 0.32)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -946,7 +946,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.8rem", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", paddingTop: "0.75rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.8rem", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", paddingTop: "0.75rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span style={{ color: "rgb(var(--color-text-muted))" }}>Account Number</span>
                       <strong>{selectedExpense.vendorBankDetails?.accountNumber || "—"}</strong>
@@ -1017,8 +1017,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       width: "1.25rem",
                       height: "1.25rem",
                       borderRadius: "50%",
-                      background: step.current ? "rgba(59, 130, 246, 0.15)" : step.active ? "#10B981" : "rgba(var(--color-card-border), 0.20)",
-                      border: step.current ? "2px solid #3B82F6" : step.active ? "2px solid #10B981" : "2px solid rgba(var(--color-card-border), 0.40)",
+                      background: step.current ? "rgba(59, 130, 246, 0.15)" : step.active ? "#10B981" : "rgb(var(--color-card-border) / 0.20)",
+                      border: step.current ? "2px solid #3B82F6" : step.active ? "2px solid #10B981" : "2px solid rgb(var(--color-card-border) / 0.40)",
                       zIndex: 2,
                       display: "flex",
                       alignItems: "center",
@@ -1047,7 +1047,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             left: 0,
             width: "100%",
             height: "100%",
-            background: "rgba(var(--color-overlay), 0.75)",
+            background: "rgb(var(--color-overlay) / 0.75)",
             zIndex: 110,
             display: "flex",
             alignItems: "center",
@@ -1061,7 +1061,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
               overflowY: "auto",
               padding: "1.75rem",
               background: "rgb(15, 23, 42)",
-              border: "1px solid rgba(var(--color-card-border), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.5)",
               borderRadius: "12px",
               boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
               display: "flex",
@@ -1121,18 +1121,18 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <span style={{ fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", color: "rgb(var(--color-text-muted))" }}>Request Information</span>
                 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                  <div style={{ background: "rgba(var(--color-card-border), 0.08)", border: "1px solid rgba(var(--color-card-border), 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                  <div style={{ background: "rgb(var(--color-card-border) / 0.08)", border: "1px solid rgb(var(--color-card-border) / 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</span>
                     <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.departmentId?.name || "—"}</strong>
                   </div>
-                  <div style={{ background: "rgba(var(--color-card-border), 0.08)", border: "1px solid rgba(var(--color-card-border), 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                  <div style={{ background: "rgb(var(--color-card-border) / 0.08)", border: "1px solid rgb(var(--color-card-border) / 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGET ITEM</span>
                     <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.category || "—"}</strong>
                   </div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                  <div style={{ background: "rgba(var(--color-card-border), 0.08)", border: "1px solid rgba(var(--color-card-border), 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                  <div style={{ background: "rgb(var(--color-card-border) / 0.08)", border: "1px solid rgb(var(--color-card-border) / 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGETED</span>
                     {/* The department's real allocation and spend. These were
                         fixed at ₦1,220,000 / ₦1,211,000 for every request, so
@@ -1142,7 +1142,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       {budgetContext?.hasBudget ? formatNaira(budgetContext.totalBudget) : "Not set"}
                     </strong>
                   </div>
-                  <div style={{ background: "rgba(var(--color-surface-secondary), 0.4)", border: "1px solid rgba(var(--color-card-border), 0.4)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                  <div style={{ background: "rgb(var(--color-surface-secondary) / 0.4)", border: "1px solid rgb(var(--color-card-border) / 0.4)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>AMOUNT SPENT</span>
                     <strong style={{ fontSize: "0.9rem" }}>
                       {budgetContext?.hasBudget ? formatNaira(budgetContext.utilisedYTD) : "—"}
@@ -1182,7 +1182,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   onChange={(e) => setEscalateJustification(e.target.value)}
                   placeholder="Enter detailed reasoning for why this request should be approved despite the budget variance..."
                   className="form-textarea"
-                  style={{ padding: "0.6rem", fontSize: "0.85rem", background: "rgba(var(--color-card-border), 0.08)", border: "1px solid rgba(var(--color-card-border), 0.5)" }}
+                  style={{ padding: "0.6rem", fontSize: "0.85rem", background: "rgb(var(--color-card-border) / 0.08)", border: "1px solid rgb(var(--color-card-border) / 0.5)" }}
                 />
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>
                   <span>Min. 50 characters required for Finance Head review.</span>
@@ -1467,7 +1467,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           /* Pending Release Table View (Screenshot 5) */
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
             <thead>
-              <tr style={{ background: "rgba(var(--color-surface-secondary), 0.5)", borderBottom: "1px solid rgba(var(--color-card-border), 0.6)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+              <tr style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
                 <th style={{ padding: "0.85rem 0.5rem 0.85rem 1rem", width: "40px" }}>
                   <input
                     type="checkbox"
@@ -1503,7 +1503,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 return (
                   <tr
                     key={exp._id}
-                    style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", transition: "all 0.15s ease" }}
+                    style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", transition: "all 0.15s ease" }}
                   >
                     <td style={{ padding: "1rem 0.5rem 1rem 1rem", width: "40px" }}>
                       <input
@@ -1594,7 +1594,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           /* Completed Release / History Table View (Screenshot 1) */
           <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.6)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+              <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "90px" }}>ID</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>REQUEST</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "120px" }}>AMOUNT</th>
@@ -1610,7 +1610,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   and released date used to fall back to fixed sample values, so
                   a request that was never paid still showed a bank reference. */}
               {visibleRows.map((exp) => (
-                <tr key={exp._id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+                <tr key={exp._id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
                   <td style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
                     {exp.requestNumber}
                   </td>
@@ -1707,7 +1707,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       {showAuthorizeReleaseModal && activeReleaseItem && (
         <div style={{
           position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "rgba(var(--color-overlay), 0.65)", zIndex: 120,
+          background: "rgb(var(--color-overlay) / 0.65)", zIndex: 120,
           display: "flex", alignItems: "center", justifyContent: "center",
           backdropFilter: "blur(6px)"
         }}>
@@ -1729,7 +1729,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.75rem" }}>
 
               {/* Left Column (Review Details) */}
-              <div style={{ background: "rgba(var(--color-surface-secondary), 0.5)", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "12px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <div style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "12px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 <div>
                   <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
                     PAYEE ACCOUNT DETAILS
@@ -1737,7 +1737,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   {/* Bank details come from the request. There is no sensible
                       placeholder for an account number, so a request missing
                       them says so rather than showing a plausible-looking one. */}
-                  <div style={{ background: "rgb(var(--color-card))", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "8px", padding: "0.85rem 1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
+                  <div style={{ background: "rgb(var(--color-card))", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "8px", padding: "0.85rem 1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
                     <div>
                       <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block" }}>Payee Name</span>
                       <strong style={{ fontSize: "0.85rem" }}>{activeReleaseItem.vendorName || "—"}</strong>
@@ -1767,7 +1767,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                         key={doc._id || `${doc.url}-${idx}`}
                         type="button"
                         onClick={() => onViewAttachment({ ...doc, requestNumber: activeReleaseItem.requestNumber })}
-                        style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "rgb(var(--color-card))", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "8px", padding: "0.65rem 0.85rem", cursor: "pointer", textAlign: "left", width: "100%", color: "inherit" }}
+                        style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "rgb(var(--color-card))", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "8px", padding: "0.65rem 0.85rem", cursor: "pointer", textAlign: "left", width: "100%", color: "inherit" }}
                       >
                         <Icons.FileText size={18} style={{ color: "#2563EB", flexShrink: 0 }} />
                         <div style={{ minWidth: 0 }}>
@@ -1793,7 +1793,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       timestamps — the very evidence the release is judged on. */}
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                     {releaseJustifications.map((entry, idx) => (
-                      <div key={idx} style={{ background: "rgb(var(--color-card))", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "8px", padding: "0.75rem 0.85rem" }}>
+                      <div key={idx} style={{ background: "rgb(var(--color-card))", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "8px", padding: "0.75rem 0.85rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", gap: "0.5rem" }}>
                           <strong style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
                             {entry.actorName} ({humanizeStatus(entry.actorRole)})
@@ -1824,7 +1824,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
               </div>
 
               {/* Right Column (Confirm Payment Release Form) */}
-              <div style={{ background: "rgb(var(--color-card))", border: "1px solid rgba(var(--color-card-border), 0.6)", borderRadius: "12px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <div style={{ background: "rgb(var(--color-card))", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "12px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                 <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>Confirm Payment Release</h3>
 
                 <div className="form-group">
@@ -1870,8 +1870,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       handleReceiptUpload(e.dataTransfer.files);
                     }}
                     style={{
-                      border: "2px dashed rgba(var(--color-card-border), 0.9)", borderRadius: "8px", padding: "1.5rem 1rem",
-                      textAlign: "center", background: "rgba(var(--color-surface-secondary), 0.4)", cursor: "pointer"
+                      border: "2px dashed rgb(var(--color-card-border) / 0.9)", borderRadius: "8px", padding: "1.5rem 1rem",
+                      textAlign: "center", background: "rgb(var(--color-surface-secondary) / 0.4)", cursor: "pointer"
                     }}
                   >
                     <Icons.UploadCloud size={32} style={{ color: "rgb(var(--color-text-muted))", margin: "0 auto 0.5rem" }} />
@@ -2013,7 +2013,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           alignItems: "center",
           gap: "1.25rem",
           zIndex: 100,
-          border: "1px solid rgba(var(--color-card-border), 0.6)"
+          border: "1px solid rgb(var(--color-card-border) / 0.6)"
         }}>
           <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>{selectedIds.length} items selected</span>
           {/* Both open the signed confirmation dialog. They previously fired

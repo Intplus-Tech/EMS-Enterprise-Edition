@@ -349,7 +349,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
 
                 return drafts.length > 0 ? drafts.map((draft) => (
                   <div key={draft._id} className="glass-card" style={{
-                    background: "rgba(var(--color-surface-secondary), 0.45)",
+                    background: "rgb(var(--color-surface-secondary) / 0.45)",
                     border: draft.status === "RETURNED" ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgb(var(--color-card-border))",
                     display: "flex",
                     justifyContent: "space-between",
@@ -485,7 +485,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
 
                   return drafts.length > 0 ? drafts.map((draft) => (
                     <div key={draft._id} className="glass-card" style={{
-                      background: "rgba(var(--color-surface-secondary), 0.45)",
+                      background: "rgb(var(--color-surface-secondary) / 0.45)",
                       border: draft.status === "RETURNED" ? "1px solid rgba(239, 68, 68, 0.3)" : "1px solid rgb(var(--color-card-border))",
                       display: "flex",
                       justifyContent: "space-between",

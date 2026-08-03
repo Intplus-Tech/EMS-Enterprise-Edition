@@ -84,7 +84,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         {currentUser?.role === "INITIATOR" ? (
           <>
             {/* Stepper tracking progress */}
-            <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.2)", padding: "1.25rem", position: "relative", marginBottom: "0.5rem" }}>
+            <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.2)", padding: "1.25rem", position: "relative", marginBottom: "0.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 {[
                   { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET"].includes(selectedExpense.status) },
@@ -102,8 +102,8 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                         width: "2rem",
                         height: "2rem",
                         borderRadius: "50%",
-                        background: isActive ? "rgba(99, 102, 241, 0.2)" : isCompleted ? "rgba(16, 185, 129, 0.2)" : "rgba(var(--color-card-border), 0.15)",
-                        border: isActive ? "2px solid rgb(var(--color-primary))" : isCompleted ? "2px solid rgb(var(--color-secondary))" : "2px solid rgba(var(--color-card-border), 0.35)",
+                        background: isActive ? "rgba(99, 102, 241, 0.2)" : isCompleted ? "rgba(16, 185, 129, 0.2)" : "rgb(var(--color-card-border) / 0.15)",
+                        border: isActive ? "2px solid rgb(var(--color-primary))" : isCompleted ? "2px solid rgb(var(--color-secondary))" : "2px solid rgb(var(--color-card-border) / 0.35)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -120,7 +120,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
               {/* Left Column: Request Information */}
-              <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)" }}>
+              <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)" }}>
                 <h4 style={{ fontSize: "0.85rem", fontWeight: "bold", textTransform: "uppercase", color: "rgb(var(--color-text-dim))", marginBottom: "1rem" }}>Request Information</h4>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", fontSize: "0.9rem" }}>
                   <div>
@@ -143,7 +143,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
 
               {/* Right Column: Attachments */}
-              <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)", display: "flex", flexDirection: "column", gap: "1rem" }}>
                 {/* Real document set with a working upload. The count was
                     hardcoded to (1) and the size to "1.2 MB • Oct 14, 2023". */}
                 <AttachmentList
@@ -181,7 +181,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         ) : (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-              <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)" }}>
+              <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)" }}>
                 <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Request Parameters</p>
                 <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <span>Department: <strong>{selectedExpense.departmentId?.name}</strong></span>
@@ -192,7 +192,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                 </div>
               </div>
 
-              <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)" }}>
+              <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)" }}>
                 <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Vendor Bank Target</p>
                 <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <span>Payee: <strong>{selectedExpense.vendorName}</strong></span>
@@ -205,7 +205,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             </div>
 
             {/* Stepper tracking */}
-            <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.2)" }}>
+            <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.2)" }}>
               <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))", marginBottom: "1rem" }}>Execution Route Progress</p>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
                 {[
@@ -222,7 +222,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                         width: "1.5rem",
                         height: "1.5rem",
                         borderRadius: "50%",
-                        background: step.active ? "rgb(var(--color-secondary))" : "rgba(var(--color-card-border), 0.15)",
+                        background: step.active ? "rgb(var(--color-secondary))" : "rgb(var(--color-card-border) / 0.15)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -241,7 +241,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
             {/* Transition action controllers */}
             {currentUser?.role === "FINANCE_HEAD" && selectedExpense.status === "PENDING_EXCEPTIONAL" && (
-              <div className="glass-card" style={{ border: "1px solid rgba(var(--color-accent), 0.3)" }}>
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-accent) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-accent))", marginBottom: "0.5rem" }}>Finance Head Action Required: Budget Overrun detected</p>
                 <div className="form-group">
                   <label className="form-label">Adjust Approved Amount (Optional)</label>
@@ -287,7 +287,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             )}
 
             {selectedExpense.status === "PENDING_APPROVAL" && (
-              <div className="glass-card" style={{ border: "1px solid rgba(var(--color-primary), 0.3)" }}>
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-primary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }}>Workflow Approval Step Required</p>
                 <div className="form-group">
                   <label className="form-label">Approval comments / details</label>
@@ -323,7 +323,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             )}
 
             {currentUser?.role === "FINANCE_OFFICER" && selectedExpense.status === "SENT_TO_FINANCE" && (
-              <div className="glass-card" style={{ border: "1px solid rgba(var(--color-primary), 0.3)" }}>
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-primary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }}>Finance Officer Action: Payee Audit & Instruction Upload</p>
                 <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginBottom: "1rem" }}>
                   Please confirm that the payee invoice attachment matches the requested amount. Then click the button below to upload the payment file to the banking system.
@@ -337,7 +337,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             )}
 
             {currentUser?.role === "FINANCE_MANAGER" && selectedExpense.status === "UPLOADED_TO_BANK" && (
-              <div className="glass-card" style={{ border: "1px solid rgba(var(--color-secondary), 0.3)" }}>
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-secondary))", marginBottom: "0.5rem" }}>Finance Manager Action: Authorize Cash Release</p>
                 <div className="form-group">
                   <label className="form-label">Bank Transaction Reference (Mandatory for ledger closure)</label>
@@ -371,7 +371,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               <p style={{ fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.5rem", color: "rgb(var(--color-text-muted))" }}>Approval Workflow History</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {selectedExpense.history?.map((hist: any, index: number) => (
-                  <div key={index} style={{ padding: "0.75rem", background: "rgba(var(--color-card-border), 0.12)", borderRadius: "4px", fontSize: "0.85rem" }}>
+                  <div key={index} style={{ padding: "0.75rem", background: "rgb(var(--color-card-border) / 0.12)", borderRadius: "4px", fontSize: "0.85rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
                       <span><strong>{hist.actorName}</strong> ({hist.actorRole})</span>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>{new Date(hist.timestamp).toLocaleString()}</span>
