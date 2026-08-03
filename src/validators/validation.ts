@@ -134,6 +134,11 @@ export const DepartmentUpdateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+/** Archive (`false`) / restore (`true`) for a department. */
+export const DepartmentStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+
 export const UserUpdateSchema = z.object({
   name: z.string().trim().min(2, "Name is required").max(80).optional(),
   email: z.string().email("Invalid email address").optional(),

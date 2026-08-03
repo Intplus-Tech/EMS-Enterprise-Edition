@@ -167,12 +167,26 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     [run, loadDepartments, loadBudgets]
   );
 
+  /**
+   * Deleting a department archives it — users, budgets and history are kept and
+   * the row can be restored. The toast says so rather than claiming a delete
+   * the server does not perform.
+   */
   const deleteDepartment = useCallback(
     (id: string) =>
       run(async () => {
         await AdminClient.deleteDepartment(id);
         await Promise.all([loadDepartments(), loadBudgets()]);
-      }, "Department deleted."),
+      }, "Department archived. It can be restored from the department list."),
+    [run, loadDepartments, loadBudgets]
+  );
+
+  const restoreDepartment = useCallback(
+    (id: string) =>
+      run(async () => {
+        await AdminClient.setDepartmentActive(id, true);
+        await Promise.all([loadDepartments(), loadBudgets()]);
+      }, "Department restored."),
     [run, loadDepartments, loadBudgets]
   );
 
@@ -274,6 +288,7 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     createDepartment,
     updateDepartment,
     deleteDepartment,
+    restoreDepartment,
     inviteUser,
     updateUser,
     setUserActive,

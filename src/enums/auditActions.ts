@@ -28,7 +28,10 @@ export enum AuditAction {
   // Department administration
   DEPARTMENT_CREATED = "DEPARTMENT_CREATED",
   DEPARTMENT_UPDATED = "DEPARTMENT_UPDATED",
+  /** Retained for rows written before deletion became an archive. */
   DEPARTMENT_DELETED = "DEPARTMENT_DELETED",
+  DEPARTMENT_ARCHIVED = "DEPARTMENT_ARCHIVED",
+  DEPARTMENT_RESTORED = "DEPARTMENT_RESTORED",
 
   // Budget administration
   BUDGET_PERIOD_CREATED = "BUDGET_PERIOD_CREATED",

@@ -1,6 +1,7 @@
 import { connectToDatabase } from "../../config/db";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
 import { User } from "../../models/User";
+import { Department } from "../../models/Department";
 import { BudgetService } from "../budget/budget.service";
 import { WorkflowService } from "../workflow/workflow.service";
 import { LoggerService } from "../logs/logger.service";
@@ -119,6 +120,16 @@ export class ExpenseService {
     if (!departmentId) {
       throw new Error(
         "Your account is not assigned to a department. Ask an administrator to assign one before raising a request."
+      );
+    }
+
+    // An archived department accepts no new spending — this is what the Delete
+    // Department modal promises, and without the check archiving would be
+    // cosmetic for anyone still assigned to it.
+    const department = await Department.findById(departmentId).select("name isActive").lean();
+    if (department && department.isActive === false) {
+      throw new Error(
+        `Invalid request: the '${department.name}' department has been archived and cannot accept new requests. Ask an administrator to restore it or reassign your account.`
       );
     }
 

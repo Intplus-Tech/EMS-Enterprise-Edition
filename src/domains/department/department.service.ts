@@ -1,14 +1,13 @@
 import { connectToDatabase } from "../../config/db";
 import { Department } from "../../models/Department";
 import { User } from "../../models/User";
-import { BudgetPeriod } from "../../models/BudgetPeriod";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
 import { LoggerService, ILogActor } from "../logs/logger.service";
 import { AuditAction } from "../../enums/auditActions";
 import { RequestStatus } from "../../enums/statuses";
 import { DepartmentDto } from "../../types/api";
 
-/** Statuses that mean a request is still moving and would be orphaned by a delete. */
+/** Statuses that mean a request is still moving, and so survives an archive. */
 const IN_FLIGHT_STATUSES = [
   RequestStatus.SUBMITTED,
   RequestStatus.BUDGET_CHECK,
@@ -22,8 +21,7 @@ const IN_FLIGHT_STATUSES = [
 ];
 
 /**
- * Department administration — create/read/update/delete plus the referential
- * safety checks that keep the Delete Department modal's promises honest.
+ * Department administration — create, read, update, archive and restore.
  * Consumed by `/api/admin/departments`.
  */
 export class DepartmentService {
@@ -126,45 +124,69 @@ export class DepartmentService {
   }
 
   /**
-   * Deletes a department, refusing while anything still references it.
-   * Historical (closed/rejected) requests are left intact — the design states
-   * audit history is preserved — but in-flight work must be resolved first or
-   * it would become unroutable.
+   * "Delete" archives rather than erases.
+   *
+   * A hard delete was unreachable in practice: it refused while any user or
+   * in-flight request still referenced the department, which is true of every
+   * department in a running system, so the action could only ever fail. It also
+   * contradicted the design (`designs/system-admin/Admin_ Delete Department
+   * Modal.png`), where the deleted row stays in the table as pending deletion
+   * with a Restore action beside it.
+   *
+   * Archiving keeps users, budget history and audit rows intact while removing
+   * the department from active use — `createRequest` refuses to book new
+   * spending against it. In-flight requests are deliberately left running:
+   * cancelling other people's approvals as a side effect of an admin tidy-up is
+   * not recoverable, and Restore has to be able to undo the whole action.
    */
-  public static async remove(id: string, actor: ILogActor) {
+  public static async archive(id: string, actor: ILogActor) {
     await connectToDatabase();
 
     const department = await Department.findById(id);
     if (!department) throw new Error("Department not found");
 
+    if (department.isActive === false) {
+      throw new Error(`Invalid request: '${department.name}' is already archived.`);
+    }
+
+    department.isActive = false;
+    await department.save();
+
+    // Reported back so the modal's summary reflects what was actually affected
+    // rather than the blanket warnings the design's copy carried.
     const [assignedUsers, inFlight] = await Promise.all([
       User.countDocuments({ departmentId: id }),
       ExpenseRequest.countDocuments({ departmentId: id, status: { $in: IN_FLIGHT_STATUSES } }),
     ]);
 
-    if (assignedUsers > 0) {
-      throw new Error(
-        `Invalid request: ${assignedUsers} user(s) are still assigned to '${department.name}'. Reassign them first.`
-      );
-    }
-    if (inFlight > 0) {
-      throw new Error(
-        `Invalid request: ${inFlight} in-flight request(s) belong to '${department.name}'. Resolve them first.`
-      );
-    }
+    await LoggerService.logAudit(
+      AuditAction.DEPARTMENT_ARCHIVED,
+      `Department '${department.name}' archived (${assignedUsers} user(s), ${inFlight} in-flight request(s) retained)`,
+      { departmentId: id, assignedUsers, inFlight },
+      actor
+    );
 
-    // Budget periods are department-owned and carry no independent history.
-    await BudgetPeriod.deleteMany({ departmentId: id });
-    await department.deleteOne();
+    return { id, name: department.name, isActive: false, assignedUsers, inFlight };
+  }
+
+  /** Undoes an archive — the Restore action on an inactive department row. */
+  public static async restore(id: string, actor: ILogActor) {
+    await connectToDatabase();
+
+    const department = await Department.findById(id);
+    if (!department) throw new Error("Department not found");
+
+    department.isActive = true;
+    await department.save();
 
     await LoggerService.logAudit(
-      AuditAction.DEPARTMENT_DELETED,
-      `Department '${department.name}' deleted`,
+      AuditAction.DEPARTMENT_RESTORED,
+      `Department '${department.name}' restored`,
       { departmentId: id },
       actor
     );
 
-    return { id, name: department.name };
+    return { id, name: department.name, isActive: true };
   }
 }
 

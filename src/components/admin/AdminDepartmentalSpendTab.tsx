@@ -3,6 +3,7 @@ import { Pagination } from "../ui/Pagination";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
 import { datedFilename, downloadCsv } from "../ui/exportCsv";
 import { DepartmentDto, DepartmentSpendDto, PopulatedExpenseDto } from "../../types/api";
+import { RequestStatus } from "../../enums/statuses";
 
 // Matches the row density shown in designs/system-admin/Admin_ Department Management.png
 const ROWS_PER_PAGE = 5;
@@ -11,6 +12,22 @@ import * as Icons from "lucide-react";
 /** A department row joined with its budget figures for this screen. */
 export type AdminDepartmentRow = DepartmentDto & Omit<DepartmentSpendDto, "id" | "name" | "description" | "isActive">;
 
+/** Statuses that count as still open for the Pending Requests tile. */
+const OPEN_STATUSES: string[] = [
+  RequestStatus.SUBMITTED,
+  RequestStatus.BUDGET_CHECK,
+  RequestStatus.INSUFFICIENT_BUDGET,
+  RequestStatus.PENDING_EXCEPTIONAL,
+  RequestStatus.PENDING_APPROVAL,
+  RequestStatus.APPROVED,
+  RequestStatus.SENT_TO_FINANCE,
+  RequestStatus.UPLOADED_TO_BANK,
+  RequestStatus.AWAITING_RELEASE,
+];
+
+/** A "deleted" department is archived, never removed — see DepartmentService.archive. */
+const archived = (d: AdminDepartmentRow) => d.isActive === false;
+
 interface AdminDepartmentalSpendTabProps {
   departments: AdminDepartmentRow[];
   /** Every request, used by the per-department analytics drill-down. */
@@ -18,6 +35,8 @@ interface AdminDepartmentalSpendTabProps {
   onOpenCreateDept: () => void;
   onOpenEditDept: (dept: AdminDepartmentRow) => void;
   onOpenDeleteDept: (dept: AdminDepartmentRow) => void;
+  /** Reactivates an archived department — no confirmation, it is reversible. */
+  onRestoreDept: (dept: AdminDepartmentRow) => void;
 }
 
 export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps> = ({
@@ -25,7 +44,8 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
   expenses = [],
   onOpenCreateDept,
   onOpenEditDept,
-  onOpenDeleteDept
+  onOpenDeleteDept,
+  onRestoreDept
 }) => {
   const [selectedAnalyticsDept, setSelectedAnalyticsDept] = useState<AdminDepartmentRow | null>(null);
 
@@ -59,6 +79,11 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
     }),
     { allocated: 0, utilised: 0, pending: 0 }
   );
+
+  // The other two tiles kept the design's sample figures (14 / 6) hardcoded, so
+  // archiving a department left "Active Depts." unchanged.
+  const activeDeptCount = departments.filter((d) => !archived(d)).length;
+  const pendingRequestCount = expenses.filter((e) => OPEN_STATUSES.includes(e.status)).length;
 
   /**
    * Utilisation against allocation, department by department, as the substitute
@@ -442,7 +467,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase" }}>PENDING REQUESTS</div>
-              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>14</div>
+              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>{pendingRequestCount}</div>
             </div>
           </div>
         </div>
@@ -455,7 +480,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase" }}>ACTIVE DEPTS.</div>
-              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>6</div>
+              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>{activeDeptCount}</div>
             </div>
           </div>
         </div>
@@ -523,8 +548,8 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                       {d.usersCount}
                     </td>
                     <td>
-                      <span className={`badge ${d.isActive !== false ? "badge-paid" : "badge-draft"}`} style={{ fontSize: "0.7rem" }}>
-                        {d.isActive !== false ? "ACTIVE" : "INACTIVE"}
+                      <span className={`badge ${archived(d) ? "badge-draft" : "badge-paid"}`} style={{ fontSize: "0.7rem" }}>
+                        {archived(d) ? "ARCHIVED" : "ACTIVE"}
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
@@ -545,14 +570,28 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                         >
                           <Icons.TrendingUp size={16} />
                         </button>
-                        {/* Delete Button */}
-                        <button
-                          onClick={() => onOpenDeleteDept(d)}
-                          title="Delete Department"
-                          style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "0.25rem" }}
-                        >
-                          <Icons.Trash2 size={16} />
-                        </button>
+                        {/* Archive / Restore — deleting a department archives it,
+                            so an archived row offers the way back instead of a
+                            second delete that would only error. */}
+                        {archived(d) ? (
+                          <button
+                            onClick={() => onRestoreDept(d)}
+                            title="Restore Department"
+                            aria-label={`Restore ${d.name}`}
+                            style={{ background: "none", border: "none", color: "#10b981", cursor: "pointer", padding: "0.25rem" }}
+                          >
+                            <Icons.RotateCcw size={16} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => onOpenDeleteDept(d)}
+                            title="Delete Department"
+                            aria-label={`Delete ${d.name}`}
+                            style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "0.25rem" }}
+                          >
+                            <Icons.Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

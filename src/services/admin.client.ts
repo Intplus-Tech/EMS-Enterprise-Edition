@@ -74,7 +74,14 @@ export const AdminClient = {
       .put<{ department: DepartmentDto }>(`/api/admin/departments/${id}`, { ...input })
       .then((r) => r.department),
 
-  deleteDepartment: (id: string) => http.delete<{ id: string }>(`/api/admin/departments/${id}`),
+  /** Archives the department (the server treats DELETE as an archive). */
+  deleteDepartment: (id: string) =>
+    http.delete<{ id: string; assignedUsers: number; inFlight: number }>(
+      `/api/admin/departments/${id}`
+    ),
+
+  setDepartmentActive: (id: string, isActive: boolean) =>
+    http.patch<{ id: string; isActive: boolean }>(`/api/admin/departments/${id}`, { isActive }),
 
   /* ----- Users ----- */
 

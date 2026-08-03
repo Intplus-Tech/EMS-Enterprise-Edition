@@ -25,6 +25,7 @@ export default function DepartmentalSpendPage() {
     setShowAdminCreateDeptModal,
     setShowAdminEditDeptModal,
     setShowAdminDeleteDeptModal,
+    restoreDepartment,
   } = useDashboard();
 
   // The directory (`departments`) and the ledger figures (`budgets`) come from
@@ -61,6 +62,8 @@ export default function DepartmentalSpendPage() {
           setSelectedAdminDept(dept);
           setShowAdminDeleteDeptModal(true);
         }}
+        // Restore is reversible and needs no confirmation step.
+        onRestoreDept={(dept) => restoreDepartment(dept.id)}
       />
     );
   }

@@ -1,10 +1,23 @@
+/**
+ * Confirms archiving a department. The copy describes an archive rather than an
+ * erase because that is what the server does — see `DepartmentService.archive`.
+ * Rendered by DashboardShell.
+ */
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+
+/** Minimal shape needed to identify and describe the department. */
+interface ArchiveTargetDepartment {
+  id?: string;
+  _id?: string;
+  name?: string;
+  usersCount?: number;
+}
 
 interface AdminDeleteDepartmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  department: any;
+  department: ArchiveTargetDepartment | null;
   onConfirmDelete: (deptId: string) => void;
 }
 
@@ -19,9 +32,10 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
   if (!isOpen || !department) return null;
 
   const deptName = department.name || "Selected Department";
+  const assignedUsers = department.usersCount ?? 0;
 
   const handleDelete = () => {
-    onConfirmDelete(department._id || department.id);
+    onConfirmDelete((department._id || department.id) as string);
     onClose();
   };
 
@@ -63,10 +77,10 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
           </div>
           <div style={{ flexGrow: 1 }}>
             <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-              Delete '{deptName}'?
+              Delete &apos;{deptName}&apos;?
             </h3>
             <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.2rem" }}>
-              This action is permanent and cannot be reversed.
+              The department is archived, not erased — you can restore it from the department list.
             </p>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer" }}>
@@ -84,13 +98,20 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#ef4444", fontWeight: "700", fontSize: "0.85rem", marginBottom: "0.6rem" }}>
             <Icons.AlertOctagon size={16} />
-            Severe System Warning
+            What archiving does
           </div>
+          {/* Each line states an effect the server actually performs. The
+              previous copy promised cascading deletes and cancelled approvals
+              that never happened — the request was simply refused. */}
           <ul style={{ fontSize: "0.8rem", color: "#fca5a5", paddingLeft: "1.25rem", lineHeight: "1.5" }}>
-            <li style={{ marginBottom: "0.35rem" }}>All historical transaction data for this department will be moved to long-term cold storage (Archived).</li>
-            <li style={{ marginBottom: "0.35rem" }}>This department's cost centers will be immediately deactivated and rejected in all future expense reports.</li>
-            <li style={{ marginBottom: "0.35rem" }}>Any pending approvals associated with this department will be automatically canceled.</li>
-            <li>User access permissions tied to this specific department will be revoked.</li>
+            <li style={{ marginBottom: "0.35rem" }}>No new expense requests can be raised against this department.</li>
+            <li style={{ marginBottom: "0.35rem" }}>
+              {assignedUsers > 0
+                ? `Its ${assignedUsers} assigned user(s) keep their accounts, but cannot raise spending until they are moved to another department.`
+                : "Users assigned later would need the department restored first."}
+            </li>
+            <li style={{ marginBottom: "0.35rem" }}>Budget allocations, request history and audit entries are preserved.</li>
+            <li>Requests already in the approval workflow continue to completion.</li>
           </ul>
         </div>
 
@@ -116,10 +137,10 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
           />
           <div>
             <div style={{ fontSize: "0.85rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-              I understand that this action is permanent
+              I understand this department will stop accepting new requests
             </div>
             <div style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))", marginTop: "0.15rem", lineHeight: "1.35" }}>
-              I acknowledge that all department history will be archived and cannot be managed through the active dashboard.
+              I acknowledge that &apos;{deptName}&apos; will be archived and can no longer be used for new spending until it is restored.
             </div>
           </div>
         </div>
@@ -159,8 +180,8 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
               boxShadow: confirmed ? "0 4px 12px rgba(239, 68, 68, 0.35)" : "none"
             }}
           >
-            <Icons.Trash2 size={15} style={{ marginRight: "0.35rem", display: "inline", verticalAlign: "middle" }} />
-            Delete Permanently
+            <Icons.Archive size={15} style={{ marginRight: "0.35rem", display: "inline", verticalAlign: "middle" }} />
+            Archive Department
           </button>
         </div>
       </div>
