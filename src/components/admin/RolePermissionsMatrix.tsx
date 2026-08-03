@@ -199,7 +199,7 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({
         <span
           style={{
             backgroundColor: "rgba(37, 99, 235, 0.15)",
-            color: "#60A5FA",
+            color: "rgb(var(--color-primary))",
             borderRadius: "2rem",
             padding: "0.35rem 0.85rem",
             fontSize: "0.75rem",
@@ -234,7 +234,7 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({
                 <React.Fragment key={group.label}>
                   {/* Group divider */}
                   <tr style={{ backgroundColor: "rgba(37, 99, 235, 0.08)" }}>
-                    <td colSpan={ACTION_COLUMNS.length + 1} style={{ fontWeight: 700, color: "#60A5FA", fontSize: "0.85rem" }}>
+                    <td colSpan={ACTION_COLUMNS.length + 1} style={{ fontWeight: 700, color: "rgb(var(--color-primary))", fontSize: "0.85rem" }}>
                       <GroupIcon size={16} style={{ marginRight: "0.5rem", display: "inline", verticalAlign: "middle" }} />
                       {group.label}
                     </td>

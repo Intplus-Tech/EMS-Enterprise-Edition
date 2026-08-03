@@ -312,7 +312,7 @@ export const AdminAuditTrailViewerTab: React.FC<AdminAuditTrailViewerTabProps> =
                           </div>
                           <div style={{ display: "flex", gap: "1.25rem", fontSize: "0.8rem" }}>
                             {log.attachmentsCount > 0 && (
-                              <span style={{ color: "#60a5fa", fontWeight: "600" }}>
+                              <span style={{ color: "rgb(var(--color-primary))", fontWeight: "600" }}>
                                 Attachments: {log.attachmentsCount}
                               </span>
                             )}

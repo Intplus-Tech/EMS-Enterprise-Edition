@@ -3,17 +3,26 @@ import * as Icons from "lucide-react";
 import { RequestJustificationModal } from "./RequestJustificationModal";
 import { formatNaira } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
+import { ThreadEntryDto } from "../types/api";
 
 interface ExceptionHistoryTabProps {
   currentUser?: any;
   expenses?: any[];
   setSelectedExpense?: (expense: any) => void;
+  /** Thread for whichever record the justification dialog is open on. */
+  thread?: ThreadEntryDto[];
+  threadLoading?: boolean;
+  /** Tells the page which request to load the thread for. */
+  onFocusThreadRequest?: (requestId: string | null) => void;
 }
 
 export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
   currentUser,
   expenses = [],
-  setSelectedExpense
+  setSelectedExpense,
+  thread = [],
+  threadLoading = false,
+  onFocusThreadRequest
 }) => {
   // Defaults to "All Periods" — the previous default was a literal "FY 2026"
   // which showed nothing at all in any other fiscal year.
@@ -337,6 +346,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                         <button
                           onClick={() => {
                             setJustificationTarget(rec);
+                            onFocusThreadRequest?.(String(rec.rawExpense?._id ?? ""));
                             setShowJustificationModal(true);
                             if (setSelectedExpense) setSelectedExpense(rec.rawExpense);
                           }}
@@ -420,7 +430,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
               width: "44px",
               height: "44px",
               borderRadius: "10px",
-              background: "rgba(255, 255, 255, 0.2)",
+              background: "rgba(var(--color-card-border), 0.80)",
               backdropFilter: "blur(8px)",
               display: "flex",
               alignItems: "center",
@@ -439,7 +449,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                 fontWeight: "700",
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                color: "rgba(255, 255, 255, 0.9)",
+                color: "rgba(var(--color-card-border), 1.00)",
                 display: "block",
                 marginBottom: "0.35rem"
               }}
@@ -450,7 +460,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
               <span style={{ fontSize: "2.35rem", fontWeight: "800", letterSpacing: "-0.03em", lineHeight: 1 }}>
                 {formatNaira(totalExpansionSum)}
               </span>
-              <span style={{ fontSize: "0.875rem", color: "rgba(255, 255, 255, 0.85)", fontWeight: "500" }}>
+              <span style={{ fontSize: "0.875rem", color: "rgba(var(--color-card-border), 1.00)", fontWeight: "500" }}>
                 ({approvedCount} approved request{approvedCount !== 1 ? "s" : ""})
               </span>
             </div>
@@ -520,11 +530,18 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
       </div>
 
       {/* Request Justification Modal */}
+      {/* History is a record, not a conversation: the question box is hidden and
+          the timeline is the request's real thread. Both the number and the
+          title used to fall back to "#0044 / Cooling Unit Replacement" — the
+          design's sample request — whenever a row lacked them. */}
       <RequestJustificationModal
         isOpen={showJustificationModal}
-        onClose={() => setShowJustificationModal(false)}
-        requestNumber={justificationTarget?.reqId || "#0044"}
-        requestTitle={justificationTarget?.requestTitle || "Cooling Unit Replacement"}
+        onClose={() => { setShowJustificationModal(false); onFocusThreadRequest?.(null); }}
+        requestNumber={justificationTarget?.reqId}
+        requestTitle={justificationTarget?.requestTitle}
+        entries={thread}
+        loading={threadLoading}
+        readOnly
       />
     </div>
   );

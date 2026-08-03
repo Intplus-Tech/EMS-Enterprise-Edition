@@ -1,15 +1,29 @@
 import React from "react";
 import * as Icons from "lucide-react";
+import { isOwnRequest } from "../domains/identity/reference";
 import { StatCard } from "./ui/StatCard";
 import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
+import { Pagination } from "./ui/Pagination";
 import { ExpenseRequestDto } from "../types/api";
+
+/**
+ * Department-queue wording from designs/approval/Requests (Approvar).png. Only
+ * the label differs from the canonical status; the badge colour still comes
+ * from `statusBadgeClass` so one status reads one way across every screen.
+ */
+const DEPT_STATUS_LABELS: Record<string, string> = {
+  PENDING_APPROVAL: "PENDING",
+  SENT_TO_FINANCE: "AWAITING FINANCE",
+  PENDING_EXCEPTIONAL: "SLA ALERT",
+  UPLOADED_TO_BANK: "PROCESSING",
+};
 
 interface RequestsTabProps {
   currentUser: any;
-  expenses: any[];
+  /** Read-only here: the shell's header owns the input that sets it (rule 1-I). */
   searchQuery: string;
-  setSearchQuery: (q: string) => void;
+  expenses: any[];
   /** Controls in the filter row above the lists (design: Today / date / amount). */
   amountSearchQuery: string;
   setAmountSearchQuery: (q: string) => void;
@@ -21,10 +35,7 @@ interface RequestsTabProps {
   setResubmitForm: (form: any) => void;
   setShowResubmitModal: (show: boolean) => void;
   setSelectedExpense: (expense: any) => void;
-  setSelectedReceiptData: (data: any) => void;
-  setShowReceiptModal: (show: boolean) => void;
-  setShowCreateModal: (show: boolean) => void;
-  
+
   requestsSubTab: "my-requests" | "dept-requests";
   setRequestsSubTab: (t: "my-requests" | "dept-requests") => void;
   deptFilterInitiator: string;
@@ -41,7 +52,6 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
   currentUser,
   expenses,
   searchQuery,
-  setSearchQuery,
   amountSearchQuery,
   setAmountSearchQuery,
   todayOnly,
@@ -52,9 +62,6 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
   setResubmitForm,
   setShowResubmitModal,
   setSelectedExpense,
-  setSelectedReceiptData,
-  setShowReceiptModal,
-  setShowCreateModal,
   requestsSubTab,
   setRequestsSubTab,
   deptFilterInitiator,
@@ -127,6 +134,36 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
 
     return true;
   };
+
+  /**
+   * The department queue an approver monitors, with every filter in the bar
+   * applied. Derived here rather than inside the table body so the paging
+   * footer below the table sees the same totals the rows were sliced from.
+   */
+  const deptRequests = expenses.filter((e) => {
+    // Scoped to the signed-in user's department; admins see every department.
+    const inDept =
+      currentUser?.role === "ADMIN" ||
+      e.departmentId === currentUser?.departmentId ||
+      e.initiatorId?.departmentId === currentUser?.departmentId ||
+      (e.departmentId as any)?.name === currentUser?.departmentName;
+    if (!inDept) return false;
+
+    if (!matchesControls(e)) return false;
+    if (deptFilterInitiator !== "ALL" && e.initiatorId?.name !== deptFilterInitiator) return false;
+    if (deptFilterStatus !== "ALL" && e.status !== deptFilterStatus) return false;
+
+    // A colleague's unsubmitted draft is not part of the department queue.
+    return e.status !== "DRAFT";
+  });
+
+  // Clamp the page so changing a filter never strands the table past the end.
+  const deptTotalPages = Math.max(1, Math.ceil(deptRequests.length / deptRowsPerPage));
+  const deptSafePage = Math.min(deptPage, deptTotalPages);
+  const deptVisibleRows = deptRequests.slice(
+    (deptSafePage - 1) * deptRowsPerPage,
+    deptSafePage * deptRowsPerPage
+  );
 
   /** Exports whatever the controls above currently show. */
   const handleExport = () => {
@@ -443,7 +480,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 {(() => {
                   const drafts = expenses.filter(e =>
-                    ["DRAFT", "RETURNED"].includes(e.status) && matchesControls(e) && e.initiatorId?._id === currentUser?._id
+                    ["DRAFT", "RETURNED"].includes(e.status) && matchesControls(e) && isOwnRequest(e, currentUser)
                   );
 
                   return drafts.length > 0 ? drafts.map((draft) => (
@@ -494,17 +531,22 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                     <div className="table-container">
                       <table className="data-table">
                         <thead>
+                          {/* Same columns as the initiator table above — the
+                              design gives both an ACTIONS eye, and a table that
+                              drops it is the only place a row cannot be opened
+                              from a keyboard. */}
                           <tr>
                             <th>ID</th>
-                            <th>Title</th>
-                            <th>Amount</th>
-                            <th>Status</th>
+                            <th>TITLE</th>
+                            <th style={{ textAlign: "right" }}>AMOUNT</th>
+                            <th>STATUS</th>
+                            <th style={{ textAlign: "right" }}>ACTIONS</th>
                           </tr>
                         </thead>
                         <tbody>
                           {(() => {
                             const myActive = expenses.filter(e =>
-                              e.initiatorId?._id === currentUser?._id &&
+                              isOwnRequest(e, currentUser) &&
                               !["DRAFT", "RETURNED", "PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(e.status) &&
                               matchesControls(e)
                             );
@@ -513,14 +555,24 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                               <tr key={exp._id} onClick={() => setSelectedExpense(exp)} style={{ cursor: "pointer" }}>
                                 <td><strong>{exp.requestNumber}</strong></td>
                                 <td>{exp.description}</td>
-                                <td>{formatNaira(exp.amount)}</td>
+                                <td style={{ textAlign: "right", fontWeight: 700 }}>{formatNairaPrecise(exp.amount)}</td>
                                 <td>
                                   <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
+                                </td>
+                                <td style={{ textAlign: "right" }}>
+                                  {/* Stop propagation so the icon does not double-fire the row handler */}
+                                  <button
+                                    onClick={(ev) => { ev.stopPropagation(); setSelectedExpense(exp); }}
+                                    aria-label={`View ${exp.requestNumber}`}
+                                    style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer", padding: "0.2rem" }}
+                                  >
+                                    <Icons.Eye size={16} />
+                                  </button>
                                 </td>
                               </tr>
                             )) : (
                               <tr>
-                                <td colSpan={4} style={{ textAlign: "center", color: "rgb(var(--color-text-dim))", padding: "1rem" }}>No active personal requests.</td>
+                                <td colSpan={5} style={{ textAlign: "center", color: "rgb(var(--color-text-dim))", padding: "1rem" }}>No active personal requests.</td>
                               </tr>
                             );
                           })()}
@@ -583,101 +635,67 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                           </tr>
                         </thead>
                         <tbody>
-                          {(() => {
-                            const filtered = expenses.filter(e => {
-                              // Gated to department of the current user
-                              const inDept = currentUser?.role === "ADMIN" || e.departmentId === currentUser?.departmentId || e.initiatorId?.departmentId === currentUser?.departmentId || (e.departmentId as any)?.name === currentUser?.departmentName;
-                              if (!inDept) return false;
-
-                              if (!matchesControls(e)) return false;
-
-                              // Filter by Initiator
-                              if (deptFilterInitiator !== "ALL" && e.initiatorId?.name !== deptFilterInitiator) return false;
-
-                              // Filter by status dropdown
-                              if (deptFilterStatus !== "ALL" && e.status !== deptFilterStatus) return false;
-
-                              // Exclude drafts that are not submitted
-                              if (e.status === "DRAFT") return false;
-
-                              return true;
-                            });
-
-                            // Pagination
-                            const totalCount = filtered.length;
-                            const totalPages = Math.ceil(totalCount / deptRowsPerPage) || 1;
-                            const startIndex = (deptPage - 1) * deptRowsPerPage;
-                            const paginated = filtered.slice(startIndex, startIndex + deptRowsPerPage);
-
-                            return (
-                              <>
-                                {paginated.length > 0 ? paginated.map((exp) => (
-                                  <tr key={exp._id} onClick={() => setSelectedExpense(exp)} style={{ cursor: "pointer" }}>
-                                    <td style={{ fontWeight: "600" }}>{exp.initiatorId?.name || "System"}</td>
-                                    <td><strong>{exp.requestNumber}</strong></td>
-                                    <td>{exp.category}</td>
-                                    <td>{formatNaira(exp.amount)}</td>
-                                    <td>{formatDate(exp.createdAt)}</td>
-                                    <td>
-                                      {(() => {
-                                        let label = exp.status;
-                                        let badgeClass = "badge-pending";
-                                        if (exp.status === "PENDING_APPROVAL") { label = "PENDING"; badgeClass = "badge-pending"; }
-                                        else if (exp.status === "SENT_TO_FINANCE") { label = "AWAITING FINANCE"; badgeClass = "badge-budget-check"; }
-                                        else if (exp.status === "PENDING_EXCEPTIONAL") { label = "SLA ALERT"; badgeClass = "badge-exceptional"; }
-                                        else if (exp.status === "UPLOADED_TO_BANK") { label = "PROCESSING"; badgeClass = "badge-pending"; }
-                                        else if (exp.status === "APPROVED") { label = "APPROVED"; badgeClass = "badge-approved"; }
-                                        else if (exp.status === "PAID") { label = "PAID"; badgeClass = "badge-approved"; }
-                                        return <span className={`badge ${badgeClass}`}>{label}</span>;
-                                      })()}
-                                    </td>
-                                    <td>
-                                      <Icons.ChevronRight size={16} style={{ color: "rgb(var(--color-text-dim))" }} />
-                                    </td>
-                                  </tr>
-                                )) : (
-                                  <tr>
-                                    <td colSpan={7} style={{ textAlign: "center", color: "rgb(var(--color-text-dim))", padding: "2rem" }}>No department submissions match your criteria.</td>
-                                  </tr>
-                                )}
-                                
-                                {totalCount > 0 && (
-                                  <tr style={{ background: "none" }}>
-                                    <td colSpan={7} style={{ border: "none", padding: "1rem 0 0" }}>
-                                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" }}>
-                                        <span style={{ color: "rgb(var(--color-text-dim))" }}>Showing {startIndex + 1}-{Math.min(startIndex + deptRowsPerPage, totalCount)} of {totalCount} requests</span>
-                                        <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                            <span style={{ color: "rgb(var(--color-text-dim))" }}>Rows per page:</span>
-                                            <select
-                                              value={deptRowsPerPage}
-                                              onChange={(e) => { setDeptRowsPerPage(Number(e.target.value)); setDeptPage(1); }}
-                                              className="form-select"
-                                              style={{ width: "65px", padding: "0.25rem", fontSize: "0.8rem" }}
-                                            >
-                                              <option value={5}>5</option>
-                                              <option value={10}>10</option>
-                                              <option value={20}>20</option>
-                                            </select>
-                                          </div>
-                                          <div style={{ display: "flex", gap: "0.25rem" }}>
-                                            <button onClick={() => setDeptPage(Math.max(1, deptPage - 1))} disabled={deptPage === 1} className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem" }}>&lt;</button>
-                                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
-                                              <button key={pg} onClick={() => setDeptPage(pg)} className={`btn ${pg === deptPage ? "btn-primary" : "btn-secondary"}`} style={{ padding: "0.25rem 0.5rem" }}>{pg}</button>
-                                            ))}
-                                            <button onClick={() => setDeptPage(Math.min(totalPages, deptPage + 1))} disabled={deptPage === totalPages} className="btn btn-secondary" style={{ padding: "0.25rem 0.5rem" }}>&gt;</button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </>
-                            );
-                          })()}
+                          {deptVisibleRows.length > 0 ? deptVisibleRows.map((exp) => (
+                            <tr key={exp._id} onClick={() => setSelectedExpense(exp)} style={{ cursor: "pointer" }}>
+                              <td style={{ fontWeight: "600" }}>{exp.initiatorId?.name || "System"}</td>
+                              <td><strong>{exp.requestNumber}</strong></td>
+                              <td>{exp.category}</td>
+                              <td>{formatNaira(exp.amount)}</td>
+                              <td>{formatDate(exp.createdAt)}</td>
+                              <td>
+                                {/* Colour comes from the shared status→class map so a
+                                    status never renders in a different colour on
+                                    another screen; only the label is this screen's
+                                    own (the design says "SLA ALERT", not
+                                    "PENDING EXCEPTIONAL"). `badge-exceptional` was
+                                    used here and is defined nowhere, so the SLA
+                                    badge rendered with no background at all. */}
+                                <span className={`badge ${statusBadgeClass(exp.status)}`}>
+                                  {DEPT_STATUS_LABELS[exp.status] ?? humanizeStatus(exp.status)}
+                                </span>
+                              </td>
+                              <td>
+                                <Icons.ChevronRight size={16} style={{ color: "rgb(var(--color-text-dim))" }} />
+                              </td>
+                            </tr>
+                          )) : (
+                            <tr>
+                              <td colSpan={7} style={{ textAlign: "center", color: "rgb(var(--color-text-dim))", padding: "2rem" }}>No department submissions match your criteria.</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
+
+                    {/* Paging footer — the shared primitive, so the summary line
+                        and the rows on screen cannot disagree (rule 2). */}
+                    {deptRequests.length > 0 && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.82rem", color: "rgb(var(--color-text-muted))", paddingTop: "1rem" }}>
+                          <span>Rows per page:</span>
+                          <select
+                            value={deptRowsPerPage}
+                            onChange={(e) => { setDeptRowsPerPage(Number(e.target.value)); setDeptPage(1); }}
+                            aria-label="Rows per page"
+                            className="form-select"
+                            style={{ width: "70px", padding: "0.25rem 0.4rem", fontSize: "0.8rem" }}
+                          >
+                            <option value={5}>5</option>
+                            <option value={10}>10</option>
+                            <option value={20}>20</option>
+                          </select>
+                        </div>
+                        <div style={{ flexGrow: 1, minWidth: "260px" }}>
+                          <Pagination
+                            page={deptSafePage}
+                            rowsPerPage={deptRowsPerPage}
+                            totalCount={deptRequests.length}
+                            onPageChange={setDeptPage}
+                            itemLabel="requests"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

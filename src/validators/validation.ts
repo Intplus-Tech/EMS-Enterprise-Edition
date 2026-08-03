@@ -153,6 +153,22 @@ export const UserStatusSchema = z.object({
   isActive: z.boolean(),
 });
 
+/**
+ * Self-service profile edit (`POST /api/auth/me`).
+ *
+ * Deliberately narrower than `UserUpdateSchema`: role and department are
+ * privilege, so a user editing their own profile must not be able to send them.
+ * This endpoint previously ran no validation at all and assigned every field
+ * straight onto the document.
+ */
+export const ProfileUpdateSchema = z.object({
+  name: z.string().trim().min(2, "Name is required").max(80).optional(),
+  email: z.string().trim().toLowerCase().email("Invalid email address").optional(),
+  officialContact: z.string().trim().max(40).optional(),
+  personalContact: z.string().trim().max(40).optional(),
+  avatar: z.string().max(500).optional(),
+});
+
 export const BudgetLineItemSchema = z.object({
   name: z.string().trim().min(2, "Line item name is required").max(80),
   description: z.string().trim().max(300).optional(),

@@ -5,7 +5,7 @@ import { formatNaira } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 
 // Row accent colours, cycled in the order the design shows them.
-const ROW_COLORS = ["#2563EB", "#475569", "#DC2626", "#0EA5E9", "#94A3B8"];
+const ROW_COLORS = ["#2563EB", "#475569", "#DC2626", "#0EA5E9", "rgb(var(--color-text-muted))"];
 
 // Rows revealed per "Load More" press.
 const ROWS_PER_PAGE = 8;
@@ -111,7 +111,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
       month: name,
       isProjection,
       height: `${heightPct}%`,
-      color: idx === currentMonthIdx ? "#2563EB" : "#93C5FD",
+      color: idx === currentMonthIdx ? "#2563EB" : "rgb(var(--color-primary))",
       amount: val
     };
   });
@@ -134,7 +134,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
   }
   const keyApproversList = Object.values(approverMap).map((app, idx) => {
     const initials = app.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
-    const colors = ["#2563EB", "#94A3B8", "#475569", "#3b82f6"];
+    const colors = ["#2563EB", "rgb(var(--color-text-muted))", "#475569", "#3b82f6"];
     return {
       id: `app-${idx}`,
       initials,
@@ -613,7 +613,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
                 <span style={{ color: "rgb(var(--color-text))" }}>Actual</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "#94A3B8" }} />
+                <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "rgb(var(--color-text-muted))" }} />
                 <span style={{ color: "rgb(var(--color-text-dim))" }}>Projection</span>
               </div>
             </div>
@@ -628,7 +628,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
                     width: "100%",
                     height: item.height,
                     backgroundColor: item.isProjection ? "transparent" : item.color,
-                    border: item.isProjection ? "2px dashed #94A3B8" : "none",
+                    border: item.isProjection ? "2px dashed rgb(var(--color-text-muted))" : "none",
                     borderRadius: "4px 4px 0 0",
                     transition: "height 0.3s ease"
                   }}

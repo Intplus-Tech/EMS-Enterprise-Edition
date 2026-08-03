@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { isOwnRequest } from "../domains/identity/reference";
 import { StatCard } from "./ui/StatCard";
 import { Pagination } from "./ui/Pagination";
 import { EmptyState } from "./ui/EmptyState";
@@ -51,7 +52,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         deptSpentThisMonth += e.amount;
       }
     }
-    if (e.initiatorId?._id === currentUser?._id) {
+    if (isOwnRequest(e, currentUser)) {
       if (e.status === "DRAFT") myDraftCount++;
       if (e.status === "RETURNED") awaitingUpdateCount++;
     }

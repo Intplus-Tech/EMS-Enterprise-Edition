@@ -54,7 +54,7 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgba(var(--color-overlay), 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -67,7 +67,7 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
         maxWidth: "480px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
       }}>
@@ -115,7 +115,7 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
             height: "36px",
             borderRadius: "50%",
             backgroundColor: "rgba(59, 130, 246, 0.25)",
-            color: "#60a5fa",
+            color: "rgb(var(--color-primary))",
             fontWeight: "700",
             fontSize: "0.85rem",
             display: "flex",
@@ -129,7 +129,7 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
             <div style={{ fontSize: "0.9rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
               {userName}
             </div>
-            <div style={{ fontSize: "0.8rem", color: "#93c5fd", marginTop: "0.2rem", lineHeight: "1.4" }}>
+            <div style={{ fontSize: "0.8rem", color: "rgb(var(--color-primary))", marginTop: "0.2rem", lineHeight: "1.4" }}>
               {isSuspended ? (
                 <>Are you sure you want to restore access for <strong>{userName}</strong>? They will be able to log in again immediately.</>
               ) : (
@@ -166,7 +166,7 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
             style={{
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
+              border: "1px solid rgb(var(--color-card-border))",
               backgroundColor: "transparent",
               color: "rgb(var(--color-text))",
               fontWeight: "600",

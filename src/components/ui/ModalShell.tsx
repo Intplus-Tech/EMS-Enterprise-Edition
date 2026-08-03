@@ -42,7 +42,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(15, 23, 42, 0.6)",
+        backgroundColor: "rgba(var(--color-overlay), 0.6)",
         backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",

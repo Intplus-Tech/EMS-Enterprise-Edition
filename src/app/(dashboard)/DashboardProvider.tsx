@@ -124,8 +124,10 @@ function useDashboardState() {
   const [workflowMessage, setWorkflowMessage] = useState("");
 
   // Logs data (Admin)
+  // Feeds "Recent System Activity" on the admin overview. The Audit Trail screen
+  // pages against the database itself (see useAuditTrailLogs) and does not read
+  // this snapshot, so no filter state is kept alongside it.
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
-  const [logFilter, setLogFilter] = useState("ALL"); // ALL, AUDIT, EXCEPTION, APP
 
   // Dashboard metrics
   const [metrics, setMetrics] = useState<any>(null);
@@ -606,15 +608,36 @@ function useDashboardState() {
     }
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  /**
+   * Persists the profile form.
+   *
+   * `override` exists for callers that compute the payload themselves — the
+   * Settings screen's "Save Update" button sets the staged form and submits in
+   * the same click, so reading `editProfileForm` here saw the *previous* render's
+   * value: on a fresh session that is the blank initial form, and the request
+   * cleared the account's name and email.
+   */
+  const handleUpdateProfile = async (
+    e: React.FormEvent | null,
+    override?: Partial<typeof editProfileForm>
+  ) => {
     if (e) e.preventDefault();
+    const form = { ...editProfileForm, ...override };
+
+    // Blank identity fields are never a legitimate edit; the server rejects them
+    // too, but failing here keeps the message specific to the field at fault.
+    if (!form.name?.trim() || !form.email?.trim()) {
+      notifyError("Name and email address are both required.");
+      return;
+    }
+
     try {
       const user = await AuthClient.updateProfile({
-        name: editProfileForm.name,
-        email: editProfileForm.email,
-        officialContact: editProfileForm.officialContact,
-        personalContact: editProfileForm.personalContact,
-        avatar: editProfileForm.avatar,
+        name: form.name,
+        email: form.email,
+        officialContact: form.officialContact,
+        personalContact: form.personalContact,
+        avatar: form.avatar,
       });
       setCurrentUser({ ...currentUser, ...user });
       setShowEditProfileModal(false);
@@ -782,7 +805,6 @@ function useDashboardState() {
     workflowSteps, setWorkflowSteps,
     workflowMessage, setWorkflowMessage,
     systemLogs, setSystemLogs,
-    logFilter, setLogFilter,
     metrics, setMetrics,
     showCreateModal, setShowCreateModal,
     newRequest, setNewRequest,

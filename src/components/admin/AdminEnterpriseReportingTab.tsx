@@ -95,7 +95,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
    */
   const statusSegments = [
     { label: "Approved", count: approvedCount, color: "#2563EB" },
-    { label: "Paid", count: paidCount, color: "#93C5FD" },
+    { label: "Paid", count: paidCount, color: "rgb(var(--color-primary))" },
     { label: "Pending", count: pendingCount, color: "#64748B" },
     { label: "Rejected", count: rejectedCount, color: "#EF4444" },
   ];
@@ -258,7 +258,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
             borderRadius: "0.375rem",
             border: "1px solid #2563eb",
             backgroundColor: "transparent",
-            color: "#60a5fa",
+            color: "rgb(var(--color-primary))",
             fontWeight: "600",
             fontSize: "0.85rem",
             display: "flex",
@@ -319,7 +319,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
 
         {/* UPLOADED */}
         <div className="glass-panel" style={{ padding: "1.25rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem", display: "flex", alignItems: "center", gap: "0.85rem" }}>
-          <div style={{ width: "38px", height: "38px", borderRadius: "50%", backgroundColor: "rgba(139, 92, 246, 0.15)", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: "38px", height: "38px", borderRadius: "50%", backgroundColor: "rgba(139, 92, 246, 0.15)", color: "rgb(var(--color-info))", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icons.Upload size={18} />
           </div>
           <div>

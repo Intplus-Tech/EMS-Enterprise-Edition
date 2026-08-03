@@ -42,7 +42,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
           </button>
         </div>
 
-        <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: 0 }} />
+        <hr style={{ border: "none", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", margin: 0 }} />
 
         {settingsMessage && (
           <div className="glass-card" style={{ borderLeft: "4px solid #10B981", background: "rgba(16,185,129,0.05)", padding: "0.75rem" }}>
@@ -105,7 +105,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
             />
           </div>
 
-          <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: 0 }} />
+          <hr style={{ border: "none", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", margin: 0 }} />
 
           <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose} className="btn btn-secondary" style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))" }}>

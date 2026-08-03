@@ -47,7 +47,7 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({
                     value={step.stepName}
                     onChange={(e) => handleStepDetailChange(idx, "stepName", e.target.value)}
                     className="form-input"
-                    style={{ padding: "0.3rem 0.5rem", fontSize: "0.9rem", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.1)", width: "240px", fontWeight: "600" }}
+                    style={{ padding: "0.3rem 0.5rem", fontSize: "0.9rem", background: "transparent", border: "none", borderBottom: "1px solid rgb(var(--color-card-border))", width: "240px", fontWeight: "600" }}
                   />
                   <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
                     <span>Actor Role: <strong>{step.role}</strong></span>

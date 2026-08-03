@@ -20,7 +20,32 @@ interface SettingsTabProps {
   setShowEditProfileModal: (show: boolean) => void;
   setShowUpdatePhotoModal: (show: boolean) => void;
   setEditProfileForm: (form: any) => void;
-  handleUpdateProfile: (e: React.FormEvent) => void;
+  /** The staged edits the dialogs write into; "Save Update" commits them. */
+  editProfileForm: ProfileForm;
+  handleUpdateProfile: (e: React.FormEvent | null, override?: Partial<ProfileForm>) => void;
+}
+
+export interface ProfileForm {
+  name: string;
+  email: string;
+  officialContact: string;
+  personalContact: string;
+  avatar: string;
+}
+
+/**
+ * The editable slice of a session user. Three buttons on this screen each built
+ * this object by hand, so a field added to one was silently dropped by the other
+ * two.
+ */
+function profileFormFromUser(user: any): ProfileForm {
+  return {
+    name: user?.name || "",
+    email: user?.email || "",
+    officialContact: user?.officialContact || "",
+    personalContact: user?.personalContact || "",
+    avatar: user?.avatar || "",
+  };
 }
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({
@@ -33,8 +58,13 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
   setShowEditProfileModal,
   setShowUpdatePhotoModal,
   setEditProfileForm,
+  editProfileForm,
   handleUpdateProfile
 }) => {
+  // Values the account currently holds, used both to seed the dialogs and as the
+  // baseline "Discard Changes" returns to.
+  const sessionProfile = profileFormFromUser(currentUser);
+
   return (
     <div style={{ maxWidth: "800px" }}>
       <div style={{ marginBottom: "2rem" }}>
@@ -51,18 +81,12 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             <span className="settings-card-title">
               <Icons.User size={20} style={{ color: "rgb(var(--color-primary))" }} /> Profile Information
             </span>
-            <button 
+            <button
               onClick={() => {
-                setEditProfileForm({
-                  name: currentUser?.name || "",
-                  email: currentUser?.email || "",
-                  officialContact: currentUser?.officialContact || "",
-                  personalContact: currentUser?.personalContact || "",
-                  avatar: currentUser?.avatar || ""
-                });
+                setEditProfileForm(sessionProfile);
                 setShowEditProfileModal(true);
               }}
-              className="btn btn-link" 
+              className="btn btn-link"
               style={{ background: "none", border: "none", color: "rgb(var(--color-primary))", fontWeight: "600", cursor: "pointer", fontSize: "0.9rem" }}
             >
               Edit Profile
@@ -71,15 +95,9 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 
           <div className="settings-profile-layout">
             {/* Left Column: Avatar */}
-            <div 
+            <div
               onClick={() => {
-                setEditProfileForm({
-                  name: currentUser?.name || "",
-                  email: currentUser?.email || "",
-                  officialContact: currentUser?.officialContact || "",
-                  personalContact: currentUser?.personalContact || "",
-                  avatar: currentUser?.avatar || ""
-                });
+                setEditProfileForm(sessionProfile);
                 setShowUpdatePhotoModal(true);
               }}
               className="avatar-container"
@@ -162,10 +180,16 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           </div>
         </div>
 
-        {/* Save & Discard Buttons */}
+        {/* Save & Discard. The screen itself has no inputs — the dialogs stage the
+            edits — so these commit or drop whatever is currently staged.
+            "Save Update" used to set the staged form and submit in the same
+            click, which sent React's *previous* value: on a fresh session that
+            is the blank initial form, so the click wiped the account's name and
+            email. The staged values are now passed explicitly. */}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: "1rem", marginTop: "1rem", alignItems: "center" }}>
-          <button 
+          <button
             onClick={() => {
+              setEditProfileForm(sessionProfile);
               fetchSession();
             }}
             className="btn btn-secondary"
@@ -173,17 +197,17 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
           >
             Discard Changes
           </button>
-          <button 
-            onClick={() => {
-              setEditProfileForm({
-                name: currentUser?.name,
-                email: currentUser?.email,
-                officialContact: currentUser?.officialContact || "",
-                personalContact: currentUser?.personalContact || "",
-                avatar: currentUser?.avatar
-              });
-              handleUpdateProfile(null as any);
-            }}
+          <button
+            onClick={() =>
+              handleUpdateProfile(null, {
+                // Any field the dialogs never touched falls back to what the
+                // account already holds, so saving cannot blank it.
+                ...sessionProfile,
+                ...Object.fromEntries(
+                  Object.entries(editProfileForm ?? {}).filter(([, value]) => value !== "" && value != null)
+                ),
+              })
+            }
             className="btn btn-primary"
             style={{ padding: "0.6rem 1.5rem", borderRadius: "8px", fontWeight: "600" }}
           >

@@ -85,16 +85,23 @@ const FINANCE_PROCESSING_NAV: NavItem[] = [
   SETTINGS,
 ];
 
+// The six items in designs/system-admin/Admin_ System Overview Dashboard.png, in
+// that order, plus Workflow Rules.
+//
+// Three further entries used to sit *below* Settings, two of which duplicated a
+// designed screen: "Users & Invites" repeated the Users & Roles directory and
+// "System Audits" repeated the Audit Trail viewer, each with its own subtly
+// different table. Both are gone; the invitation actions the first one carried
+// now live in the ACTIONS column of Users & Roles. Workflow Rules has no design
+// but also no substitute, so it stays.
 const ADMIN_NAV: NavItem[] = [
   { route: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
   { route: "/departmental-spend", label: "Departmental Spend", icon: "PieChart" },
   { route: "/reports", label: "Report", icon: "BarChart2" },
   { route: "/users-roles", label: "Users & Roles", icon: "Users" },
   { route: "/audit-trail", label: "Audit Trail", icon: "FileText" },
-  SETTINGS,
   { route: "/workflow", label: "Workflow Rules", icon: "GitFork" },
-  { route: "/logs", label: "System Audits", icon: "History" },
-  { route: "/users", label: "Users & Invites", icon: "Users" },
+  SETTINGS,
 ];
 
 // APPROVER and any other authenticated role.

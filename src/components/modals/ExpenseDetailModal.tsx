@@ -6,7 +6,7 @@ import { WorkflowActionType } from "../../enums/workflowActions";
 import { AttachmentTarget } from "./AttachmentViewModal";
 import { AttachmentList } from "../ui/AttachmentList";
 import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
-import { formatNaira } from "../ui/format";
+import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
@@ -72,7 +72,9 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h3 style={{ fontWeight: "bold", fontSize: "1.25rem" }}>Request Details: {selectedExpense.requestNumber}</h3>
-            <span className={`badge badge-${selectedExpense.status?.toLowerCase().replace(/_/g, '-')}`}>{selectedExpense.status}</span>
+            {/* Shared status→class map; a class built from the status string
+                (`badge-pending-approval`, …) matches nothing in globals.css. */}
+            <span className={`badge ${statusBadgeClass(selectedExpense.status)}`}>{humanizeStatus(selectedExpense.status)}</span>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer" }}>
             <Icons.X size={24} />
@@ -82,7 +84,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         {currentUser?.role === "INITIATOR" ? (
           <>
             {/* Stepper tracking progress */}
-            <div className="glass-card" style={{ background: "rgba(15,23,42,0.2)", padding: "1.25rem", position: "relative", marginBottom: "0.5rem" }}>
+            <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.2)", padding: "1.25rem", position: "relative", marginBottom: "0.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 {[
                   { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET"].includes(selectedExpense.status) },
@@ -118,7 +120,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
               {/* Left Column: Request Information */}
-              <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)" }}>
+              <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)" }}>
                 <h4 style={{ fontSize: "0.85rem", fontWeight: "bold", textTransform: "uppercase", color: "rgb(var(--color-text-dim))", marginBottom: "1rem" }}>Request Information</h4>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", fontSize: "0.9rem" }}>
                   <div>
@@ -141,7 +143,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
 
               {/* Right Column: Attachments */}
-              <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)", display: "flex", flexDirection: "column", gap: "1rem" }}>
                 {/* Real document set with a working upload. The count was
                     hardcoded to (1) and the size to "1.2 MB • Oct 14, 2023". */}
                 <AttachmentList
@@ -179,7 +181,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         ) : (
           <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-              <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)" }}>
+              <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)" }}>
                 <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Request Parameters</p>
                 <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <span>Department: <strong>{selectedExpense.departmentId?.name}</strong></span>
@@ -190,7 +192,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                 </div>
               </div>
 
-              <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)" }}>
+              <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)" }}>
                 <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Vendor Bank Target</p>
                 <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <span>Payee: <strong>{selectedExpense.vendorName}</strong></span>
@@ -203,7 +205,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             </div>
 
             {/* Stepper tracking */}
-            <div className="glass-card" style={{ background: "rgba(15,23,42,0.2)" }}>
+            <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.2)" }}>
               <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))", marginBottom: "1rem" }}>Execution Route Progress</p>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
                 {[
@@ -369,7 +371,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               <p style={{ fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.5rem", color: "rgb(var(--color-text-muted))" }}>Approval Workflow History</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                 {selectedExpense.history?.map((hist: any, index: number) => (
-                  <div key={index} style={{ padding: "0.75rem", background: "rgba(255,255,255,0.03)", borderRadius: "4px", fontSize: "0.85rem" }}>
+                  <div key={index} style={{ padding: "0.75rem", background: "rgba(var(--color-card-border), 0.12)", borderRadius: "4px", fontSize: "0.85rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
                       <span><strong>{hist.actorName}</strong> ({hist.actorRole})</span>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>{new Date(hist.timestamp).toLocaleString()}</span>

@@ -129,7 +129,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               height: "48px",
               borderRadius: "50%",
               backgroundColor: "rgba(139, 92, 246, 0.15)",
-              color: "#a78bfa",
+              color: "rgb(var(--color-info))",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",

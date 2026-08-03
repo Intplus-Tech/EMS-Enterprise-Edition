@@ -45,7 +45,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgba(var(--color-overlay), 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -58,7 +58,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
         maxWidth: "520px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
       }}>
@@ -124,8 +124,8 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
 
         {/* Implications Confirmation Checkbox */}
         <div style={{
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          backgroundColor: "rgba(15, 23, 42, 0.5)",
+          border: "1px solid rgb(var(--color-card-border))",
+          backgroundColor: "rgba(var(--color-surface-secondary), 0.5)",
           borderRadius: "0.5rem",
           padding: "0.85rem 1rem",
           display: "flex",
@@ -160,7 +160,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
             style={{
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
+              border: "1px solid rgb(var(--color-card-border))",
               backgroundColor: "transparent",
               color: "rgb(var(--color-text))",
               fontWeight: "600",

@@ -69,7 +69,7 @@ export const AttachmentViewModal: React.FC<AttachmentViewModalProps> = ({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(15, 23, 42, 0.75)",
+        backgroundColor: "rgba(var(--color-overlay), 0.75)",
         backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
@@ -89,7 +89,7 @@ export const AttachmentViewModal: React.FC<AttachmentViewModalProps> = ({
           right: "1.5rem",
           background: "none",
           border: "none",
-          color: "#F8FAFC",
+          color: "rgb(var(--color-text))",
           cursor: "pointer",
           padding: "0.25rem",
           lineHeight: 0,

@@ -158,7 +158,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (startupError) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#0F172A", color: "#F8FAFC", padding: "2rem", fontFamily: "var(--font-sans)" }}>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "rgb(var(--color-background))", color: "rgb(var(--color-text))", padding: "2rem", fontFamily: "var(--font-sans)" }}>
         <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", padding: "2.5rem", textAlign: "center" }}>
           <div style={{ display: "inline-flex", padding: "0.75rem", borderRadius: "50%", background: "rgba(239, 68, 68, 0.2)", color: "#EF4444", marginBottom: "1.5rem" }}>
             <Icons.AlertTriangle size={32} />
@@ -181,7 +181,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "rgb(15 23 42)", color: "#fff" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "rgb(var(--color-background))", color: "rgb(var(--color-text))" }}>
         <div style={{ textAlign: "center" }}>
           <Icons.Loader className="animate-spin" size={48} style={{ color: "rgb(var(--color-primary))", margin: "0 auto 1rem" }} />
           <p>Initialising spend management dashboard...</p>
@@ -233,7 +233,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* User profile card at bottom of sidebar */}
-        <div style={{ marginTop: "auto", paddingTop: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <div style={{ marginTop: "auto", paddingTop: "0.75rem", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           <div
             style={{
               padding: "0.6rem 0.75rem",

@@ -43,7 +43,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgba(var(--color-overlay), 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -56,7 +56,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
         maxWidth: "560px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
       }}>
@@ -115,8 +115,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -141,8 +141,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -162,8 +162,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -187,8 +187,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                   style={{
                     width: "100%",
                     padding: "0.65rem 0.85rem",
-                    backgroundColor: "rgba(15, 23, 42, 0.6)",
-                    border: "1px solid rgba(255, 255, 255, 0.12)",
+                    backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                    border: "1px solid rgb(var(--color-card-border))",
                     borderRadius: "0.5rem",
                     color: "rgb(var(--color-text))",
                     fontSize: "0.9rem",
@@ -218,8 +218,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -248,7 +248,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
             marginBottom: "1.5rem"
           }}>
             <Icons.Info size={18} style={{ color: "#3b82f6", flexShrink: 0, marginTop: "2px" }} />
-            <p style={{ fontSize: "0.8rem", color: "#93c5fd", lineHeight: "1.4" }}>
+            <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-primary))", lineHeight: "1.4" }}>
               The user will receive an automated invitation email to set their password once the profile is saved. Invitation expires in 72 hours.
             </p>
           </div>
@@ -261,7 +261,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
               style={{
                 padding: "0.65rem 1.25rem",
                 borderRadius: "0.5rem",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgb(var(--color-card-border))",
                 backgroundColor: "transparent",
                 color: "rgb(var(--color-text))",
                 fontWeight: "600",

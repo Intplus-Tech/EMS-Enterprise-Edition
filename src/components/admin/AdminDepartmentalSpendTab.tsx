@@ -491,10 +491,10 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
           <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Department Overview</h3>
           <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button style={{ padding: "0.4rem 0.6rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.375rem", color: "rgb(var(--color-text-muted))" }}>
+            <button style={{ padding: "0.4rem 0.6rem", background: "none", border: "1px solid rgb(var(--color-card-border))", borderRadius: "0.375rem", color: "rgb(var(--color-text-muted))" }}>
               <Icons.SlidersHorizontal size={14} />
             </button>
-            <button style={{ padding: "0.4rem 0.6rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.375rem", color: "rgb(var(--color-text-muted))" }}>
+            <button style={{ padding: "0.4rem 0.6rem", background: "none", border: "1px solid rgb(var(--color-card-border))", borderRadius: "0.375rem", color: "rgb(var(--color-text-muted))" }}>
               <Icons.ListFilter size={14} />
             </button>
           </div>
@@ -503,7 +503,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         <div className="table-container">
           <table className="data-table" style={{ width: "100%" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
+              <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)" }}>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</th>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>BUDGET (FY2026)</th>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>UTILIZED</th>
@@ -564,7 +564,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                         <button
                           onClick={() => onOpenEditDept(d)}
                           title="Edit Department"
-                          style={{ background: "none", border: "none", color: "#60a5fa", cursor: "pointer", padding: "0.25rem" }}
+                          style={{ background: "none", border: "none", color: "rgb(var(--color-primary))", cursor: "pointer", padding: "0.25rem" }}
                         >
                           <Icons.Edit2 size={16} />
                         </button>
@@ -681,7 +681,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         }}>
           <div>
             <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem" }}>Budget Committed</h3>
-            <p style={{ fontSize: "0.82rem", color: "rgba(255, 255, 255, 0.8)", lineHeight: "1.4" }}>
+            <p style={{ fontSize: "0.82rem", color: "rgba(var(--color-card-border), 1.00)", lineHeight: "1.4" }}>
               Utilised plus pending, across every departmental allocation.
             </p>
           </div>
@@ -690,7 +690,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             width: "130px",
             height: "130px",
             borderRadius: "50%",
-            background: `conic-gradient(#FFFFFF ${Math.min(100, utilisationPct) * 3.6}deg, rgba(255, 255, 255, 0.25) 0deg)`,
+            background: `conic-gradient(#FFFFFF ${Math.min(100, utilisationPct) * 3.6}deg, rgba(var(--color-card-border), 1.00) 0deg)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -711,7 +711,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
           </div>
 
-          <span style={{ fontSize: "0.8rem", color: "rgba(255, 255, 255, 0.85)", textAlign: "center" }}>
+          <span style={{ fontSize: "0.8rem", color: "rgba(var(--color-card-border), 1.00)", textAlign: "center" }}>
             {formatNaira(enterpriseTotals.utilised + enterpriseTotals.pending)} of {formatNaira(enterpriseTotals.allocated)}
           </span>
         </div>

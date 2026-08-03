@@ -33,6 +33,11 @@ interface AdminUsersAndRolesTabProps {
   }) => Promise<boolean> | void;
   /** Persists an inline role change made from the directory table. */
   onChangeUserRole: (user: AdminUserDto, role: SystemRole) => Promise<boolean> | void;
+  /**
+   * Re-issues an invitation and shows the fresh link. Absorbed from the separate
+   * "Users & Invites" screen, which duplicated this directory just to host it.
+   */
+  onResendInvite: (user: AdminUserDto) => void;
   /** Per-department budget allocations, for the access overview. */
   budgets: DepartmentSpendDto[];
   /** True while an admin mutation is in flight. */
@@ -50,6 +55,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
   onOpenDeleteUser,
   onSaveRolePermissions,
   onChangeUserRole,
+  onResendInvite,
   budgets,
   busy = false
 }) => {
@@ -66,7 +72,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
       { header: "Email", value: (u) => u.email },
       { header: "Role", value: (u) => u.role },
       { header: "Department", value: (u) => deptNameOf(u) || GLOBAL_SCOPE_LABEL },
-      { header: "Status", value: (u) => (u.isActive ? "Active" : "Suspended") },
+      { header: "Status", value: (u) => (u.isActive ? "Active" : u.isInvited ? "Pending Invite" : "Suspended") },
       { header: "Invite Pending", value: (u) => (u.isInvited ? "Yes" : "No") },
     ]);
   };
@@ -147,9 +153,9 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
             style={{
               padding: "0.65rem 1.15rem",
               borderRadius: "0.5rem",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
+              border: "1px solid rgb(var(--color-card-border))",
               backgroundColor: "transparent",
-              color: "#60a5fa",
+              color: "rgb(var(--color-primary))",
               fontWeight: "600",
               fontSize: "0.85rem",
               display: "flex",
@@ -166,7 +172,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
               border: "none",
-              backgroundColor: "#2563eb",
+              backgroundColor: "rgb(var(--color-primary))",
               color: "#ffffff",
               fontWeight: "600",
               fontSize: "0.85rem",
@@ -174,7 +180,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
               alignItems: "center",
               gap: "0.5rem",
               cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
+              boxShadow: "0 4px 12px rgba(var(--color-primary), 0.35)"
             }}
           >
             <Icons.UserPlus size={18} /> Add New User
@@ -219,7 +225,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
             <select
               value={selectedRoleFilter}
               onChange={(e) => setSelectedRoleFilter(e.target.value)}
-              style={{ padding: "0.5rem 0.85rem", backgroundColor: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}
+              style={{ padding: "0.5rem 0.85rem", backgroundColor: "rgb(var(--color-surface-secondary))", border: "1px solid rgb(var(--color-card-border))", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}
             >
               <option value="ALL">All Roles</option>
               <option value="ADMIN">Admin</option>
@@ -236,7 +242,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
             <select
               value={selectedDeptFilter}
               onChange={(e) => setSelectedDeptFilter(e.target.value)}
-              style={{ padding: "0.5rem 0.85rem", backgroundColor: "rgba(15, 23, 42, 0.6)", border: "1px solid rgba(255, 255, 255, 0.12)", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}
+              style={{ padding: "0.5rem 0.85rem", backgroundColor: "rgb(var(--color-surface-secondary))", border: "1px solid rgb(var(--color-card-border))", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}
             >
               <option value="ALL">All Departments</option>
               {departments.map((d: any) => (
@@ -257,8 +263,8 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
               style={{
                 width: "100%",
                 padding: "0.5rem 0.85rem 0.5rem 2.4rem",
-                backgroundColor: "rgba(15, 23, 42, 0.6)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
+                backgroundColor: "rgb(var(--color-surface-secondary))",
+                border: "1px solid rgb(var(--color-card-border))",
                 borderRadius: "0.375rem",
                 color: "rgb(var(--color-text))",
                 fontSize: "0.85rem",
@@ -273,7 +279,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
           style={{
             padding: "0.5rem 1rem",
             borderRadius: "0.375rem",
-            border: "1px solid rgba(255, 255, 255, 0.15)",
+            border: "1px solid rgb(var(--color-card-border))",
             backgroundColor: "transparent",
             color: "rgb(var(--color-text))",
             fontWeight: "600",
@@ -293,7 +299,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
         <div className="table-container">
           <table className="data-table" style={{ width: "100%" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
+              <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border))" }}>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>NAME</th>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</th>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>ASSIGNED ROLE</th>
@@ -310,9 +316,18 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                 // a "General" department that does not exist.
                 const deptName = u.departmentName || u.department?.name || GLOBAL_SCOPE_LABEL;
                 const initials = userName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
+                // An invited account is inactive because it has not been set up
+                // yet, which is a different thing from access having been
+                // withdrawn — the directory has to say which.
+                const pendingInvite = u.isActive === false && u.isInvited === true;
+                const statusTone = pendingInvite
+                  ? { label: "Pending Invite", colour: "rgb(var(--color-warning))" }
+                  : u.isActive !== false
+                    ? { label: "Active", colour: "rgb(var(--color-secondary))" }
+                    : { label: "Suspended", colour: "rgb(var(--color-danger))" };
 
                 return (
-                  <tr key={u.id || idx} style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.05)" }}>
+                  <tr key={u.id || idx} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.6)" }}>
                     {/* NAME */}
                     <td style={{ padding: "1rem 0" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -320,7 +335,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                           width: "40px",
                           height: "40px",
                           borderRadius: "50%",
-                          backgroundColor: "#2563eb",
+                          backgroundColor: "rgb(var(--color-primary))",
                           color: "#ffffff",
                           fontWeight: "700",
                           fontSize: "0.85rem",
@@ -341,8 +356,8 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                     {/* DEPARTMENT */}
                     <td>
                       <span style={{
-                        backgroundColor: "rgba(59, 130, 246, 0.12)",
-                        color: "#93c5fd",
+                        backgroundColor: "rgba(var(--color-primary), 0.12)",
+                        color: "rgb(var(--color-primary))",
                         borderRadius: "2rem",
                         padding: "0.3rem 0.75rem",
                         fontSize: "0.78rem",
@@ -378,12 +393,15 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                           width: "8px",
                           height: "8px",
                           borderRadius: "50%",
-                          backgroundColor: u.isActive !== false ? "#10b981" : "#ef4444"
+                          backgroundColor: statusTone.colour
                         }} />
                         <span style={{ fontSize: "0.82rem", color: "rgb(var(--color-text))", fontWeight: "600" }}>
                           {/* "Suspended", not "Inactive" — matches the stat card
-                              and the CSV export so one account reads one way. */}
-                          {u.isActive !== false ? "Active" : "Suspended"}
+                              and the CSV export so one account reads one way.
+                              An account that has simply never accepted its
+                              invitation is neither: it used to read "Suspended",
+                              which reports a revoked account where none exists. */}
+                          {statusTone.label}
                         </span>
                       </div>
                     </td>
@@ -391,10 +409,22 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                     {/* ACTIONS */}
                     <td style={{ textAlign: "right" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.35rem" }}>
+                        {/* Re-issue an invitation. Only offered while one is
+                            outstanding — a live account has nothing to accept. */}
+                        {pendingInvite && (
+                          <button
+                            onClick={() => onResendInvite(u)}
+                            title="Resend invitation link"
+                            aria-label={`Resend invitation to ${userName}`}
+                            style={{ background: "none", border: "none", color: "rgb(var(--color-warning))", cursor: "pointer", padding: "0.25rem" }}
+                          >
+                            <Icons.Mail size={16} />
+                          </button>
+                        )}
                         <button
                           onClick={() => onOpenEditUserProfile(u)}
                           title="Edit Profile"
-                          style={{ background: "none", border: "none", color: "#60a5fa", cursor: "pointer", padding: "0.25rem" }}
+                          style={{ background: "none", border: "none", color: "rgb(var(--color-primary))", cursor: "pointer", padding: "0.25rem" }}
                         >
                           <Icons.Edit size={16} />
                         </button>
@@ -408,7 +438,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                           }}
                           disabled={!rolePermissions.some((r) => r.role === u.role)}
                           title="Edit Role Config"
-                          style={{ background: "none", border: "none", color: "#a78bfa", cursor: "pointer", padding: "0.25rem" }}
+                          style={{ background: "none", border: "none", color: "rgb(var(--color-info))", cursor: "pointer", padding: "0.25rem" }}
                         >
                           <Icons.Shield size={16} />
                         </button>
@@ -421,7 +451,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                           style={{
                             background: "none",
                             border: "none",
-                            color: u.isActive === false ? "#10b981" : "#f59e0b",
+                            color: u.isActive === false ? "rgb(var(--color-secondary))" : "rgb(var(--color-warning))",
                             cursor: "pointer",
                             padding: "0.25rem"
                           }}
@@ -431,7 +461,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                         <button
                           onClick={() => onOpenDeleteUser(u)}
                           title="Delete User"
-                          style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "0.25rem" }}
+                          style={{ background: "none", border: "none", color: "rgb(var(--color-danger))", cursor: "pointer", padding: "0.25rem" }}
                         >
                           <Icons.Trash2 size={16} />
                         </button>
@@ -440,6 +470,20 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                   </tr>
                 );
               })}
+
+              {/* Every list needs loading / empty / populated; this one rendered
+                  a bare header row when the filters matched nothing. */}
+              {visibleUsers.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ padding: 0 }}>
+                    <EmptyState
+                      icon={<Icons.Users size={20} />}
+                      title="No users match these filters"
+                      description="Clear the role, department or search filters to see the full directory."
+                    />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -482,7 +526,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                   </span>
                 </div>
                 <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "3px" }}>
-                  <div style={{ width: `${dept.sharePct}%`, height: "100%", backgroundColor: "#2563EB", borderRadius: "3px" }} />
+                  <div style={{ width: `${dept.sharePct}%`, height: "100%", backgroundColor: "rgb(var(--color-primary))", borderRadius: "3px" }} />
                 </div>
               </div>
             ))}

@@ -7,7 +7,7 @@ export default function RequestsPage() {
   const {
     currentUser,
     expenses,
-    searchQuery, setSearchQuery,
+    searchQuery,
     amountSearchQuery, setAmountSearchQuery,
     requestsTodayOnly, setRequestsTodayOnly,
     requestsDateFilter, setRequestsDateFilter,
@@ -15,9 +15,6 @@ export default function RequestsPage() {
     setResubmitForm,
     setShowResubmitModal,
     setSelectedExpense,
-    setSelectedReceiptData,
-    setShowReceiptModal,
-    setShowCreateModal,
     requestsSubTab, setRequestsSubTab,
     deptFilterInitiator, setDeptFilterInitiator,
     deptFilterStatus, setDeptFilterStatus,
@@ -30,7 +27,6 @@ export default function RequestsPage() {
       currentUser={currentUser}
       expenses={expenses}
       searchQuery={searchQuery}
-      setSearchQuery={setSearchQuery}
       amountSearchQuery={amountSearchQuery}
       setAmountSearchQuery={setAmountSearchQuery}
       todayOnly={requestsTodayOnly}
@@ -41,9 +37,6 @@ export default function RequestsPage() {
       setResubmitForm={setResubmitForm}
       setShowResubmitModal={setShowResubmitModal}
       setSelectedExpense={setSelectedExpense}
-      setSelectedReceiptData={setSelectedReceiptData}
-      setShowReceiptModal={setShowReceiptModal}
-      setShowCreateModal={setShowCreateModal}
       requestsSubTab={requestsSubTab}
       setRequestsSubTab={setRequestsSubTab}
       deptFilterInitiator={deptFilterInitiator}

@@ -4,7 +4,7 @@ import { RequestJustificationModal } from "./RequestJustificationModal";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
 import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
-import { AttachmentDto, BudgetContextDto } from "../types/api";
+import { AttachmentDto, BudgetContextDto, ThreadEntryDto } from "../types/api";
 import { AttachmentTarget } from "./modals/AttachmentViewModal";
 import { formatNaira, formatNairaPrecise } from "./ui/format";
 
@@ -26,6 +26,12 @@ interface PendingExceptionsTabProps {
   /** Opens a supporting document in the shared attachment viewer. */
   onViewAttachment: (attachment: AttachmentTarget) => void;
   onBackToDashboard?: () => void;
+  /** Persisted thread for this request, shown in the justification dialog. */
+  thread?: ThreadEntryDto[];
+  threadLoading?: boolean;
+  threadSending?: boolean;
+  /** Posts the Finance Head's question back to the approver. */
+  onSendQuestion?: (question: string) => Promise<boolean>;
 }
 
 export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
@@ -35,7 +41,11 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   actions,
   budgetContext,
   onViewAttachment,
-  onBackToDashboard
+  onBackToDashboard,
+  thread = [],
+  threadLoading = false,
+  threadSending = false,
+  onSendQuestion
 }) => {
   const [showJustificationModal, setShowJustificationModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -44,6 +54,12 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   // The request under review is whatever the queue handed over — never a
   // re-derived "first pending exception".
   const targetExp = request;
+
+  // The approver the Finance Head's question goes to: whoever last signed the
+  // request off, read from its own history rather than named in the markup.
+  const approverName: string | undefined = [...(targetExp?.history ?? [])]
+    .reverse()
+    .find((h: any) => h.actorRole === "APPROVER")?.actorName;
 
   const requestDetails = targetExp ? {
     requestNumber: targetExp.requestNumber ? `#${targetExp.requestNumber.replace(/^REQ-/, '')}` : `#${targetExp._id?.slice(-4)}`,
@@ -356,7 +372,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.825rem", fontWeight: "700", color: item.isOverbudget ? "#B91C1C" : "#1E293B" }}>
+                        <span style={{ fontSize: "0.825rem", fontWeight: "700", color: item.isOverbudget ? "#B91C1C" : "rgb(var(--color-text))" }}>
                           {item.actor}
                         </span>
                         <span style={{ fontSize: "0.725rem", color: "rgb(var(--color-text-dim))" }}>
@@ -405,7 +421,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               <span style={{ fontSize: "0.7rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.2rem" }}>
                 TOTAL ANNUAL BUDGET
               </span>
-              <span style={{ fontSize: "1.45rem", fontWeight: "800", color: "#0F172A" }}>
+              <span style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
                 {hasBudget ? formatNairaPrecise(budgetContext?.totalBudget) : "Not configured"}
               </span>
             </div>
@@ -416,7 +432,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                 <span style={{ fontSize: "0.675rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.2rem" }}>
                   UTILIZED YTD
                 </span>
-                <span style={{ fontSize: "1.05rem", fontWeight: "800", color: "#0F172A" }}>
+                <span style={{ fontSize: "1.05rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
                   {formatNairaPrecise(budgetContext?.utilisedYTD)}
                 </span>
               </div>
@@ -503,7 +519,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
           bottom: 0,
           right: 0,
           left: "260px",
-          background: "rgba(255, 255, 255, 0.95)",
+          background: "rgba(var(--color-card-border), 1.00)",
           backdropFilter: "blur(12px)",
           borderTop: "1px solid #E2E8F0",
           padding: "1rem 2rem",
@@ -515,7 +531,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         }}
       >
         <div>
-          <span style={{ fontSize: "0.8rem", fontWeight: "800", color: "#1E293B", display: "block" }}>
+          <span style={{ fontSize: "0.8rem", fontWeight: "800", color: "rgb(var(--color-text))", display: "block" }}>
             Action Required
           </span>
           <span style={{ fontSize: "0.8rem", color: "#64748B" }}>
@@ -585,11 +601,18 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
       </div>
 
       {/* Modals */}
+      {/* Real thread, and a Send Request that actually posts the question to the
+          request's audit trail rather than appending to local state. */}
       <RequestJustificationModal
         isOpen={showJustificationModal}
         onClose={() => setShowJustificationModal(false)}
         requestNumber={requestDetails.requestNumber}
         requestTitle={requestDetails.description}
+        departmentApprover={approverName}
+        entries={thread}
+        loading={threadLoading}
+        sending={threadSending}
+        onSendQuestion={onSendQuestion}
       />
 
       <ApproveExpansionModal

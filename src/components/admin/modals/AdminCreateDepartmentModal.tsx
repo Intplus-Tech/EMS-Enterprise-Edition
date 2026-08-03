@@ -65,7 +65,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgba(var(--color-overlay), 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -78,7 +78,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
         maxWidth: "600px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
         maxHeight: "90vh",
@@ -121,8 +121,8 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
               style={{
                 width: "100%",
                 padding: "0.65rem 0.85rem",
-                backgroundColor: "rgba(15, 23, 42, 0.6)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
+                backgroundColor: "rgba(var(--color-surface-secondary), 0.6)",
+                border: "1px solid rgb(var(--color-card-border))",
                 borderRadius: "0.5rem",
                 color: "rgb(var(--color-text))",
                 fontSize: "0.9rem",
@@ -154,8 +154,8 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {lineItems.map((item) => (
                 <div key={item.id} style={{
-                  backgroundColor: "rgba(15, 23, 42, 0.5)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  backgroundColor: "rgba(var(--color-surface-secondary), 0.5)",
+                  border: "1px solid rgba(var(--color-card-border), 0.5)",
                   borderRadius: "0.5rem",
                   padding: "0.75rem 1rem",
                   display: "flex",
@@ -202,7 +202,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                         width: "110px",
                         padding: "0.35rem 0.6rem",
                         backgroundColor: "rgba(30, 41, 59, 0.8)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        border: "1px solid rgb(var(--color-card-border))",
                         borderRadius: "0.375rem",
                         color: "rgb(var(--color-text))",
                         fontSize: "0.85rem",
@@ -233,7 +233,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                 borderRadius: "0.5rem",
                 border: "1px dashed rgba(59, 130, 246, 0.4)",
                 backgroundColor: "transparent",
-                color: "#60a5fa",
+                color: "rgb(var(--color-primary))",
                 fontSize: "0.8rem",
                 fontWeight: "600",
                 display: "flex",
@@ -256,7 +256,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
               style={{
                 padding: "0.65rem 1.25rem",
                 borderRadius: "0.5rem",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgb(var(--color-card-border))",
                 backgroundColor: "transparent",
                 color: "rgb(var(--color-text))",
                 fontWeight: "600",

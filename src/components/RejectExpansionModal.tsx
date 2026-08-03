@@ -55,7 +55,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "rgba(15, 23, 42, 0.65)",
+        backgroundColor: "rgba(var(--color-overlay), 0.65)",
         backdropFilter: "blur(4px)",
         zIndex: 1000,
         display: "flex",
@@ -140,7 +140,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
             <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.3rem" }}>
               REQUEST AMOUNT
             </span>
-            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#0F172A" }}>
+            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
               ₦{requestAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
@@ -149,7 +149,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
             <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.3rem" }}>
               REMAINING BUDGET
             </span>
-            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#0F172A" }}>
+            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
               ₦{remainingBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>

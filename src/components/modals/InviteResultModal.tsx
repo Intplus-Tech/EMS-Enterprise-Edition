@@ -31,14 +31,14 @@ export const InviteResultModal: React.FC<InviteResultModalProps> = ({
           The user record has been created. An invitation email was simulated. You can preview the email template and copy the setup URL below.
         </p>
 
-        <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+        <div className="glass-card" style={{ background: "rgba(var(--color-surface-secondary), 0.3)", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-dim))", textTransform: "uppercase", fontWeight: "bold" }}>Setup Activation Link</span>
           <div style={{ display: "flex", gap: "0.5rem" }}>
             <input 
               type="text" 
               readOnly 
               value={inviteResult.inviteUrl} 
-              style={{ flexGrow: 1, padding: "0.5rem", borderRadius: "4px", background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.1)", color: "#fff", fontSize: "0.85rem" }} 
+              style={{ flexGrow: 1, padding: "0.5rem", borderRadius: "4px", background: "#0a0a0a", border: "1px solid rgb(var(--color-card-border))", color: "#fff", fontSize: "0.85rem" }} 
             />
             <button 
               onClick={() => {
@@ -64,7 +64,7 @@ export const InviteResultModal: React.FC<InviteResultModalProps> = ({
             style={{ 
               width: "100%", 
               height: "360px", 
-              border: "1px solid rgba(255, 255, 255, 0.1)", 
+              border: "1px solid rgb(var(--color-card-border))", 
               borderRadius: "8px", 
               background: "#fff" 
             }} 

@@ -3,11 +3,13 @@ import * as Icons from "lucide-react";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
 import { ApproveRequestModal, ApproveRequestPayload } from "./modals/ApproveRequestModal";
-import { RejectOrClarifyModal, RejectOrClarifyPayload } from "./modals/RejectOrClarifyModal";
+import { RejectDecision, RejectOrClarifyModal, RejectOrClarifyPayload } from "./modals/RejectOrClarifyModal";
 import { CompletedReleaseModal } from "./modals/CompletedReleaseModal";
 import { Notice } from "./ui/NoticeBanner";
 import { AttachmentDto, AttachmentInput, BudgetContextDto, ThreadEntryDto } from "../types/api";
 import { AttachmentTarget } from "./modals/AttachmentViewModal";
+import { CommunicationThreadModal } from "./approvals/CommunicationThreadModal";
+import { RequestQueueTable } from "./approvals/RequestQueueTable";
 import { AttachmentList } from "./ui/AttachmentList";
 import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
 import { ModalShell } from "./ui/ModalShell";
@@ -36,9 +38,17 @@ interface ApprovalsTabProps {
   actions: ExpenseActions;
   /** Real budget position for the selected request; null while loading. */
   budgetContext?: BudgetContextDto | null;
-  /** Persisted communication thread for the selected request. */
+  /** Persisted communication thread for whichever request is in focus. */
   thread: ThreadEntryDto[];
+  threadLoading?: boolean;
   threadSending?: boolean;
+  /**
+   * Tells the page which request the thread should be loaded for. The release
+   * and thread dialogs are opened straight from the Completed list, where
+   * `selectedExpense` is null, so without this the thread they showed belonged
+   * to no request at all.
+   */
+  onFocusThreadRequest?: (requestId: string | null) => void;
   /** Posts a comment; resolves false when the save was rejected. */
   onAddComment: (message: string, isInternal?: boolean) => Promise<boolean>;
   /** Opens a stored document in the shared attachment viewer. */
@@ -81,7 +91,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   actions,
   budgetContext,
   thread,
+  threadLoading = false,
   threadSending = false,
+  onFocusThreadRequest,
   onAddComment,
   onViewAttachment,
   onAddAttachments,
@@ -123,8 +135,22 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   // Every financial decision must be signed off in a dialog rather than fired inline.
   const [showApproveRequestModal, setShowApproveRequestModal] = useState(false);
   const [showRejectClarifyModal, setShowRejectClarifyModal] = useState(false);
-  const [expansionModalTarget, setExpansionModalTarget] = useState<any>(null);
+  // Which chip the dialog opens on. "Insufficient Budget" returns the request to
+  // the initiator, "Reject" closes it — two different outcomes that both used to
+  // open the dialog on its REJECT default, so the budget button silently
+  // rejected requests it was only meant to send back.
+  const [rejectClarifyIntent, setRejectClarifyIntent] = useState<RejectDecision>("REJECT");
   const [activeReleaseItem, setActiveReleaseItem] = useState<any>(null);
+
+  /**
+   * Opens the release/thread dialogs on a request. The focus callback is what
+   * points the page's thread fetch at it — these dialogs are opened from the
+   * list, where `selectedExpense` is null.
+   */
+  const focusReleaseItem = (expense: any) => {
+    setActiveReleaseItem(expense);
+    onFocusThreadRequest?.(expense ? String(expense._id) : null);
+  };
   const [bankRefNumber, setBankRefNumber] = useState("");
   // The uploaded transfer evidence — a real stored document, not a filename.
   const [receipt, setReceipt] = useState<AttachmentInput | null>(null);
@@ -167,7 +193,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           tone: "error",
           message: "Open the release dialog to record the bank reference and transfer evidence.",
         });
-        setActiveReleaseItem(selectedExpense);
+        focusReleaseItem(selectedExpense);
         setBankRefNumber(selectedExpense.paymentReference || "");
         setShowAuthorizeReleaseModal(true);
         return;
@@ -339,7 +365,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
     if (ok) {
       setShowAuthorizeReleaseModal(false);
-      setActiveReleaseItem(null);
+      focusReleaseItem(null);
       setSelectedExpense(null);
       setBankRefNumber("");
       setReceipt(null);
@@ -379,7 +405,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
   // Exports the persisted communication thread for the open request.
   const handleExportThread = () => {
-    if (!downloadCsv(datedFilename(`thread-${selectedExpense?.requestNumber ?? "request"}`), thread, [
+    const target = activeReleaseItem ?? selectedExpense;
+    if (!downloadCsv(datedFilename(`thread-${target?.requestNumber ?? "request"}`), thread, [
       { header: "Timestamp", value: (t) => formatDateTime(t.timestamp) },
       { header: "Author", value: (t) => t.authorName },
       { header: "Role", value: (t) => t.authorRole },
@@ -579,8 +606,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             )}
             
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "0.5rem" }}>
-              <span className={`badge badge-${selectedExpense.status?.toLowerCase().replace(/_/g, '-')}`} style={{ fontWeight: "700" }}>
-                {selectedExpense.status === "SENT_TO_FINANCE" ? "APPROVED BY DEPT HEAD" : selectedExpense.status?.replace(/_/g, ' ')}
+              {/* Class comes from the shared status map. Building it from the
+                  status string produced names like `badge-pending-approval` and
+                  `badge-uploaded-to-bank`, none of which exist in globals.css,
+                  so the header badge rendered with no colour on most statuses. */}
+              <span className={`badge ${statusBadgeClass(selectedExpense.status)}`} style={{ fontWeight: "700" }}>
+                {selectedExpense.status === "SENT_TO_FINANCE" ? "APPROVED BY DEPT HEAD" : humanizeStatus(selectedExpense.status)}
               </span>
               <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>
                 Submitted on {new Date(selectedExpense.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -595,7 +626,6 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <>
                   <button 
                     onClick={() => {
-                      setExpansionModalTarget(selectedExpense);
                       setShowRejectExpansionModal(true);
                     }}
                     className="btn btn-danger" 
@@ -607,7 +637,6 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
                   <button 
                     onClick={() => {
-                      setExpansionModalTarget(selectedExpense);
                       setShowApproveExpansionModal(true);
                     }}
                     className="btn btn-primary" 
@@ -623,16 +652,16 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       returning a request for budget reasons is recorded and
                       signed like every other decision. */}
                   <button
-                    onClick={() => setShowRejectClarifyModal(true)}
+                    onClick={() => { setRejectClarifyIntent("CLARIFY"); setShowRejectClarifyModal(true); }}
                     className="btn"
-                    style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent", borderWidth: "1.5px" }}
+                    style={{ borderColor: "#3B82F6", color: "#3B82F6", background: "transparent", borderWidth: "1.5px" }}
                     disabled={actions.submitting}
                   >
                     Insufficient Budget
                   </button>
-                  {/* Opens the signed "Reject or Request Clarification" dialog */}
+                  {/* Opens the same signed dialog on the REJECT chip */}
                   <button
-                    onClick={() => setShowRejectClarifyModal(true)}
+                    onClick={() => { setRejectClarifyIntent("REJECT"); setShowRejectClarifyModal(true); }}
                     className="btn"
                     style={{ borderColor: "#EF4444", color: "#EF4444", background: "transparent", borderWidth: "1.5px" }}
                     disabled={actions.submitting}
@@ -735,7 +764,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#2563EB" }}>
                   <Icons.MessageSquare size={20} />
                   <h3 style={{ fontSize: "1.05rem", fontWeight: "700", margin: 0 }}>Message History</h3>
-                  <span style={{ fontSize: "0.8rem", background: "rgba(255,255,255,0.08)", padding: "0.15rem 0.5rem", borderRadius: "999px", color: "rgb(var(--color-text-muted))" }}>
+                  <span style={{ fontSize: "0.8rem", background: "rgba(var(--color-card-border), 0.32)", padding: "0.15rem 0.5rem", borderRadius: "999px", color: "rgb(var(--color-text-muted))" }}>
                     {thread.length} Total Messages
                   </span>
                 </div>
@@ -770,7 +799,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                             {isDept ? <Icons.ShieldCheck size={18} /> : <Icons.User size={18} />}
                           </div>
 
-                          <div style={{ flexGrow: 1, background: "rgba(255,255,255,0.03)", padding: "0.85rem 1rem", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                          <div style={{ flexGrow: 1, background: "rgba(var(--color-card-border), 0.12)", padding: "0.85rem 1rem", borderRadius: "8px", border: "1px solid rgba(var(--color-card-border), 0.5)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", gap: "0.5rem" }}>
                               <span style={{ fontSize: "0.85rem", fontWeight: "700" }}>
                                 {entry.authorName} ({humanizeStatus(entry.authorRole)})
@@ -834,13 +863,10 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
                 <div className="form-group" style={{ marginBottom: "1rem" }}>
                   <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "0.25rem" }}>Your Question</label>
-                  {/* Editor Toolbar Mock */}
-                  <div style={{ display: "flex", gap: "0.5rem", background: "rgba(255,255,255,0.03)", padding: "0.25rem 0.5rem", border: "1px solid rgba(255,255,255,0.08)", borderBottom: "none", borderTopLeftRadius: "6px", borderTopRightRadius: "6px" }}>
-                    <button type="button" style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: "0.1rem 0.25rem" }}><Icons.Bold size={12} /></button>
-                    <button type="button" style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: "0.1rem 0.25rem" }}><Icons.Italic size={12} /></button>
-                    <button type="button" style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: "0.1rem 0.25rem" }}><Icons.List size={12} /></button>
-                    <button type="button" style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: "0.1rem 0.25rem" }}><Icons.Link size={12} /></button>
-                  </div>
+                  {/* The bold/italic/list/link toolbar the design shows here had
+                      no handlers, and the comment is stored and rendered as
+                      plain text everywhere it is read — four buttons that
+                      silently do nothing are worse than none. */}
                   <textarea
                     rows={4}
                     placeholder="Specify what information is missing or needs clarification..."
@@ -897,7 +923,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       width: "3rem",
                       height: "3rem",
                       borderRadius: "50%",
-                      background: "rgba(255,255,255,0.08)",
+                      background: "rgba(var(--color-card-border), 0.32)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -913,7 +939,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.8rem", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "0.75rem" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.8rem", borderTop: "1px solid rgba(var(--color-card-border), 0.5)", paddingTop: "0.75rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span style={{ color: "rgb(var(--color-text-muted))" }}>Account Number</span>
                       <strong>{selectedExpense.vendorBankDetails?.accountNumber || "—"}</strong>
@@ -984,8 +1010,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       width: "1.25rem",
                       height: "1.25rem",
                       borderRadius: "50%",
-                      background: step.current ? "rgba(59, 130, 246, 0.15)" : step.active ? "#10B981" : "rgba(255,255,255,0.05)",
-                      border: step.current ? "2px solid #3B82F6" : step.active ? "2px solid #10B981" : "2px solid rgba(255,255,255,0.1)",
+                      background: step.current ? "rgba(59, 130, 246, 0.15)" : step.active ? "#10B981" : "rgba(var(--color-card-border), 0.20)",
+                      border: step.current ? "2px solid #3B82F6" : step.active ? "2px solid #10B981" : "2px solid rgba(var(--color-card-border), 0.40)",
                       zIndex: 2,
                       display: "flex",
                       alignItems: "center",
@@ -1014,7 +1040,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             left: 0,
             width: "100%",
             height: "100%",
-            background: "rgba(15, 23, 42, 0.75)",
+            background: "rgba(var(--color-overlay), 0.75)",
             zIndex: 110,
             display: "flex",
             alignItems: "center",
@@ -1028,7 +1054,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
               overflowY: "auto",
               padding: "1.75rem",
               background: "rgb(15, 23, 42)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: "1px solid rgba(var(--color-card-border), 0.5)",
               borderRadius: "12px",
               boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
               display: "flex",
@@ -1088,18 +1114,18 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <span style={{ fontSize: "0.75rem", fontWeight: "700", textTransform: "uppercase", color: "rgb(var(--color-text-muted))" }}>Request Information</span>
                 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                  <div style={{ background: "rgba(var(--color-card-border), 0.08)", border: "1px solid rgba(var(--color-card-border), 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</span>
                     <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.departmentId?.name || "—"}</strong>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                  <div style={{ background: "rgba(var(--color-card-border), 0.08)", border: "1px solid rgba(var(--color-card-border), 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGET ITEM</span>
                     <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.category || "—"}</strong>
                   </div>
                 </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
-                  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
+                  <div style={{ background: "rgba(var(--color-card-border), 0.08)", border: "1px solid rgba(var(--color-card-border), 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGETED</span>
                     {/* The department's real allocation and spend. These were
                         fixed at ₦1,220,000 / ₦1,211,000 for every request, so
@@ -1149,7 +1175,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   onChange={(e) => setEscalateJustification(e.target.value)}
                   placeholder="Enter detailed reasoning for why this request should be approved despite the budget variance..."
                   className="form-textarea"
-                  style={{ padding: "0.6rem", fontSize: "0.85rem", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  style={{ padding: "0.6rem", fontSize: "0.85rem", background: "rgba(var(--color-card-border), 0.08)", border: "1px solid rgba(var(--color-card-border), 0.5)" }}
                 />
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>
                   <span>Min. 50 characters required for Finance Head review.</span>
@@ -1248,14 +1274,41 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             to sit here duplicated `handleExportPipeline`; both buttons now go
             through the shared `downloadCsv` helper. */}
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <button
-            onClick={() => { setApprovalDateFilter(approvalDateFilter === "today" ? "all" : "today"); setListPage(1); }}
-            className={`btn ${approvalDateFilter === "today" ? "btn-primary" : "btn-secondary"}`}
-            style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.25rem" }}
-          >
-            <Icons.Calendar size={14} />
-            {approvalDateFilter === "today" ? "Today Only" : "All Dates"}
-          </button>
+          {/* Today toggle + date picker, as a pair — the design pairs them and
+              `approvalDatePicker` was already being applied in `filteredList`,
+              but nothing on screen could ever set it. */}
+          <div style={{ display: "flex", alignItems: "center", borderRadius: "8px", overflow: "hidden", border: "1px solid rgb(var(--color-card-border))" }}>
+            <button
+              onClick={() => {
+                setApprovalDateFilter(approvalDateFilter === "today" ? "all" : "today");
+                setApprovalDatePicker("");
+                setListPage(1);
+              }}
+              style={{
+                padding: "0.55rem 1rem",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                border: "none",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                background: approvalDateFilter === "today" ? "#2563EB" : "transparent",
+                color: approvalDateFilter === "today" ? "#FFFFFF" : "rgb(var(--color-text))",
+              }}
+            >
+              <Icons.Calendar size={14} />
+              {approvalDateFilter === "today" ? "Today Only" : "All Dates"}
+            </button>
+            <input
+              type="date"
+              aria-label="Filter the pipeline by date"
+              value={approvalDatePicker}
+              onChange={(e) => { setApprovalDatePicker(e.target.value); setApprovalDateFilter("all"); setListPage(1); }}
+              className="form-input"
+              style={{ border: "none", borderRadius: 0, fontSize: "0.85rem", padding: "0.55rem 0.75rem", height: "auto" }}
+            />
+          </div>
 
           <button
             onClick={handleExportPipeline}
@@ -1384,13 +1437,30 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         })}
       </div>
 
-      {/* Data Table */}
-      <div className="glass-panel" style={{ overflow: "hidden", padding: 0 }}>
-        {activeSubTab !== "completed" ? (
+      {/* Data table. Which layout applies is a property of the role, not of the
+          sub-tab: the Finance Manager works a payment run (bank account, payee,
+          bulk selection) while the Finance Officer and the departmental
+          Approver work a request queue. Both used to render the payment-run
+          table, so the officer's screen showed payee bank details it has no use
+          for and omitted the "Requested by / Approved by" line and the OVER
+          BUDGET flag its design is built around. */}
+      <div className="glass-panel" style={{ overflow: "hidden", padding: isFinanceManager ? 0 : "0.5rem 1rem" }}>
+        {!isFinanceManager ? (
+          <RequestQueueTable
+            rows={visibleRows}
+            emptyTitle={activeSubTab === "completed" ? "Nothing completed yet" : "Nothing in this queue"}
+            emptyDescription={
+              activeSubTab === "completed"
+                ? "Paid, closed and rejected requests are archived here."
+                : "Requests appear here once they reach this stage of the pipeline."
+            }
+            onOpenRequest={setSelectedExpense}
+          />
+        ) : activeSubTab !== "completed" ? (
           /* Pending Release Table View (Screenshot 5) */
           <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
             <thead>
-              <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+              <tr style={{ background: "rgba(var(--color-surface-secondary), 0.5)", borderBottom: "1px solid rgba(var(--color-card-border), 0.6)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
                 <th style={{ padding: "0.85rem 0.5rem 0.85rem 1rem", width: "40px" }}>
                   <input
                     type="checkbox"
@@ -1482,7 +1552,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                         <button
                           onClick={() => {
                             if (isFinanceManager && exp.status === "UPLOADED_TO_BANK") {
-                              setActiveReleaseItem(exp);
+                              focusReleaseItem(exp);
                               setBankRefNumber(exp.paymentReference || "");
                               setShowAuthorizeReleaseModal(true);
                             } else {
@@ -1554,7 +1624,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   <td style={{ padding: "1rem", textAlign: "center" }}>
                     <button
                       onClick={() => {
-                        setActiveReleaseItem(exp);
+                        focusReleaseItem(exp);
                         setShowCompletedReleaseModal(true);
                       }}
                       aria-label={`View release ${exp.requestNumber}`}
@@ -1630,7 +1700,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       {showAuthorizeReleaseModal && activeReleaseItem && (
         <div style={{
           position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "rgba(15, 23, 42, 0.65)", zIndex: 120,
+          background: "rgba(var(--color-overlay), 0.65)", zIndex: 120,
           display: "flex", alignItems: "center", justifyContent: "center",
           backdropFilter: "blur(6px)"
         }}>
@@ -1851,138 +1921,22 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           quotes) and hardcoded light-mode colours. */}
       <CompletedReleaseModal
         isOpen={showCompletedReleaseModal}
-        onClose={() => { setShowCompletedReleaseModal(false); setActiveReleaseItem(null); }}
+        onClose={() => { setShowCompletedReleaseModal(false); focusReleaseItem(null); }}
         expense={activeReleaseItem}
         onViewThread={() => setShowThreadModal(true)}
       />
 
-      {/* MODAL 3: COMMUNICATION THREAD MODAL (Screenshot 3) */}
-      {showThreadModal && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "rgba(15, 23, 42, 0.65)", zIndex: 130,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          backdropFilter: "blur(6px)"
-        }}>
-          <div style={{
-            width: "95%", maxWidth: "620px", maxHeight: "90vh", overflowY: "auto",
-            background: "#FFFFFF", color: "#0F172A", borderRadius: "16px",
-            padding: "2rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", borderBottom: "1px solid #E2E8F0", paddingBottom: "1rem" }}>
-              <div>
-                <h2 style={{ fontSize: "1.2rem", fontWeight: "700", margin: 0, color: "#1E293B" }}>
-                  Communication Thread - {activeReleaseItem?.requestNumber || "REQ-0518"}
-                </h2>
-                <span style={{ fontSize: "0.75rem", color: "#64748B", fontWeight: "600", textTransform: "uppercase" }}>
-                  SERVER NODE REPLACEMENT &bull; TOTAL: ₦1,250,000.00
-                </span>
-              </div>
-              <button onClick={() => setShowThreadModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748B" }}>
-                <Icons.X size={20} />
-              </button>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginBottom: "1.5rem" }}>
-              {/* Message 1 */}
-              <div style={{ display: "flex", gap: "0.85rem", alignItems: "flex-start" }}>
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#2563EB", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "0.85rem", flexShrink: 0 }}>
-                  <Icons.User size={18} />
-                </div>
-                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1rem", flexGrow: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                    <div>
-                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>M. Chen</strong>
-                      <span style={{ fontSize: "0.7rem", color: "#2563EB", fontWeight: "700", marginLeft: "0.5rem", textTransform: "uppercase" }}>INITIATOR &bull; IT INFRASTRUCTURE</span>
-                    </div>
-                    <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 23, 02:45 PM</span>
-                  </div>
-                  <p style={{ margin: "0 0 0.75rem 0", fontSize: "0.8rem", color: "#475569", lineHeight: "1.5" }}>
-                    Initial request for server node replacement. Vendor quote attached. Urgent requirement to maintain redundancy in Node Cluster 4.
-                  </p>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#FFFFFF", border: "1px solid #E2E8F0", borderRadius: "6px", padding: "0.5rem 0.75rem" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <Icons.FileText size={16} style={{ color: "#2563EB" }} />
-                      <div>
-                        <div style={{ fontSize: "0.75rem", fontWeight: "600", color: "#1E293B" }}>server_quote_v2.pdf</div>
-                        <span style={{ fontSize: "0.65rem", color: "#94A3B8" }}>420 KB &bull; PDF</span>
-                      </div>
-                    </div>
-                    <Icons.Download size={16} style={{ color: "#64748B", cursor: "pointer" }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Message 2 */}
-              <div style={{ display: "flex", gap: "0.85rem", alignItems: "flex-start" }}>
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#EFF6FF", color: "#2563EB", border: "1px solid #BFDBFE", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "0.85rem", flexShrink: 0 }}>
-                  <Icons.ShieldCheck size={18} />
-                </div>
-                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1rem", flexGrow: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                    <div>
-                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>K. Adeyemi</strong>
-                      <span style={{ fontSize: "0.7rem", color: "#64748B", fontWeight: "700", marginLeft: "0.5rem", textTransform: "uppercase" }}>APPROVER &bull; DEPT HEAD</span>
-                    </div>
-                    <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 09:12 AM</span>
-                  </div>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", background: "#DBEAFE", color: "#2563EB", fontSize: "0.7rem", fontWeight: "700", padding: "0.2rem 0.5rem", borderRadius: "999px", marginBottom: "0.5rem" }}>
-                    <Icons.CheckCircle size={12} /> Status Changed to Approved
-                  </div>
-                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#475569", lineHeight: "1.5" }}>
-                    Approved. Budget verified for Q3 infrastructure spend. Priority 1 release requested.
-                  </p>
-                </div>
-              </div>
-
-              {/* Message 3 */}
-              <div style={{ display: "flex", gap: "0.85rem", alignItems: "flex-start" }}>
-                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "#F1F5F9", color: "#475569", border: "1px solid #CBD5E1", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "0.85rem", flexShrink: 0 }}>
-                  <Icons.Briefcase size={18} />
-                </div>
-                <div style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "12px", padding: "1rem", flexGrow: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
-                    <div>
-                      <strong style={{ fontSize: "0.85rem", color: "#1E293B" }}>J. Doe</strong>
-                      <span style={{ fontSize: "0.7rem", color: "#64748B", fontWeight: "700", marginLeft: "0.5rem", textTransform: "uppercase" }}>FINANCE OFFICER &bull; TREASURY</span>
-                    </div>
-                    <span style={{ fontSize: "0.7rem", color: "#94A3B8" }}>Oct 24, 11:45 AM</span>
-                  </div>
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", background: "#F1F5F9", color: "#475569", fontSize: "0.7rem", fontWeight: "700", padding: "0.2rem 0.5rem", borderRadius: "999px", marginBottom: "0.5rem" }}>
-                    <Icons.Archive size={12} /> Documentation Verified
-                  </div>
-                  <p style={{ margin: 0, fontSize: "0.8rem", color: "#475569", lineHeight: "1.5" }}>
-                    Documentation verified. Bank file prepared. Awaiting final release authority for batch settlement.
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 0.85rem", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: "8px", fontSize: "0.75rem", color: "#64748B" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#94A3B8" }} />
-                <span>Current Status: <strong>Pending Final Release</strong></span>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #E2E8F0", paddingTop: "1rem" }}>
-              <button 
-                onClick={handleExportThread}
-                className="btn btn-secondary" 
-                style={{ border: "1px solid #CBD5E1", background: "#FFFFFF", color: "#475569", fontSize: "0.8rem" }}
-              >
-                Export Thread
-              </button>
-              <button 
-                onClick={() => setShowThreadModal(false)}
-                className="btn btn-primary"
-                style={{ background: "#2563EB", border: "none", fontSize: "0.8rem", fontWeight: "700" }}
-              >
-                &larr; Back to Review
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      {/* Full communication thread for the request open in the release dialog.
+          Its own component now, rendering the real merged thread — the copy that
+          lived here was 125 lines of fabricated conversation. */}
+      <CommunicationThreadModal
+        isOpen={showThreadModal}
+        onClose={() => setShowThreadModal(false)}
+        expense={activeReleaseItem}
+        entries={thread}
+        loading={threadLoading}
+        onExport={handleExportThread}
+      />
 
       {/* Approver decision dialogs — every approve/reject is signed off in a modal */}
       <ApproveRequestModal
@@ -1997,6 +1951,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         isOpen={showRejectClarifyModal}
         onClose={() => setShowRejectClarifyModal(false)}
         expense={selectedExpense}
+        initialDecision={rejectClarifyIntent}
         submitting={actions.submitting}
         onConfirm={handleRejectOrClarifyConfirm}
       />
@@ -2005,7 +1960,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       <ApproveExpansionModal
         isOpen={showApproveExpansionModal}
         onClose={() => setShowApproveExpansionModal(false)}
-        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : "#0044"}
+        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : ""}
         requestAmount={selectedExpense?.amount ?? 0}
         remainingBudget={budgetContext?.remaining ?? 0}
         deficitAmount={budgetContext?.criticalGap ?? 0}
@@ -2022,7 +1977,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       <RejectExpansionModal
         isOpen={showRejectExpansionModal}
         onClose={() => setShowRejectExpansionModal(false)}
-        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : "#0044"}
+        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : ""}
         requestAmount={selectedExpense?.amount ?? 0}
         remainingBudget={budgetContext?.remaining ?? 0}
         deficitAmount={budgetContext?.criticalGap ?? 0}

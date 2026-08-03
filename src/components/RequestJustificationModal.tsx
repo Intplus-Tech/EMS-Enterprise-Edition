@@ -1,102 +1,72 @@
+/**
+ * RequestJustificationModal - designs/finance-head/Request Justification Modal
+ * (Finance Head).png.
+ *
+ * The Finance Head reads the conversation so far and puts a question back to the
+ * departmental approver. Both halves used to be theatre: the message history was
+ * four hardcoded messages ("Please find the invoice for the Q3 Server
+ * maintenance attached.", ...) shown for every request, and "Send Request"
+ * pushed the typed question into local state after a 400ms fake delay, so it
+ * reached nobody and vanished on close. The thread and the send now come from
+ * the page, which owns the I/O (engineering rule 1-D).
+ */
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
-
-interface MessageItem {
-  id: string;
-  senderRole: "Initiator" | "Dept Head" | "Final Approval Comment" | "Finance Head" | "Approver";
-  senderName?: string;
-  time: string;
-  text: string;
-  isApproval?: boolean;
-  avatarBg?: string;
-}
+import { EmptyState } from "./ui/EmptyState";
+import { formatDateTime, humanizeStatus } from "./ui/format";
+import { ThreadEntryDto } from "../types/api";
 
 interface RequestJustificationModalProps {
   isOpen: boolean;
   onClose: () => void;
   requestNumber?: string;
   requestTitle?: string;
+  /** Named in the prompt above the question box; falls back to the generic role. */
   departmentApprover?: string;
-  messages?: MessageItem[];
-  onSendMessage?: (question: string) => void;
+  /** Workflow transitions merged with comments, newest last. */
+  entries: ThreadEntryDto[];
+  loading?: boolean;
+  sending?: boolean;
+  /** Posts the question; resolves false when the save was rejected. */
+  onSendQuestion?: (question: string) => Promise<boolean>;
+  /** Hides the question box on screens that only read history. */
+  readOnly?: boolean;
 }
 
 export const RequestJustificationModal: React.FC<RequestJustificationModalProps> = ({
   isOpen,
   onClose,
-  requestNumber = "#0044",
-  requestTitle = "Cooling Unit Replacement",
-  departmentApprover = "K. Adeyemi",
-  messages: customMessages,
-  onSendMessage
+  requestNumber,
+  requestTitle,
+  departmentApprover,
+  entries,
+  loading = false,
+  sending = false,
+  onSendQuestion,
+  readOnly = false,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [questionText, setQuestionText] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [sentSuccess, setSentSuccess] = useState(false);
 
-  // Default initial messages matching exact screenshot text
-  const defaultMessages: MessageItem[] = [
-    {
-      id: "msg-1",
-      senderRole: "Initiator",
-      time: "09:12 AM",
-      text: "Please find the invoice for the Q3 Server maintenance attached.",
-      avatarBg: "#2563EB"
-    },
-    {
-      id: "msg-2",
-      senderRole: "Dept Head",
-      time: "11:45 AM",
-      text: "The amount is slightly above the usual maintenance fee. Please provide further justification for the 15% increase.",
-      avatarBg: "#93C5FD"
-    },
-    {
-      id: "msg-3",
-      senderRole: "Initiator",
-      time: "02:30 PM",
-      text: "The increase is due to the emergency replacement of the cooling fans which were not in the initial quote. Justification document uploaded.",
-      avatarBg: "#2563EB"
-    },
-    {
-      id: "msg-4",
-      senderRole: "Final Approval Comment",
-      senderName: "Dept Head",
-      time: "04:15 PM",
-      text: '"Justification accepted. Urgent maintenance confirmed. Approved for Finance processing."',
-      isApproval: true,
-      avatarBg: "#16A34A"
-    }
-  ];
+  const approverLabel = departmentApprover || "Departmental Approver";
 
-  const [messageList, setMessageList] = useState<MessageItem[]>(customMessages || defaultMessages);
-
-  if (!isOpen) return null;
-
-  const handleSend = (e?: React.FormEvent) => {
+  const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!questionText.trim()) return;
+    if (!questionText.trim() || !onSendQuestion || sending) return;
 
-    setIsSubmitting(true);
-    setTimeout(() => {
-      const newMsg: MessageItem = {
-        id: `msg-${Date.now()}`,
-        senderRole: "Finance Head",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        text: questionText,
-        avatarBg: "#2563EB"
-      };
-
-      setMessageList(prev => [...prev, newMsg]);
-      if (onSendMessage) {
-        onSendMessage(questionText);
-      }
+    // Only clear the box and confirm once the server accepted the comment.
+    if (await onSendQuestion(questionText.trim())) {
       setQuestionText("");
-      setIsSubmitting(false);
       setSentSuccess(true);
       setTimeout(() => setSentSuccess(false), 3000);
-    }, 400);
+    }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div
@@ -106,7 +76,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "rgba(15, 23, 42, 0.65)",
+        backgroundColor: "rgba(var(--color-overlay), 0.65)",
         backdropFilter: "blur(4px)",
         zIndex: 1000,
         display: "flex",
@@ -196,7 +166,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
 
               <div style={{ display: "flex", alignItems: "center", gap: "0.85rem" }}>
                 <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>
-                  {messageList.length} Total Messages
+                  {entries.length} Total Message{entries.length === 1 ? "" : "s"}
                 </span>
                 <button
                   onClick={() => setIsCollapsed(!isCollapsed)}
@@ -215,15 +185,28 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
               </div>
             </div>
 
-            {/* Timeline of Messages */}
+            {/* Timeline - the request's real thread. An approval decision is
+                highlighted, matching the green "Final Approval Comment" card in
+                the design. */}
             {!isCollapsed && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", position: "relative" }}>
-                {messageList.map((msg, index) => {
-                  const isLast = index === messageList.length - 1;
+              loading ? (
+                <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", textAlign: "center", padding: "1.25rem" }}>
+                  Loading the conversation...
+                </p>
+              ) : entries.length === 0 ? (
+                <EmptyState
+                  icon={<Icons.MessageSquare size={18} />}
+                  title="No messages yet"
+                  description="Decisions and comments on this request will appear here."
+                />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", position: "relative" }}>
+                  {entries.map((entry, index) => {
+                    const isLast = index === entries.length - 1;
+                    const isApproval = ["APPROVE", "APPROVED"].includes(String(entry.action));
 
-                  if (msg.isApproval) {
                     return (
-                      <div key={msg.id} style={{ display: "flex", gap: "1rem", alignItems: "flex-start", position: "relative" }}>
+                      <div key={entry.id} style={{ display: "flex", gap: "1rem", alignItems: "flex-start", position: "relative" }}>
                         {/* Timeline connector line */}
                         {!isLast && (
                           <div
@@ -238,13 +221,12 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
                           />
                         )}
 
-                        {/* Green checkmark circle icon */}
                         <div
                           style={{
                             width: "30px",
                             height: "30px",
                             borderRadius: "50%",
-                            backgroundColor: "#16A34A",
+                            backgroundColor: isApproval ? "rgb(var(--color-secondary))" : "rgb(var(--color-primary))",
                             color: "#FFFFFF",
                             display: "flex",
                             alignItems: "center",
@@ -253,149 +235,90 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
                             zIndex: 2
                           }}
                         >
-                          <Icons.Check size={16} />
+                          {isApproval ? <Icons.Check size={16} /> : <Icons.User size={15} />}
                         </div>
 
-                        {/* Approval Box */}
                         <div
                           style={{
                             flexGrow: 1,
-                            background: "rgba(34, 197, 94, 0.08)",
-                            border: "1px solid rgba(34, 197, 94, 0.25)",
+                            minWidth: 0,
+                            background: isApproval ? "rgba(var(--color-secondary), 0.08)" : "rgba(var(--color-surface), 0.5)",
+                            border: isApproval
+                              ? "1px solid rgba(var(--color-secondary), 0.25)"
+                              : "1px solid rgba(var(--color-card-border), 0.4)",
                             borderRadius: "10px",
-                            padding: "1rem 1.15rem",
+                            padding: "0.85rem 1.15rem",
                             display: "flex",
                             flexDirection: "column",
-                            gap: "0.4rem"
+                            gap: "0.35rem"
                           }}
                         >
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: "0.825rem", fontWeight: "700", color: "#16A34A" }}>
-                              {msg.senderRole}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+                            <span style={{ fontSize: "0.825rem", fontWeight: "700", color: isApproval ? "rgb(var(--color-secondary))" : "rgb(var(--color-text))" }}>
+                              {entry.authorName}
+                              <span style={{ fontWeight: 600, color: "rgb(var(--color-text-muted))", marginLeft: "0.4rem" }}>
+                                {humanizeStatus(String(entry.authorRole))}
+                              </span>
                             </span>
-                            <span style={{ fontSize: "0.725rem", color: "rgb(var(--color-text-dim))" }}>
-                              {msg.time}
+                            <span style={{ fontSize: "0.725rem", color: "rgb(var(--color-text-dim))", whiteSpace: "nowrap" }}>
+                              {formatDateTime(entry.timestamp)}
                             </span>
                           </div>
 
-                          <p style={{ fontSize: "0.875rem", fontStyle: "italic", fontWeight: "600", color: "#15803D", margin: 0, lineHeight: 1.5 }}>
-                            {msg.text}
+                          <p
+                            style={{
+                              fontSize: "0.875rem",
+                              margin: 0,
+                              lineHeight: 1.5,
+                              fontStyle: isApproval ? "italic" : "normal",
+                              fontWeight: isApproval ? 600 : 400,
+                              color: isApproval ? "rgb(var(--color-secondary))" : "rgb(var(--color-text))"
+                            }}
+                          >
+                            {entry.message}
                           </p>
-
-                          <span style={{ fontSize: "0.775rem", color: "#16A34A", fontWeight: "600", marginTop: "0.2rem" }}>
-                            — {msg.senderName || "Dept Head"}
-                          </span>
                         </div>
                       </div>
                     );
-                  }
-
-                  return (
-                    <div key={msg.id} style={{ display: "flex", gap: "1rem", alignItems: "flex-start", position: "relative" }}>
-                      {/* Timeline connector line */}
-                      {!isLast && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            left: "14px",
-                            top: "32px",
-                            bottom: "-20px",
-                            width: "2px",
-                            background: "rgba(var(--color-card-border), 0.4)"
-                          }}
-                        />
-                      )}
-
-                      {/* User Avatar circle icon */}
-                      <div
-                        style={{
-                          width: "30px",
-                          height: "30px",
-                          borderRadius: "50%",
-                          backgroundColor: msg.avatarBg || "#2563EB",
-                          color: "#FFFFFF",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          zIndex: 2
-                        }}
-                      >
-                        <Icons.User size={15} />
-                      </div>
-
-                      {/* Message Box */}
-                      <div
-                        style={{
-                          flexGrow: 1,
-                          background: "rgba(var(--color-surface), 0.5)",
-                          border: "1px solid rgba(var(--color-card-border), 0.4)",
-                          borderRadius: "10px",
-                          padding: "0.85rem 1.15rem",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "0.35rem"
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "0.825rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-                            {msg.senderRole}
-                          </span>
-                          <span style={{ fontSize: "0.725rem", color: "rgb(var(--color-text-dim))" }}>
-                            {msg.time}
-                          </span>
-                        </div>
-
-                        <p style={{ fontSize: "0.875rem", color: "rgb(var(--color-text))", margin: 0, lineHeight: 1.5 }}>
-                          {msg.text}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                  })}
+                </div>
+              )
             )}
           </div>
         </div>
 
-        {/* Section: Question to Departmental Approver (Soft Blue Box) */}
-        <div
-          style={{
-            background: "rgba(239, 246, 255, 0.9)",
-            border: "1px solid #BFDBFE",
-            borderRadius: "12px",
-            padding: "1.25rem",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem"
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#1E40AF" }}>
-            <Icons.HelpCircle size={18} />
-            <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>
-              Your Question to the Departmental Approver ({departmentApprover})
-            </span>
-          </div>
-
-          <textarea
-            rows={3}
-            value={questionText}
-            onChange={(e) => setQuestionText(e.target.value)}
-            placeholder="Example: Please provide a detailed risk assessment for hardware failure if this is not replaced within 48 hours. Are there cheaper emergency rental alternatives available locally?"
+        {/* Question to the departmental approver. Tinted with the brand token
+            rather than the design's literal #EFF6FF / #BFDBFE, which painted a
+            pale blue card with pale blue text in dark mode. */}
+        {!readOnly && (
+          <div
             style={{
-              width: "100%",
-              padding: "0.85rem",
-              fontSize: "0.875rem",
-              borderRadius: "8px",
-              border: "1px solid #93C5FD",
-              background: "#FFFFFF",
-              color: "#1E293B",
-              outline: "none",
-              lineHeight: 1.5,
-              resize: "vertical"
+              background: "rgba(var(--color-primary), 0.08)",
+              border: "1px solid rgba(var(--color-primary), 0.25)",
+              borderRadius: "12px",
+              padding: "1.25rem",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem"
             }}
-          />
-        </div>
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "rgb(var(--color-primary))" }}>
+              <Icons.HelpCircle size={18} />
+              <span style={{ fontWeight: "700", fontSize: "0.9rem" }}>
+                Your Question to the Departmental Approver ({approverLabel})
+              </span>
+            </div>
+
+            <textarea
+              rows={3}
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              placeholder="Example: Please provide a detailed risk assessment for hardware failure if this is not replaced within 48 hours. Are there cheaper emergency rental alternatives available locally?"
+              className="form-textarea"
+              style={{ resize: "vertical", lineHeight: 1.5 }}
+            />
+          </div>
+        )}
 
         {/* Section: Audit Info Banner */}
         <div
@@ -431,7 +354,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
               gap: "0.5rem"
             }}
           >
-            <Icons.CheckCircle size={16} /> Question transmitted successfully to {departmentApprover}.
+            <Icons.CheckCircle size={16} /> Question sent to {approverLabel}.
           </div>
         )}
 
@@ -452,27 +375,28 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
               cursor: "pointer"
             }}
           >
-            Cancel
+            {readOnly ? "Close" : "Cancel"}
           </button>
 
-          <button
-            type="button"
-            onClick={() => handleSend()}
-            disabled={isSubmitting || !questionText.trim()}
-            className="btn btn-primary"
-            style={{
-              padding: "0.6rem 1.5rem",
-              borderRadius: "8px",
-              fontSize: "0.875rem",
-              fontWeight: "600",
-              background: isSubmitting || !questionText.trim() ? "#93C5FD" : "#2563EB",
-              color: "#FFFFFF",
-              border: "none",
-              cursor: isSubmitting || !questionText.trim() ? "not-allowed" : "pointer"
-            }}
-          >
-            {isSubmitting ? "Sending..." : "Send Request"}
-          </button>
+          {/* Hidden on read-only screens, which have no question to send. */}
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={() => handleSend()}
+              disabled={sending || !questionText.trim()}
+              className="btn btn-primary"
+              style={{
+                padding: "0.6rem 1.5rem",
+                borderRadius: "8px",
+                fontSize: "0.875rem",
+                fontWeight: "600",
+                opacity: sending || !questionText.trim() ? 0.55 : 1,
+                cursor: sending || !questionText.trim() ? "not-allowed" : "pointer"
+              }}
+            >
+              {sending ? "Sending..." : "Send Request"}
+            </button>
+          )}
         </div>
       </div>
     </div>

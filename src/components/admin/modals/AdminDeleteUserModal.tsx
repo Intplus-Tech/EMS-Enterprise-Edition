@@ -29,7 +29,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgba(var(--color-overlay), 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -42,7 +42,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
         maxWidth: "500px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
       }}>
@@ -82,7 +82,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
           padding: "1rem",
           marginBottom: "1.25rem"
         }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#60a5fa", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-primary))", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Icons.Info size={14} />
             IMPACT ASSESSMENT
           </div>
@@ -122,7 +122,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
             style={{
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
+              border: "1px solid rgb(var(--color-card-border))",
               backgroundColor: "transparent",
               color: "rgb(var(--color-text))",
               fontWeight: "600",

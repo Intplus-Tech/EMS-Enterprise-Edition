@@ -35,7 +35,7 @@ export default function Home() {
   }, [router]);
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "rgb(15 23 42)", color: "#fff" }}>
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "rgb(var(--color-background))", color: "rgb(var(--color-text))" }}>
       <div style={{ textAlign: "center" }}>
         <Icons.Loader className="animate-spin" size={48} style={{ color: "rgb(var(--color-primary))", margin: "0 auto 1rem" }} />
         <p>Loading your workspace...</p>
