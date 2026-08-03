@@ -9,10 +9,10 @@ import { useAdminAdministration } from "./hooks/useAdminAdministration";
 import { useExpenseActions } from "./hooks/useExpenseActions";
 import { useAttachments } from "./hooks/useAttachments";
 import { ExpenseClient } from "../../services/expense.client";
-import { AdminClient } from "../../services/admin.client";
+import { AdminClient, InviteInput } from "../../services/admin.client";
 import { AuthClient } from "../../services/auth.client";
 import { ApiRequestError, toErrorMessage } from "../../services/http";
-import { AttachmentInput } from "../../types/api";
+import { AttachmentInput, InviteResultDto } from "../../types/api";
 import type { AttachmentTarget } from "../../components/modals/AttachmentViewModal";
 import { WorkflowActionType } from "../../enums/workflowActions";
 
@@ -85,7 +85,7 @@ function useDashboardState() {
   const { systemUsers, departments } = admin;
 
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteResult, setInviteResult] = useState<any>(null);
+  const [inviteResult, setInviteResult] = useState<InviteResultDto | null>(null);
   const [inviteForm, setInviteForm] = useState({
     name: "",
     email: "",
@@ -94,6 +94,10 @@ function useDashboardState() {
   });
   const [inviteError, setInviteError] = useState("");
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  // The payload behind the invitation currently on screen, so a failed delivery
+  // can be retried after the form has been reset.
+  const [lastInvitePayload, setLastInvitePayload] = useState<InviteInput | null>(null);
+  const [inviteRetrying, setInviteRetrying] = useState(false);
 
   // Covers both "my account" writes (profile edit, password change). They are
   // never in flight at the same time, so one flag drives both dialogs' buttons.
@@ -452,12 +456,51 @@ function useDashboardState() {
     try {
       const result = await AdminClient.inviteUser(inviteForm);
       setInviteResult(result);
+      // Kept so "Retry sending" can re-issue the same invitation; the form
+      // itself is cleared below, so it can no longer supply these values.
+      setLastInvitePayload(inviteForm);
       setInviteForm({ name: "", email: "", role: "INITIATOR", departmentId: "" });
       admin.loadUsers();
     } catch (err) {
       setInviteError(toErrorMessage(err, "Failed to invite user"));
     } finally {
       setInviteSubmitting(false);
+    }
+  };
+
+  /**
+   * Invites from the admin "Add User" screen and raises the result dialog when
+   * there is something to act on.
+   *
+   * A clean send is already reported by the notice banner, so the dialog is
+   * reserved for the cases that need a decision: delivery failed (retry), or no
+   * provider is configured (copy the link and send it yourself).
+   */
+  const inviteAndReport = async (payload: InviteInput) => {
+    const result = await admin.inviteUser(payload);
+    if (result) {
+      setLastInvitePayload(payload);
+      if (!result.emailSent || result.emailSimulated) setInviteResult(result);
+    }
+    return result;
+  };
+
+  /**
+   * Re-issues the last invitation after a failed delivery.
+   *
+   * Re-posting the same email inside the invite window takes the route's
+   * re-invite branch: a new token is generated and the mail is sent again. The
+   * result replaces what the dialog is showing, so a second failure reports the
+   * new reason rather than the stale one, and a success flips it to "sent".
+   */
+  const retryInvite = async () => {
+    if (!lastInvitePayload) return;
+    setInviteRetrying(true);
+    try {
+      const result = await admin.inviteUser(lastInvitePayload);
+      if (result) setInviteResult(result);
+    } finally {
+      setInviteRetrying(false);
     }
   };
 
@@ -791,6 +834,7 @@ function useDashboardState() {
     adminNotice, setAdminNotice,
     showInviteModal, setShowInviteModal,
     inviteResult, setInviteResult,
+    inviteAndReport, retryInvite, inviteRetrying,
     inviteForm, setInviteForm,
     inviteError, setInviteError,
     inviteSubmitting, setInviteSubmitting,

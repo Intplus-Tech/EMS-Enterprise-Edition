@@ -6,8 +6,6 @@
  */
 import { AdminUsersAndRolesTab } from "../../../components/admin/AdminUsersAndRolesTab";
 import { useDashboard } from "../DashboardProvider";
-import { AdminClient } from "../../../services/admin.client";
-import { toErrorMessage } from "../../../services/http";
 import { AdminUserDto, RolePermissionDto } from "../../../types/api";
 import { SystemRole } from "../../../enums/roles";
 
@@ -21,11 +19,9 @@ export default function UsersRolesPage() {
     adminBusy,
     saveRolePermissions,
     updateUser,
-    loadUsers,
+    inviteAndReport,
     setInviteForm,
     setInviteResult,
-    setShowInviteModal,
-    setAdminNotice,
     setSelectedAdminUser,
     setShowAdminAddUserModal,
     setShowAdminEditUserProfileModal,
@@ -50,13 +46,12 @@ export default function UsersRolesPage() {
       departmentId: user.department?.id ?? "",
     };
     setInviteForm(input);
-    try {
-      setInviteResult(await AdminClient.inviteUser(input));
-      setShowInviteModal(true);
-      await loadUsers();
-    } catch (error) {
-      setAdminNotice({ tone: "error", message: toErrorMessage(error, "Failed to generate invitation link.") });
-    }
+    // `inviteAndReport` refetches, reports delivery through the notice banner
+    // and records the payload the dialog's retry replays.
+    const result = await inviteAndReport(input);
+    // A resend is an explicit request for the link, so the dialog opens even on
+    // a clean send — unlike the create path, where the banner is enough.
+    if (result) setInviteResult(result);
   };
 
   return (

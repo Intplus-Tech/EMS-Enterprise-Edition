@@ -60,19 +60,28 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       await existingUser.save();
 
       const inviteUrl = `${req.nextUrl.origin}/setup?token=${inviteToken}`;
-      await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
+      // The delivery result is carried back to the caller: the account exists
+      // either way, so this stays a 200, but the admin must be told when the
+      // provider refused the message instead of being shown "Invitation sent".
+      const delivery = await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
 
       await LoggerService.logAudit(
         AuditAction.USER_RE_INVITED,
-        `User invitation re-sent for ${name} (${email}) as ${role}`,
-        { email, role },
+        `User invitation re-sent for ${name} (${email}) as ${role}` +
+          (delivery.sent ? "" : ` — email delivery FAILED: ${delivery.error}`),
+        { email, role, emailSent: delivery.sent },
         { id: actor.id, name: actor.name, role: actor.role }
       );
 
       return NextResponse.json({
         success: true,
-        message: "Invitation re-sent successfully.",
+        message: delivery.sent
+          ? "Invitation re-sent successfully."
+          : "Invitation updated, but the email could not be delivered.",
         inviteUrl,
+        emailSent: delivery.sent,
+        emailSimulated: delivery.simulated ?? false,
+        emailError: delivery.error,
         user: {
           id: existingUser._id.toString(),
           email: existingUser.email,
@@ -106,20 +115,27 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   // 6. Generate the invitation link and compile/send the email
   const inviteUrl = `${req.nextUrl.origin}/setup?token=${inviteToken}`;
-  await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
+  const delivery = await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
 
-  // 7. Log audit entry
+  // 7. Log audit entry — a failed delivery is part of the record, since the
+  // account now exists but its owner was never told.
   await LoggerService.logAudit(
     AuditAction.USER_INVITED,
-    `User ${name} (${email}) invited as ${role} by ${actor.name}`,
-    { email, role },
+    `User ${name} (${email}) invited as ${role} by ${actor.name}` +
+      (delivery.sent ? "" : ` — email delivery FAILED: ${delivery.error}`),
+    { email, role, emailSent: delivery.sent },
     { id: actor.id, name: actor.name, role: actor.role }
   );
 
   return NextResponse.json({
     success: true,
-    message: "Invitation created successfully.",
+    message: delivery.sent
+      ? "Invitation created successfully."
+      : "Account created, but the invitation email could not be delivered.",
     inviteUrl,
+    emailSent: delivery.sent,
+    emailSimulated: delivery.simulated ?? false,
+    emailError: delivery.error,
     user: {
       id: newUser._id.toString(),
       email: newUser.email,

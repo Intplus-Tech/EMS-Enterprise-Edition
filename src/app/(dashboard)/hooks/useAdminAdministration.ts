@@ -211,13 +211,43 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
    * Users
    * --------------------------------------------------------------------- */
 
+  /**
+   * Invites a user and reports what actually happened to the email.
+   *
+   * Deliberately does not use `run`: creating the account and delivering the
+   * invitation are two outcomes, and `run` can only report one. A refused
+   * message used to surface as "Invitation sent to …" because the route's
+   * delivery result was discarded. Returns the result so the caller can offer
+   * a retry.
+   */
   const inviteUser = useCallback(
-    (input: { name: string; email: string; role: string; departmentId?: string }) =>
-      run(async () => {
-        await AdminClient.inviteUser(input);
+    async (input: { name: string; email: string; role: string; departmentId?: string }) => {
+      setAdminBusy(true);
+      try {
+        const result = await AdminClient.inviteUser(input);
         await loadUsers();
-      }, `Invitation sent to ${input.email}.`),
-    [run, loadUsers]
+
+        if (result.emailSimulated) {
+          onError(
+            `Account created for ${input.email}, but no email provider is configured — the invitation was only written to the server log. Share the activation link manually.`
+          );
+        } else if (!result.emailSent) {
+          onError(
+            `Account created for ${input.email}, but the invitation email was not delivered: ${result.emailError ?? "the provider gave no reason."}`
+          );
+        } else {
+          onSuccess(`Invitation sent to ${input.email}.`);
+        }
+
+        return result;
+      } catch (error) {
+        onError(toErrorMessage(error));
+        return null;
+      } finally {
+        setAdminBusy(false);
+      }
+    },
+    [onSuccess, onError, loadUsers]
   );
 
   const updateUser = useCallback(

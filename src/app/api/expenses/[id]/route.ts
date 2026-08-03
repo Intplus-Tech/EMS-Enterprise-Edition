@@ -4,7 +4,7 @@ import { ExpenseRequest } from "../../../../models/ExpenseRequest";
 import { authenticate } from "../../../../middlewares/auth";
 import { withErrorHandling } from "../../../../middlewares/errors";
 import { SystemRole } from "../../../../enums/roles";
-import { RequestStatus } from "../../../../enums/statuses";
+import { POST_APPROVAL_STATUSES, RequestStatus } from "../../../../enums/statuses";
 import { ExpenseInitiateSchema } from "../../../../validators/validation";
 import { LoggerService } from "../../../../domains/logs/logger.service";
 import { AuditAction } from "../../../../enums/auditActions";
@@ -28,6 +28,14 @@ export const GET = withErrorHandling(async (req: NextRequest, { params }: { para
     throw new Error("Forbidden: You do not have permission to view this request.");
   }
   if (user.role === SystemRole.APPROVER && expense.departmentId._id.toString() !== user.departmentId) {
+    throw new Error("Forbidden: You do not have permission to view this request.");
+  }
+  // A Finance Officer's remit starts after approval. Without this the list
+  // filter could be stepped around by requesting an id directly.
+  if (
+    user.role === SystemRole.FINANCE_OFFICER &&
+    !POST_APPROVAL_STATUSES.includes(expense.status)
+  ) {
     throw new Error("Forbidden: You do not have permission to view this request.");
   }
 

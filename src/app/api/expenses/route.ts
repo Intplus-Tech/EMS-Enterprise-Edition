@@ -7,6 +7,7 @@ import { authenticate } from "../../../middlewares/auth";
 import { withErrorHandling } from "../../../middlewares/errors";
 import { ExpenseInitiateSchema } from "../../../validators/validation";
 import { SystemRole } from "../../../enums/roles";
+import { POST_APPROVAL_STATUSES } from "../../../enums/statuses";
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   await connectToDatabase();
@@ -17,11 +18,17 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   // Role-based visibility controls:
   // - Initiator: Only see requests raised by themselves
   // - Approver: Only see requests matching their own department
-  // - Finance roles / Admin: Can view all requests across the organization
+  // - Finance Officer: Only requests that have cleared approval — they audit
+  //   payment payloads, so anything still in (or refused by) the approval chain
+  //   is outside their remit. Enforced here rather than in the screen's tab
+  //   filters, which are cosmetic and cannot stop a direct call to this route.
+  // - Finance Head / Finance Manager / Admin: all requests across the org
   if (user.role === SystemRole.INITIATOR) {
     query.initiatorId = user.id;
   } else if (user.role === SystemRole.APPROVER) {
     query.departmentId = user.departmentId;
+  } else if (user.role === SystemRole.FINANCE_OFFICER) {
+    query.status = { $in: POST_APPROVAL_STATUSES };
   }
 
   // Requests belonging to a deleted department are cold storage: they stay in

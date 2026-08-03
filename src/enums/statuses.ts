@@ -18,3 +18,25 @@ export enum RequestStatus {
   RETURNED = "RETURNED",                                   // Returned to Initiator for correction/info
   CANCELLED = "CANCELLED"                                  // Cancelled by initiator before completion
 }
+
+/**
+ * Statuses a request can hold once it has cleared the approval chain.
+ *
+ * This is the Finance Officer's entire world: they audit payment payloads and
+ * upload bank instructions, so nothing that is still being approved — or that
+ * was refused — is any of their business. Note the final approval lands on
+ * SENT_TO_FINANCE, not APPROVED (APPROVED comes off the exceptional-budget
+ * path), so "approved requests only" has to mean this set rather than the
+ * single APPROVED value, or the officer's own queue would be empty.
+ *
+ * REJECTED and CANCELLED are absent by design: a refused request never cleared
+ * approval, so it is not part of the payment pipeline.
+ */
+export const POST_APPROVAL_STATUSES: RequestStatus[] = [
+  RequestStatus.APPROVED,
+  RequestStatus.SENT_TO_FINANCE,
+  RequestStatus.UPLOADED_TO_BANK,
+  RequestStatus.AWAITING_RELEASE,
+  RequestStatus.PAID,
+  RequestStatus.CLOSED,
+];

@@ -94,6 +94,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     inviteSubmitting,
     handleInviteUser,
     inviteResult, setInviteResult,
+    inviteAndReport, retryInvite, inviteRetrying,
     showEditProfileModal, setShowEditProfileModal,
     editProfileForm, setEditProfileForm,
     handleUpdateProfile,
@@ -108,7 +109,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     systemUsers,
     // Persisted admin mutations from useAdminAdministration.
     createDepartment, updateDepartment, deleteDepartment, loadDashboardData,
-    inviteUser, updateUser, setUserActive, deleteUser, revokeUserSessions,
+    updateUser, setUserActive, deleteUser, revokeUserSessions,
     saveBudgetPeriod, saveRolePermissions,
     adminNotice, setAdminNotice, adminBusy,
     accountBusy,
@@ -480,6 +481,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <InviteResultModal
         inviteResult={inviteResult}
         onClose={() => { setInviteResult(null); setShowInviteModal(false); }}
+        onRetry={retryInvite}
+        retrying={inviteRetrying}
       />
 
       <EditProfileModal
@@ -529,7 +532,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onClose={() => setShowAdminAddUserModal(false)}
         departments={departments}
         onSaveUser={(userData: any) =>
-          inviteUser({
+          inviteAndReport({
             name: userData.fullName,
             email: userData.email,
             role: userData.role,

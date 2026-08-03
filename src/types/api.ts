@@ -124,6 +124,26 @@ export interface SessionUserDto {
 }
 
 /** A row in the Admin user directory. */
+/**
+ * Outcome of `POST /api/admin/invite`.
+ *
+ * The account is created whether or not the email leaves the building, so the
+ * delivery fields are reported separately from `success` — an admin needs to
+ * know the difference between "they have been invited" and "the account exists
+ * but nobody told them".
+ */
+export interface InviteResultDto {
+  inviteUrl: string;
+  message: string;
+  /** False when the provider refused the message. */
+  emailSent: boolean;
+  /** True when no real provider is configured and the mail was only logged. */
+  emailSimulated: boolean;
+  /** Provider's reason, present when `emailSent` is false. */
+  emailError?: string;
+  user: AdminUserDto;
+}
+
 export interface AdminUserDto {
   id: string;
   email: string;

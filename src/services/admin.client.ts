@@ -13,11 +13,20 @@ import {
   BudgetPeriodDto,
   DepartmentDto,
   DepartmentSpendDto,
+  InviteResultDto,
   LogPageDto,
   RolePermissionDto,
   WorkflowStepDto,
 } from "../types/api";
 import { IBudgetLineItem } from "../types/domain";
+
+/** Everything `POST /api/admin/invite` needs, and all a retry has to replay. */
+export interface InviteInput {
+  name: string;
+  email: string;
+  role: string;
+  departmentId?: string;
+}
 
 export interface DepartmentInput {
   name: string;
@@ -94,11 +103,12 @@ export const AdminClient = {
         "/api/admin/invite"
       ),
 
-  inviteUser: (input: { name: string; email: string; role: string; departmentId?: string }) =>
-    http.post<{ inviteUrl: string; message: string; user: AdminUserDto }>(
-      "/api/admin/invite",
-      { ...input }
-    ),
+  /**
+   * Creates or re-invites a user. Re-posting the same email inside the invite
+   * window issues a fresh token and re-sends — which is what the retry action
+   * on a failed delivery calls.
+   */
+  inviteUser: (input: InviteInput) => http.post<InviteResultDto>("/api/admin/invite", { ...input }),
 
   updateUser: (id: string, input: UserProfileInput) =>
     http.put<{ user: AdminUserDto }>(`/api/admin/users/${id}`, { ...input }),
