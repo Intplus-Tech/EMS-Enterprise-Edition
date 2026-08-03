@@ -38,6 +38,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       description: department.description || "",
       headUserId: department.headUserId?.toString() ?? null,
       isActive: department.isActive !== false,
+      isPendingDeletion: false,
       usersCount: 0,
     },
   });

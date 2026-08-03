@@ -62,8 +62,12 @@ export default function DepartmentalSpendPage() {
           setSelectedAdminDept(dept);
           setShowAdminDeleteDeptModal(true);
         }}
-        // Restore is reversible and needs no confirmation step.
-        onRestoreDept={(dept) => restoreDepartment(dept.id)}
+        // Restore undoes the deletion cascade, so the reinstated requests have
+        // to be refetched alongside the department list.
+        onRestoreDept={async (dept) => {
+          await restoreDepartment(dept.id);
+          await loadDashboardData(currentUser);
+        }}
       />
     );
   }

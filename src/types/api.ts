@@ -144,6 +144,8 @@ export interface DepartmentDto {
   name: string;
   description: string;
   isActive: boolean;
+  /** Deleted and awaiting purge — the row stays visible and offers Restore. */
+  isPendingDeletion: boolean;
   headUserId: string | null;
   headName: string | null;
   usersCount: number;

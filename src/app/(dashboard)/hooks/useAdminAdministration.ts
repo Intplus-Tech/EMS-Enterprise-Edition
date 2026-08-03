@@ -91,11 +91,13 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
    * admin actions below stays a single expressive line.
    */
   const run = useCallback(
-    async (action: () => Promise<void>, successMessage: string) => {
+    // A thunk lets an action report what it actually did (how many requests were
+    // cancelled, say) instead of a message fixed before the call was made.
+    async (action: () => Promise<void>, successMessage: string | (() => string)) => {
       setAdminBusy(true);
       try {
         await action();
-        onSuccess(successMessage);
+        onSuccess(typeof successMessage === "function" ? successMessage() : successMessage);
         return true;
       } catch (error) {
         onError(toErrorMessage(error));
@@ -168,25 +170,40 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
   );
 
   /**
-   * Deleting a department archives it — users, budgets and history are kept and
-   * the row can be restored. The toast says so rather than claiming a delete
-   * the server does not perform.
+   * Deletion cascades, so the toast reports what it actually reached rather than
+   * a bare "deleted" — the admin needs to see how many approvals were cancelled.
    */
   const deleteDepartment = useCallback(
-    (id: string) =>
-      run(async () => {
-        await AdminClient.deleteDepartment(id);
-        await Promise.all([loadDepartments(), loadBudgets()]);
-      }, "Department archived. It can be restored from the department list."),
+    (id: string) => {
+      let summary = "Department deleted.";
+      return run(
+        async () => {
+          const result = await AdminClient.deleteDepartment(id);
+          summary =
+            `'${result.name}' deleted. ${result.cancelledRequests} in-flight request(s) cancelled, ` +
+            `${result.revokedUsers} user assignment(s) revoked. Restore it to undo.`;
+          await Promise.all([loadDepartments(), loadBudgets()]);
+        },
+        () => summary
+      );
+    },
     [run, loadDepartments, loadBudgets]
   );
 
   const restoreDepartment = useCallback(
-    (id: string) =>
-      run(async () => {
-        await AdminClient.setDepartmentActive(id, true);
-        await Promise.all([loadDepartments(), loadBudgets()]);
-      }, "Department restored."),
+    (id: string) => {
+      let summary = "Department restored.";
+      return run(
+        async () => {
+          const result = await AdminClient.restoreDepartment(id);
+          summary =
+            `'${result.name}' restored. ${result.reinstatedRequests} request(s) reinstated, ` +
+            `${result.reassignedUsers} user assignment(s) returned.`;
+          await Promise.all([loadDepartments(), loadBudgets()]);
+        },
+        () => summary
+      );
+    },
     [run, loadDepartments, loadBudgets]
   );
 

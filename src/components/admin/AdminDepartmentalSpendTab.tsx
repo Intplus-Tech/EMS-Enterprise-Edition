@@ -25,8 +25,8 @@ const OPEN_STATUSES: string[] = [
   RequestStatus.AWAITING_RELEASE,
 ];
 
-/** A "deleted" department is archived, never removed — see DepartmentService.archive. */
-const archived = (d: AdminDepartmentRow) => d.isActive === false;
+/** A deleted department stays in the table awaiting purge — see DepartmentService.beginDeletion. */
+const pendingDeletion = (d: AdminDepartmentRow) => d.isPendingDeletion === true;
 
 interface AdminDepartmentalSpendTabProps {
   departments: AdminDepartmentRow[];
@@ -81,8 +81,8 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
   );
 
   // The other two tiles kept the design's sample figures (14 / 6) hardcoded, so
-  // archiving a department left "Active Depts." unchanged.
-  const activeDeptCount = departments.filter((d) => !archived(d)).length;
+  // deleting a department left "Active Depts." unchanged.
+  const activeDeptCount = departments.filter((d) => d.isActive !== false).length;
   const pendingRequestCount = expenses.filter((e) => OPEN_STATUSES.includes(e.status)).length;
 
   /**
@@ -547,9 +547,15 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                     <td style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.85rem" }}>
                       {d.usersCount}
                     </td>
+                    {/* Three states, not two: a department deliberately made
+                        inactive is not the same as one awaiting deletion, and
+                        only the latter offers Restore. */}
                     <td>
-                      <span className={`badge ${archived(d) ? "badge-draft" : "badge-paid"}`} style={{ fontSize: "0.7rem" }}>
-                        {archived(d) ? "ARCHIVED" : "ACTIVE"}
+                      <span
+                        className={`badge ${pendingDeletion(d) ? "badge-rejected" : d.isActive === false ? "badge-draft" : "badge-paid"}`}
+                        style={{ fontSize: "0.7rem" }}
+                      >
+                        {pendingDeletion(d) ? "PENDING DELETION" : d.isActive === false ? "INACTIVE" : "ACTIVE"}
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
@@ -570,17 +576,24 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                         >
                           <Icons.TrendingUp size={16} />
                         </button>
-                        {/* Archive / Restore — deleting a department archives it,
-                            so an archived row offers the way back instead of a
-                            second delete that would only error. */}
-                        {archived(d) ? (
+                        {/* Delete / Restore. The design pairs a Pending Deletion
+                            row with a red "Restore" link rather than an icon, so
+                            the way back is unmissable. */}
+                        {pendingDeletion(d) ? (
                           <button
                             onClick={() => onRestoreDept(d)}
-                            title="Restore Department"
                             aria-label={`Restore ${d.name}`}
-                            style={{ background: "none", border: "none", color: "#10b981", cursor: "pointer", padding: "0.25rem" }}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#ef4444",
+                              cursor: "pointer",
+                              padding: "0.25rem",
+                              fontWeight: "700",
+                              fontSize: "0.82rem"
+                            }}
                           >
-                            <Icons.RotateCcw size={16} />
+                            Restore
                           </button>
                         ) : (
                           <button

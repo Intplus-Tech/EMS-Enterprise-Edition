@@ -32,23 +32,32 @@ export const PUT = withErrorHandling(async (req: NextRequest, { params }: RouteC
   });
 });
 
-/** Archive / restore — split from PUT so a status flip cannot clear other fields. */
+/**
+ * Restore — the action on a pending-deletion row. Split from PUT so undoing a
+ * deletion cannot clear the department's other fields, and kept on EDIT rather
+ * than DELETE because putting a department back is not a destructive act.
+ */
 export const PATCH = withErrorHandling(async (req: NextRequest, { params }: RouteContext) => {
   await connectToDatabase();
   const actor = await requirePermission(req, PermissionResource.DEPARTMENTS, PermissionAction.EDIT);
   const { id } = await params;
 
   const { isActive } = DepartmentStatusSchema.parse(await req.json());
-  const log = { id: actor.id, name: actor.name, role: actor.role };
+  if (!isActive) {
+    // Deleting cascades and must go through the DELETE permission.
+    throw new Error("Invalid request: use DELETE to remove a department.");
+  }
 
-  const result = isActive
-    ? await DepartmentService.restore(id, log)
-    : await DepartmentService.archive(id, log);
+  const restored = await DepartmentService.restore(id, {
+    id: actor.id,
+    name: actor.name,
+    role: actor.role,
+  });
 
-  return NextResponse.json({ success: true, ...result });
+  return NextResponse.json({ success: true, ...restored });
 });
 
-/** Deletion is an archive — see `DepartmentService.archive` for why. */
+/** Cascading delete — see `DepartmentService.beginDeletion` for what it touches. */
 export const DELETE = withErrorHandling(async (req: NextRequest, { params }: RouteContext) => {
   await connectToDatabase();
   const actor = await requirePermission(
@@ -58,11 +67,11 @@ export const DELETE = withErrorHandling(async (req: NextRequest, { params }: Rou
   );
   const { id } = await params;
 
-  const archived = await DepartmentService.archive(id, {
+  const deleted = await DepartmentService.beginDeletion(id, {
     id: actor.id,
     name: actor.name,
     role: actor.role,
   });
 
-  return NextResponse.json({ success: true, ...archived });
+  return NextResponse.json({ success: true, ...deleted });
 });

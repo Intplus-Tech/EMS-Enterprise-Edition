@@ -105,7 +105,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     handleChangePassword,
     systemUsers,
     // Persisted admin mutations from useAdminAdministration.
-    createDepartment, updateDepartment, deleteDepartment,
+    createDepartment, updateDepartment, deleteDepartment, loadDashboardData,
     inviteUser, updateUser, setUserActive, deleteUser, revokeUserSessions,
     saveBudgetPeriod, saveRolePermissions,
     adminNotice, setAdminNotice, adminBusy,
@@ -581,7 +581,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         isOpen={showAdminDeleteDeptModal}
         onClose={() => setShowAdminDeleteDeptModal(false)}
         department={selectedAdminDept}
-        onConfirmDelete={(deptId: string) => deleteDepartment(deptId)}
+        // Deletion cancels requests and hides the department's history, so the
+        // request lists on screen are stale until they are refetched.
+        onConfirmDelete={async (deptId: string) => {
+          await deleteDepartment(deptId);
+          await loadDashboardData(currentUser);
+        }}
       />
 
       <AdminDeleteUserModal

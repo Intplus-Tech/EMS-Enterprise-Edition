@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "../../../config/db";
 import { ExpenseRequest } from "../../../models/ExpenseRequest";
+import { Department } from "../../../models/Department";
 import { ExpenseService } from "../../../domains/expense/expense.service";
 import { authenticate } from "../../../middlewares/auth";
 import { withErrorHandling } from "../../../middlewares/errors";
@@ -21,6 +22,20 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     query.initiatorId = user.id;
   } else if (user.role === SystemRole.APPROVER) {
     query.departmentId = user.departmentId;
+  }
+
+  // Requests belonging to a deleted department are cold storage: they stay in
+  // the database, the audit trail and reporting, but drop out of the active
+  // dashboard, as the Delete Department modal warns. Restoring the department
+  // brings them back. Composed with $and so the exclusion cannot displace the
+  // role scope above — overwriting `departmentId` would widen an approver's
+  // visibility to the whole organisation.
+  const purgedDepartmentIds = await Department.find({
+    pendingDeletion: { $exists: true },
+  }).distinct("_id");
+
+  if (purgedDepartmentIds.length > 0) {
+    query = { $and: [query, { departmentId: { $nin: purgedDepartmentIds } }] };
   }
 
   const expenses = await ExpenseRequest.find(query)
