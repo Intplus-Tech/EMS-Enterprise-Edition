@@ -23,6 +23,35 @@ const money = (amount: number) => `${NAIRA}${Number(amount || 0).toLocaleString(
 
 export class BudgetService {
   /**
+   * Explains a missing budget period in terms of the fix, not the fault.
+   *
+   * A request reaches the Finance Head precisely because the budget check
+   * failed, and "no period configured for the payment date" is one of the ways
+   * it fails — so this is the first thing an approver sees on a department that
+   * has never been given a budget. Naming the department, the date and the
+   * screen that resolves it turns a dead end into an instruction.
+   */
+  private static async missingPeriodMessage(
+    request: { departmentId: unknown; requiredPaymentDate: Date },
+    blockedAction: "approved" | "paid"
+  ): Promise<string> {
+    const department = await Department.findById(request.departmentId).select("name");
+    const departmentName = department?.name ?? "this department";
+    const paymentDate = new Date(request.requiredPaymentDate).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+    return (
+      `${departmentName} has no budget period covering ${paymentDate}, ` +
+      `so this request cannot be ${blockedAction} yet. ` +
+      `An administrator must create one from Dashboard → Set Budget, with a period ` +
+      `that includes ${paymentDate}. Retry once it is in place.`
+    );
+  }
+
+  /**
    * Find the active budget period for a department based on a target date
    */
   public static async getBudgetPeriodForDate(departmentId: string, date: Date) {
@@ -86,7 +115,11 @@ export class BudgetService {
     // which may push the period's pendingBudget over totalBudget. This is correct as exceptional approval expands it.
     const period = await this.getBudgetPeriodForDate(request.departmentId.toString(), request.requiredPaymentDate);
     if (!period) {
-      throw new Error("No active budget period found to lock budget");
+      // Refused rather than skipped: approving with nowhere to record the
+      // reservation would leave the amount untracked in every spend figure.
+      // An administrator can create the period, so the caller is told exactly
+      // that instead of being handed a bare failure.
+      throw new Error(await this.missingPeriodMessage(request, "approved"));
     }
 
     period.pendingBudget += request.amount;
@@ -108,7 +141,17 @@ export class BudgetService {
     if (!request) throw new Error("Request not found");
     
     const period = await this.getBudgetPeriodForDate(request.departmentId.toString(), request.requiredPaymentDate);
-    if (!period) return; // If budget period was deleted, skip
+    if (!period) {
+      // Deliberately skips where lock and commit refuse. This is the give-back
+      // direction: nothing was ever reserved, and blocking a rejection or a
+      // cancellation on missing configuration would trap the request with no
+      // way out for the requester. Logged so the gap is still visible.
+      await LoggerService.logApp(
+        AuditAction.BUDGET_PERIOD_MISSING,
+        `No budget period covers the payment date for request ${request.requestNumber}; nothing to release.`
+      );
+      return;
+    }
 
     period.pendingBudget = Math.max(0, period.pendingBudget - request.amount);
     await period.save();
@@ -129,7 +172,11 @@ export class BudgetService {
     if (!request) throw new Error("Request not found");
     
     const period = await this.getBudgetPeriodForDate(request.departmentId.toString(), request.requiredPaymentDate);
-    if (!period) throw new Error("No budget period found to commit budget");
+    if (!period) {
+      // Reachable only if the period was deleted after the request was
+      // approved. Same remedy as lockBudget: restore the period, then release.
+      throw new Error(await this.missingPeriodMessage(request, "paid"));
+    }
 
     // Reduce pending budget and increase utilised budget
     period.pendingBudget = Math.max(0, period.pendingBudget - request.amount);

@@ -595,7 +595,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         isOpen={showAdminSuspendUserModal}
         onClose={() => setShowAdminSuspendUserModal(false)}
         user={selectedAdminUser}
-        onConfirmSuspend={(userId: string) => setUserActive(userId, false)}
+        onConfirmToggleAccess={(userId: string, nextActive: boolean) => setUserActive(userId, nextActive)}
       />
 
       <AdminEditRoleModal

@@ -1,26 +1,52 @@
+/**
+ * Confirms a suspend *or* restore of a user's access. One modal covers both
+ * directions because the confirmation flow is identical — only the copy, the
+ * accent colour and the target state differ. Rendered by DashboardShell.
+ */
 import React from "react";
 import * as Icons from "lucide-react";
+
+/** Minimal shape needed to identify and label the account being acted on. */
+interface SuspendTargetUser {
+  id?: string;
+  _id?: string;
+  name?: string;
+  fullName?: string;
+  isActive?: boolean;
+}
 
 interface AdminSuspendUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  user: any;
-  onConfirmSuspend: (userId: string) => void;
+  user: SuspendTargetUser | null;
+  /** `nextActive` is the state the account should end up in. */
+  onConfirmToggleAccess: (userId: string, nextActive: boolean) => void;
 }
 
 export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
   isOpen,
   onClose,
   user,
-  onConfirmSuspend
+  onConfirmToggleAccess
 }) => {
   if (!isOpen || !user) return null;
 
   const userName = user.name || user.fullName || "User";
   const initials = userName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
 
-  const handleSuspend = () => {
-    onConfirmSuspend(user._id || user.id);
+  // An already-suspended account can only be restored — offering "Suspend"
+  // again is a no-op that reads to the admin as though nothing happened.
+  // `!== false` so rows that arrive without the flag are treated as active.
+  const isSuspended = user.isActive === false;
+  const nextActive = isSuspended;
+
+  // Restore is a safe, reversible action, so it gets the positive accent;
+  // suspension keeps the destructive red treatment.
+  const accent = isSuspended ? "#10b981" : "#ef4444";
+  const accentSoft = isSuspended ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)";
+
+  const handleConfirm = () => {
+    onConfirmToggleAccess((user._id || user.id) as string, nextActive);
     onClose();
   };
 
@@ -51,18 +77,18 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
             width: "44px",
             height: "44px",
             borderRadius: "50%",
-            backgroundColor: "rgba(239, 68, 68, 0.15)",
-            color: "#ef4444",
+            backgroundColor: accentSoft,
+            color: accent,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0
           }}>
-            <Icons.Lock size={22} />
+            {isSuspended ? <Icons.Unlock size={22} /> : <Icons.Lock size={22} />}
           </div>
           <div style={{ flexGrow: 1 }}>
             <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-              Suspend User Access
+              {isSuspended ? "Restore User Access" : "Suspend User Access"}
             </h3>
             <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.2rem" }}>
               Confirm security action
@@ -104,15 +130,19 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
               {userName}
             </div>
             <div style={{ fontSize: "0.8rem", color: "#93c5fd", marginTop: "0.2rem", lineHeight: "1.4" }}>
-              Are you sure you want to suspend access for <strong>{userName}</strong>? They will be unable to log in until access is restored.
+              {isSuspended ? (
+                <>Are you sure you want to restore access for <strong>{userName}</strong>? They will be able to log in again immediately.</>
+              ) : (
+                <>Are you sure you want to suspend access for <strong>{userName}</strong>? They will be unable to log in until access is restored.</>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Termination Warning */}
+        {/* Consequence notice — sessions are only terminated on suspension */}
         <div style={{
-          backgroundColor: "rgba(239, 68, 68, 0.06)",
-          border: "1px solid rgba(239, 68, 68, 0.25)",
+          backgroundColor: isSuspended ? "rgba(16, 185, 129, 0.06)" : "rgba(239, 68, 68, 0.06)",
+          border: `1px solid ${isSuspended ? "rgba(16, 185, 129, 0.25)" : "rgba(239, 68, 68, 0.25)"}`,
           borderRadius: "0.5rem",
           padding: "0.75rem 1rem",
           display: "flex",
@@ -120,9 +150,11 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
           alignItems: "center",
           marginBottom: "1.5rem"
         }}>
-          <Icons.Info size={16} style={{ color: "#ef4444", flexShrink: 0 }} />
-          <span style={{ fontSize: "0.8rem", color: "#fca5a5" }}>
-            This action will terminate all active sessions immediately.
+          <Icons.Info size={16} style={{ color: accent, flexShrink: 0 }} />
+          <span style={{ fontSize: "0.8rem", color: isSuspended ? "#6ee7b7" : "#fca5a5" }}>
+            {isSuspended
+              ? "This account will regain its existing role and permissions."
+              : "This action will terminate all active sessions immediately."}
           </span>
         </div>
 
@@ -146,20 +178,22 @@ export const AdminSuspendUserModal: React.FC<AdminSuspendUserModalProps> = ({
           </button>
           <button
             type="button"
-            onClick={handleSuspend}
+            onClick={handleConfirm}
             style={{
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
               border: "none",
-              backgroundColor: "#dc2626",
+              backgroundColor: isSuspended ? "#059669" : "#dc2626",
               color: "#ffffff",
               fontWeight: "600",
               fontSize: "0.85rem",
               cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(220, 38, 38, 0.35)"
+              boxShadow: isSuspended
+                ? "0 4px 12px rgba(5, 150, 105, 0.35)"
+                : "0 4px 12px rgba(220, 38, 38, 0.35)"
             }}
           >
-            Suspend Access
+            {isSuspended ? "Restore Access" : "Suspend Access"}
           </button>
         </div>
       </div>

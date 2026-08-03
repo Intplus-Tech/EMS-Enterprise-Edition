@@ -37,6 +37,8 @@ export enum AuditAction {
   BUDGET_UNLOCKED = "BUDGET_UNLOCKED",
   BUDGET_COMMITTED = "BUDGET_COMMITTED",
   BUDGET_OVERRUN = "BUDGET_OVERRUN",
+  /** A reserve/commit was skipped because no period covers the payment date. */
+  BUDGET_PERIOD_MISSING = "BUDGET_PERIOD_MISSING",
 
   // Role administration
   ROLE_PERMISSIONS_UPDATED = "ROLE_PERMISSIONS_UPDATED",

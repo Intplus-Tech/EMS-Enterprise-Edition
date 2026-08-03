@@ -381,7 +381,9 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                           backgroundColor: u.isActive !== false ? "#10b981" : "#ef4444"
                         }} />
                         <span style={{ fontSize: "0.82rem", color: "rgb(var(--color-text))", fontWeight: "600" }}>
-                          {u.isActive !== false ? "Active" : "Inactive"}
+                          {/* "Suspended", not "Inactive" — matches the stat card
+                              and the CSV export so one account reads one way. */}
+                          {u.isActive !== false ? "Active" : "Suspended"}
                         </span>
                       </div>
                     </td>
@@ -410,12 +412,21 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                         >
                           <Icons.Shield size={16} />
                         </button>
+                        {/* Access toggle — a suspended account offers Restore,
+                            not another Suspend that would change nothing. */}
                         <button
                           onClick={() => onOpenSuspendUser(u)}
-                          title="Suspend Access"
-                          style={{ background: "none", border: "none", color: "#f59e0b", cursor: "pointer", padding: "0.25rem" }}
+                          title={u.isActive === false ? "Restore Access" : "Suspend Access"}
+                          aria-label={`${u.isActive === false ? "Restore" : "Suspend"} access for ${userName}`}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            color: u.isActive === false ? "#10b981" : "#f59e0b",
+                            cursor: "pointer",
+                            padding: "0.25rem"
+                          }}
                         >
-                          <Icons.Lock size={16} />
+                          {u.isActive === false ? <Icons.Unlock size={16} /> : <Icons.Lock size={16} />}
                         </button>
                         <button
                           onClick={() => onOpenDeleteUser(u)}

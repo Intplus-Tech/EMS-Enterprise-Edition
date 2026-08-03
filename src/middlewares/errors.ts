@@ -48,10 +48,14 @@ export function withErrorHandling(handler: ApiHandler): ApiHandler {
       } else if (errorMessage.includes("not found")) {
         statusCode = 404;
       } else if (
-        errorMessage.includes("mandatory") || 
-        errorMessage.includes("Invalid") || 
+        errorMessage.includes("mandatory") ||
+        errorMessage.includes("Invalid") ||
         errorMessage.includes("exceeds") ||
         errorMessage.includes("Must") ||
+        // A missing budget period is a configuration precondition the caller
+        // can resolve, not a server fault; a 500 would both misreport it and
+        // file it in the exception log as a crash.
+        errorMessage.includes("budget period") ||
         isZodError
       ) {
         statusCode = 400;
