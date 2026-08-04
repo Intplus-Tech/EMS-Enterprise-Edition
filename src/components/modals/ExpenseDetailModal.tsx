@@ -3,6 +3,7 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { WorkflowActionType } from "../../enums/workflowActions";
+import { BANK_STAGE_STATUSES } from "../../enums/statuses";
 import { AttachmentTarget } from "./AttachmentViewModal";
 import { AttachmentList } from "../ui/AttachmentList";
 import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
@@ -87,10 +88,10 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.2)", padding: "1.25rem", position: "relative", marginBottom: "0.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 {[
-                  { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET"].includes(selectedExpense.status) },
-                  { name: "Approval", active: ["PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["PENDING_EXCEPTIONAL", "PENDING_APPROVAL"].includes(selectedExpense.status) },
-                  { name: "Finance", active: ["APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["APPROVED", "SENT_TO_FINANCE"].includes(selectedExpense.status) },
-                  { name: "Bank", active: ["UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["UPLOADED_TO_BANK"].includes(selectedExpense.status) },
+                  { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET"].includes(selectedExpense.status) },
+                  { name: "Approval", active: ["PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["PENDING_EXCEPTIONAL", "PENDING_APPROVAL"].includes(selectedExpense.status) },
+                  { name: "Finance", active: ["APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["APPROVED", "SENT_TO_FINANCE"].includes(selectedExpense.status) },
+                  { name: "Bank", active: ["UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status), current: BANK_STAGE_STATUSES.includes(selectedExpense.status) },
                   { name: "Paid", active: ["PAID", "CLOSED"].includes(selectedExpense.status), current: ["PAID"].includes(selectedExpense.status) },
                   { name: "Closed", active: ["CLOSED"].includes(selectedExpense.status), current: ["CLOSED"].includes(selectedExpense.status) }
                 ].map((step, idx) => {
@@ -209,11 +210,11 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))", marginBottom: "1rem" }}>Execution Route Progress</p>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
                 {[
-                  { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
-                  { name: "Budget Check", active: ["BUDGET_CHECK", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
-                  { name: "Approvals", active: ["PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) && selectedExpense.currentStepIndex > 0 },
-                  { name: "Finance Audit", active: ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
-                  { name: "Payment Release", active: ["UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { name: "Budget Check", active: ["BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { name: "Approvals", active: ["PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) && selectedExpense.currentStepIndex > 0 },
+                  { name: "Finance Audit", active: ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { name: "Payment Release", active: ["UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) },
                   { name: "Closed", active: ["CLOSED"].includes(selectedExpense.status) }
                 ].map((step, idx) => (
                   <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", zIndex: 2 }}>
@@ -336,7 +337,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             )}
 
-            {currentUser?.role === "FINANCE_MANAGER" && selectedExpense.status === "UPLOADED_TO_BANK" && (
+            {currentUser?.role === "FINANCE_MANAGER" && BANK_STAGE_STATUSES.includes(selectedExpense.status) && (
               <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-secondary))", marginBottom: "0.5rem" }}>Finance Manager Action: Authorize Cash Release</p>
                 <div className="form-group">

@@ -42,7 +42,36 @@ export const NOTIFIABLE_TRANSITIONS: Partial<Record<RequestStatus, NotificationT
   [RequestStatus.PENDING_EXCEPTIONAL]: "IN_PROGRESS",
   [RequestStatus.INSUFFICIENT_BUDGET]: "IN_PROGRESS",
   [RequestStatus.UPLOADED_TO_BANK]: "IN_PROGRESS",
+  // A request rests here after the officer's upload, so this is the status the
+  // initiator's email reports; the bell collapses it into the upload it followed
+  // (see `collapsesInto` below) rather than announcing the pair twice.
+  [RequestStatus.AWAITING_RELEASE]: "IN_PROGRESS",
 };
+
+/**
+ * Transitions the workflow writes as a pair, and the half that represents the
+ * whole event to a reader.
+ *
+ * Two stages of the flow are recorded in one atomic step: the budget flag is
+ * immediately routed to the Finance Head, and the bank upload immediately hands
+ * over to the Finance Manager. Both halves are real states — the email reports
+ * whichever one the request came to rest on — but they are one thing happening,
+ * so the bell must not raise a notification for each.
+ */
+const COLLAPSED_PAIRS: Partial<Record<RequestStatus, RequestStatus>> = {
+  [RequestStatus.PENDING_EXCEPTIONAL]: RequestStatus.INSUFFICIENT_BUDGET,
+  [RequestStatus.AWAITING_RELEASE]: RequestStatus.UPLOADED_TO_BANK,
+};
+
+/**
+ * True when `status` is the trailing half of a pair whose leading half is the
+ * status immediately before it in the request's history — meaning a
+ * notification was already raised for this event.
+ */
+export function collapsesInto(status?: string | null, previousStatus?: string | null): boolean {
+  const leadsWith = COLLAPSED_PAIRS[status as RequestStatus];
+  return Boolean(leadsWith) && leadsWith === previousStatus;
+}
 
 /** True when a transition into `status` is worth telling the initiator about. */
 export function isNotifiableStatus(status: RequestStatus | string): boolean {

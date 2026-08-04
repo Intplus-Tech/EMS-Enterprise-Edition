@@ -20,9 +20,7 @@ import React from "react";
 import * as Icons from "lucide-react";
 import { EmptyState } from "../ui/EmptyState";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
-
-/** Statuses that mean the request has breached its department's allocation. */
-const OVER_BUDGET_STATUSES = ["INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL"];
+import { OVER_BUDGET_STATUSES, isStatusIn } from "../../enums/statuses";
 
 interface RequestQueueTableProps {
   rows: any[];
@@ -34,7 +32,7 @@ interface RequestQueueTableProps {
 
 /** True when the request is flagged over budget, or was granted an expansion. */
 function isOverBudget(expense: any): boolean {
-  return OVER_BUDGET_STATUSES.includes(String(expense.status)) || Boolean(expense.exceptionalBudgetApproved);
+  return isStatusIn(OVER_BUDGET_STATUSES, expense.status) || Boolean(expense.exceptionalBudgetApproved);
 }
 
 /** The approver who last signed the request off, for the "Approved by" line. */

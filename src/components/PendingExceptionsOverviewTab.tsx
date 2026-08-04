@@ -6,6 +6,7 @@ import { formatNaira } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import { ExpenseClient } from "../services/expense.client";
 import { BudgetContextDto } from "../types/api";
+import { OVER_BUDGET_STATUSES, isStatusIn } from "../enums/statuses";
 
 /** Rows shown per page in the exceptions queue. */
 const ROWS_PER_PAGE = 8;
@@ -41,7 +42,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
   const [budgetByRequest, setBudgetByRequest] = useState<Record<string, BudgetContextDto>>({});
 
   const openExceptions = useMemo(
-    () => expenses.filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET"),
+    () => expenses.filter(e => isStatusIn(OVER_BUDGET_STATUSES, e.status)),
     [expenses]
   );
 

@@ -16,7 +16,9 @@ const DEPT_STATUS_LABELS: Record<string, string> = {
   PENDING_APPROVAL: "PENDING",
   SENT_TO_FINANCE: "AWAITING FINANCE",
   PENDING_EXCEPTIONAL: "SLA ALERT",
+  INSUFFICIENT_BUDGET: "SLA ALERT",
   UPLOADED_TO_BANK: "PROCESSING",
+  AWAITING_RELEASE: "PROCESSING",
 };
 
 interface RequestsTabProps {
@@ -614,6 +616,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                         <option value="SENT_TO_FINANCE">AWAITING FINANCE</option>
                         <option value="PENDING_EXCEPTIONAL">SLA ALERT</option>
                         <option value="UPLOADED_TO_BANK">PROCESSING</option>
+                        <option value="AWAITING_RELEASE">AWAITING RELEASE</option>
                         <option value="APPROVED">APPROVED</option>
                       </select>
                     </div>

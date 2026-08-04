@@ -4,6 +4,24 @@ import { ExpenseRequest } from "../../models/ExpenseRequest";
 import { RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
 
+/**
+ * Roles whose stage in the request flow is served by a dedicated route, not by
+ * the generic approval chain.
+ *
+ * The Finance Officer acts through `/upload` (SENT_TO_FINANCE →
+ * UPLOADED_TO_BANK) and the Finance Manager through `/release`
+ * (AWAITING_RELEASE → PAID). Listing either of them as an approval step as well
+ * strands the request: `processWorkflowAction` keeps it at PENDING_APPROVAL
+ * waiting for a finance "approval" that no screen offers, while every finance
+ * queue in the app is looking for SENT_TO_FINANCE. Filtering them out here
+ * repairs configurations already saved with those steps, so existing databases
+ * do not need a migration.
+ */
+const DEDICATED_STAGE_ROLES: SystemRole[] = [
+  SystemRole.FINANCE_OFFICER,
+  SystemRole.FINANCE_MANAGER,
+];
+
 export class WorkflowService {
   /**
    * Get the active workflow configuration.
@@ -11,14 +29,13 @@ export class WorkflowService {
    */
   public static async getActiveWorkflow() {
     await connectToDatabase();
-    
+
     let config = await WorkflowConfig.findOne({ isActive: true });
-    
+
     if (!config) {
-      // Seed default workflow steps matching the functional spec:
-      // Step 1: Departmental Approver
-      // Step 2: Finance Officer (Processing & Bank Upload)
-      // Step 3: Finance Manager (Bank Release & Close)
+      // The approval chain only — the "Approval workflow" box in the request
+      // flow. Finance processing and payment release are fixed stages that
+      // follow it, so they are not steps here.
       config = new WorkflowConfig({
         name: "Standard Lifecycle Flow",
         isActive: true,
@@ -29,26 +46,12 @@ export class WorkflowService {
             role: SystemRole.APPROVER,
             minAmount: 0,
             requiresAllApprovals: false
-          },
-          {
-            stepIndex: 1,
-            stepName: "Finance Audit & Upload",
-            role: SystemRole.FINANCE_OFFICER,
-            minAmount: 0,
-            requiresAllApprovals: false
-          },
-          {
-            stepIndex: 2,
-            stepName: "Payment Release Authorization",
-            role: SystemRole.FINANCE_MANAGER,
-            minAmount: 0,
-            requiresAllApprovals: false
           }
         ]
       });
       await config.save();
     }
-    
+
     return config;
   }
 
@@ -60,20 +63,25 @@ export class WorkflowService {
   public static async getNextStepForRequest(request: any) {
     const config = await this.getActiveWorkflow();
     const steps = [...config.steps].sort((a: any, b: any) => a.stepIndex - b.stepIndex);
-    
+
     // Scan steps starting from the request's current step index
     for (let i = request.currentStepIndex; i < steps.length; i++) {
       const step = steps[i];
-      
+
+      // Finance stages are not approval steps; see DEDICATED_STAGE_ROLES.
+      if (DEDICATED_STAGE_ROLES.includes(step.role)) {
+        continue;
+      }
+
       // Amount threshold condition:
       // If the request amount is below the step's minimum required amount, we skip it.
       if (step.minAmount && request.amount < step.minAmount) {
         continue;
       }
-      
+
       return { step, index: i };
     }
-    
+
     return null; // No more steps remaining
   }
 }

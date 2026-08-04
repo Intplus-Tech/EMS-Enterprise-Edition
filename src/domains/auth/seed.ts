@@ -198,6 +198,9 @@ export async function runDatabaseSeed() {
   console.log(`Default and per-department users seeded (${userDocs.length} users total).`);
 
   // 5. Create Default Active Workflow configuration
+  // The approval chain only. Finance audit and payment release are fixed stages
+  // that follow approval and are driven by their own routes, so listing them as
+  // approval steps would strand every request at PENDING_APPROVAL.
   const defaultWorkflow = new WorkflowConfig({
     name: "Standard Dynamic Lifecycle",
     isActive: true,
@@ -206,20 +209,6 @@ export async function runDatabaseSeed() {
         stepIndex: 0,
         stepName: "Departmental Manager Review",
         role: SystemRole.APPROVER,
-        minAmount: 0,
-        requiresAllApprovals: false
-      },
-      {
-        stepIndex: 1,
-        stepName: "Finance Audit & Bank Upload",
-        role: SystemRole.FINANCE_OFFICER,
-        minAmount: 100,
-        requiresAllApprovals: false
-      },
-      {
-        stepIndex: 2,
-        stepName: "Payment Release Authorization",
-        role: SystemRole.FINANCE_MANAGER,
         minAmount: 0,
         requiresAllApprovals: false
       }

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { RequestStatus } from "../../enums/statuses";
+import { BANK_STAGE_STATUSES, OVER_BUDGET_STATUSES, RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
-import { NotificationType, notificationTypeFor } from "./notifiable-events";
+import { NotificationType, collapsesInto, notificationTypeFor } from "./notifiable-events";
 import { humanizeRequestStatus } from "./status-labels";
 import { idOf } from "../identity/reference";
 
@@ -106,19 +106,23 @@ function messageFor(type: NotificationType, expense: any, entry: any): string {
 
 /**
  * Statuses that represent work sitting in a given reviewer role's queue.
+ *
+ * Returns a set rather than one status because two stages can share an owner:
+ * the Finance Head rules on a request whether it is still flagged or already
+ * routed to them, and the Finance Manager releases from either bank state.
  */
-function pendingStatusForRole(role: string | undefined): string | null {
+function pendingStatusesForRole(role: string | undefined): string[] {
   switch (role) {
     case SystemRole.FINANCE_HEAD:
-      return RequestStatus.PENDING_EXCEPTIONAL;
+      return OVER_BUDGET_STATUSES;
     case SystemRole.APPROVER:
-      return RequestStatus.PENDING_APPROVAL;
+      return [RequestStatus.PENDING_APPROVAL];
     case SystemRole.FINANCE_OFFICER:
-      return RequestStatus.SENT_TO_FINANCE;
+      return [RequestStatus.SENT_TO_FINANCE];
     case SystemRole.FINANCE_MANAGER:
-      return RequestStatus.UPLOADED_TO_BANK;
+      return BANK_STAGE_STATUSES;
     default:
-      return null;
+      return [];
   }
 }
 
@@ -136,6 +140,10 @@ function buildOwnRequestNotifications(expenses: any[], userId: string): AppNotif
 
       const type = notificationTypeFor(entry.statusAfter);
       if (!type) return;
+
+      // The trailing half of a paired transition is the same event as the row
+      // before it, which already produced a notification.
+      if (collapsesInto(entry.statusAfter, history[index - 1]?.statusAfter)) return;
 
       const requestNumber = expense.requestNumber || "Request";
 
@@ -178,11 +186,11 @@ function buildReviewQueueNotifications(
   userId: string,
   role: string | undefined
 ): AppNotification[] {
-  const pendingStatus = pendingStatusForRole(role);
-  if (!pendingStatus) return [];
+  const pendingStatuses = pendingStatusesForRole(role);
+  if (pendingStatuses.length === 0) return [];
 
   return expenses
-    .filter((expense) => expense.status === pendingStatus && idOf(expense.initiatorId) !== userId)
+    .filter((expense) => pendingStatuses.includes(expense.status) && idOf(expense.initiatorId) !== userId)
     .map((expense) => {
       const requestNumber = expense.requestNumber || "Request";
       const initiatorName = expense.initiatorId?.name || "an initiator";

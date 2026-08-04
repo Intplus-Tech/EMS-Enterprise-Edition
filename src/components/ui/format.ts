@@ -67,10 +67,15 @@ export function statusBadgeClass(status?: string | null): string {
       return "badge-draft";
     case "RETURNED":
     case "PENDING_EXCEPTIONAL":
+    // The flag and the Finance Head review are one branch of the flow, so they
+    // read as one colour rather than this one falling through to the default.
+    case "INSUFFICIENT_BUDGET":
       return "badge-budget-check";
     case "SENT_TO_FINANCE":
       return "badge-finance";
     case "UPLOADED_TO_BANK":
+    // Both halves of the bank leg — instruction uploaded, cash not yet released.
+    case "AWAITING_RELEASE":
       return "badge-bank";
     case "SUBMITTED":
       return "badge-submitted";

@@ -40,3 +40,36 @@ export const POST_APPROVAL_STATUSES: RequestStatus[] = [
   RequestStatus.PAID,
   RequestStatus.CLOSED,
 ];
+
+/**
+ * The two states of the "insufficient budget" branch of the request flow.
+ *
+ * A request is first flagged (INSUFFICIENT_BUDGET) and then handed to the
+ * Finance Head (PENDING_EXCEPTIONAL). Both mean "over budget, nobody has ruled
+ * on it yet", so every over-budget queue, badge and filter must match the pair
+ * rather than either one — five screens had drifted into their own inline
+ * copies of this list.
+ */
+export const OVER_BUDGET_STATUSES: RequestStatus[] = [
+  RequestStatus.INSUFFICIENT_BUDGET,
+  RequestStatus.PENDING_EXCEPTIONAL,
+];
+
+/**
+ * The bank leg of the pipeline: the Finance Officer has uploaded the payment
+ * instruction and the Finance Manager has not yet released the cash.
+ *
+ * UPLOADED_TO_BANK is the moment of upload and AWAITING_RELEASE is the queue the
+ * request then sits in. Screens that gate the Finance Manager's release action
+ * must accept both, because records created before the AWAITING_RELEASE
+ * transition existed are parked on the former.
+ */
+export const BANK_STAGE_STATUSES: RequestStatus[] = [
+  RequestStatus.UPLOADED_TO_BANK,
+  RequestStatus.AWAITING_RELEASE,
+];
+
+/** String-set membership test, for the many UI call sites holding raw statuses. */
+export function isStatusIn(statuses: RequestStatus[], status?: string | null): boolean {
+  return statuses.includes(String(status) as RequestStatus);
+}

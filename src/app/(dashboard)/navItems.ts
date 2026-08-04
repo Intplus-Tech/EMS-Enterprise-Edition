@@ -7,7 +7,12 @@
 // treatments, which is how INITIATOR and APPROVER ended up with a grey
 // highlight while FINANCE_HEAD and ADMIN got the blue one from the designs.
 
-import type { RequestStatus } from "../../enums/statuses";
+import {
+  BANK_STAGE_STATUSES,
+  OVER_BUDGET_STATUSES,
+  isStatusIn,
+  type RequestStatus,
+} from "../../enums/statuses";
 
 /** Shape of the dashboard data a badge count is derived from. */
 export interface NavBadgeContext {
@@ -33,9 +38,7 @@ const draftOrReturnedCount = ({ expenses }: NavBadgeContext) =>
 
 /** Over-budget requests sitting with the Finance Head. */
 const openExceptionCount = ({ expenses }: NavBadgeContext) =>
-  expenses.filter((e) =>
-    ["PENDING_EXCEPTIONAL", "INSUFFICIENT_BUDGET"].includes(String(e.status))
-  ).length;
+  expenses.filter((e) => isStatusIn(OVER_BUDGET_STATUSES, e.status)).length;
 
 /**
  * Requests waiting on *this* approver. Each role owns a different stage, so the
@@ -44,10 +47,10 @@ const openExceptionCount = ({ expenses }: NavBadgeContext) =>
 const awaitingMyDecisionCount = ({ expenses, role }: NavBadgeContext) =>
   expenses.filter((e) => {
     const status = String(e.status);
-    if (role === "FINANCE_HEAD") return status === "PENDING_EXCEPTIONAL";
+    if (role === "FINANCE_HEAD") return isStatusIn(OVER_BUDGET_STATUSES, status);
     if (role === "APPROVER") return status === "PENDING_APPROVAL" && e.currentStepIndex === 0;
     if (role === "FINANCE_OFFICER") return status === "SENT_TO_FINANCE";
-    if (role === "FINANCE_MANAGER") return status === "UPLOADED_TO_BANK";
+    if (role === "FINANCE_MANAGER") return isStatusIn(BANK_STAGE_STATUSES, status);
     return false;
   }).length;
 

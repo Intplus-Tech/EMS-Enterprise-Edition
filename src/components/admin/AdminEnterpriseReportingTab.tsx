@@ -4,6 +4,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { formatNaira, formatNairaCompact } from "../ui/format";
 import { DepartmentDto, DepartmentSpendDto, PopulatedExpenseDto } from "../../types/api";
 import { datedFilename, downloadCsv } from "../ui/exportCsv";
+import { BANK_STAGE_STATUSES } from "../../enums/statuses";
 
 /** Period presets, expressed as a day window. 0 means "no cut-off". */
 const PERIOD_OPTIONS: { label: string; days: number }[] = [
@@ -73,7 +74,9 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
   const approvedCount = countOf(e => e.status === "APPROVED");
   const rejectedCount = countOf(e => e.status === "REJECTED");
   const paidCount = countOf(e => SPENT_STATUSES.includes(e.status));
-  const uploadedCount = countOf(e => e.status === "UPLOADED_TO_BANK");
+  // The whole bank leg, not just the upload instant — a request moves straight
+  // on to AWAITING_RELEASE, so keying on UPLOADED_TO_BANK alone reported zero.
+  const uploadedCount = countOf(e => BANK_STAGE_STATUSES.includes(e.status));
 
   // Utilisation reads the server-computed budget summaries rather than assuming
   // a ₦250,000 allocation for any department without one — an unbudgeted

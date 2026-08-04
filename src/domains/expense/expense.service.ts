@@ -6,7 +6,7 @@ import { BudgetService } from "../budget/budget.service";
 import { WorkflowService } from "../workflow/workflow.service";
 import { LoggerService } from "../logs/logger.service";
 import { RequestNotifier } from "../notifications/request-notifier";
-import { RequestStatus } from "../../enums/statuses";
+import { BANK_STAGE_STATUSES, OVER_BUDGET_STATUSES, RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
 import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
@@ -247,26 +247,44 @@ export class ExpenseService {
         await request.save();
       }
     } else {
-      // Insufficient budget -> route to Finance Head for exceptional approval
-      request.status = RequestStatus.PENDING_EXCEPTIONAL;
+      // Insufficient budget -> flag the overrun, then route to the Finance Head.
+      //
+      // These are two distinct stages of the flow and both are recorded: the
+      // flag is what the request breached, the routing is who now owns it. The
+      // flag transition used to be skipped entirely, so INSUFFICIENT_BUDGET
+      // never appeared in any history even though the exception queues, the
+      // over-budget badges and the budget-overrun audit all key off it.
+      request.status = RequestStatus.INSUFFICIENT_BUDGET;
       request.history.push({
         statusBefore: RequestStatus.BUDGET_CHECK,
-        statusAfter: RequestStatus.PENDING_EXCEPTIONAL,
+        statusAfter: RequestStatus.INSUFFICIENT_BUDGET,
         actorId: actorId,
         actorName: "System Engine",
         actorRole: SystemRole.ADMIN,
         action: `Budget Overrun. Flagged: ${budgetCheck.message}`,
         timestamp: new Date()
       });
-      
       await request.save();
-      
+
       await LoggerService.logAudit(
         AuditAction.BUDGET_OVERRUN,
-        `Request ${request.requestNumber} triggered a budget overrun alert. Flagged: PENDING_EXCEPTIONAL`,
+        `Request ${request.requestNumber} triggered a budget overrun alert. Flagged: INSUFFICIENT_BUDGET`,
         { budgetCheck },
         logActor
       );
+
+      // Exception approval required -> the Finance Head's queue.
+      request.status = RequestStatus.PENDING_EXCEPTIONAL;
+      request.history.push({
+        statusBefore: RequestStatus.INSUFFICIENT_BUDGET,
+        statusAfter: RequestStatus.PENDING_EXCEPTIONAL,
+        actorId: actorId,
+        actorName: "System Engine",
+        actorRole: SystemRole.ADMIN,
+        action: "Routed to Finance Head for exceptional budget approval",
+        timestamp: new Date()
+      });
+      await request.save();
     }
 
     // Tell the initiator their request moved. Non-blocking by design.
@@ -289,10 +307,7 @@ export class ExpenseService {
     // Both states mean "over budget, waiting on the Finance Head" — the queue
     // lists them together. Accepting only PENDING_EXCEPTIONAL stranded records
     // parked at INSUFFICIENT_BUDGET: they were reviewable but never decidable.
-    if (
-      request.status !== RequestStatus.PENDING_EXCEPTIONAL &&
-      request.status !== RequestStatus.INSUFFICIENT_BUDGET
-    ) {
+    if (!OVER_BUDGET_STATUSES.includes(request.status)) {
       throw new Error("Request is not awaiting exceptional budget approval.");
     }
 
@@ -544,7 +559,7 @@ export class ExpenseService {
     const actorId = getActorId(actor);
     const previousStatus = request.status;
     request.status = RequestStatus.UPLOADED_TO_BANK;
-    
+
     request.history.push({
       statusBefore: previousStatus,
       statusAfter: RequestStatus.UPLOADED_TO_BANK,
@@ -556,7 +571,7 @@ export class ExpenseService {
     });
 
     await request.save();
-    
+
     // `ipAddress` rides along on the authenticated actor so audit rows carry
     // the real client address; the viewer no longer substitutes a fake one.
     const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
@@ -566,6 +581,22 @@ export class ExpenseService {
       undefined,
       logActor
     );
+
+    // The upload hands the request to the Finance Manager, so it moves on into
+    // that queue rather than resting on the officer's own action. Segregation of
+    // duties is the point of the stage: the officer prepares the instruction,
+    // a different role releases the cash.
+    request.status = RequestStatus.AWAITING_RELEASE;
+    request.history.push({
+      statusBefore: RequestStatus.UPLOADED_TO_BANK,
+      statusAfter: RequestStatus.AWAITING_RELEASE,
+      actorId: actorId,
+      actorName: "System Engine",
+      actorRole: SystemRole.ADMIN,
+      action: "Awaiting Finance Manager release on the bank platform",
+      timestamp: new Date()
+    });
+    await request.save();
 
     // Tell the initiator their request moved. Non-blocking by design.
     await RequestNotifier.notifyInitiator(request);
@@ -590,7 +621,10 @@ export class ExpenseService {
 
     const request = await ExpenseRequest.findById(requestId);
     if (!request) throw new Error("Request not found");
-    if (request.status !== RequestStatus.UPLOADED_TO_BANK) {
+    // AWAITING_RELEASE is where the upload now leaves a request; UPLOADED_TO_BANK
+    // is still accepted so records written before that transition existed — the
+    // seeded ones included — remain releasable rather than stranded.
+    if (!BANK_STAGE_STATUSES.includes(request.status)) {
       throw new Error("Request has not been uploaded to the bank yet.");
     }
 

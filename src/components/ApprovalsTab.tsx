@@ -22,6 +22,11 @@ import { formatNaira, formatDate, formatDateTime, humanizeStatus, statusBadgeCla
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import { ExpenseClient } from "../services/expense.client";
 import { toErrorMessage } from "../services/http";
+import {
+  BANK_STAGE_STATUSES,
+  OVER_BUDGET_STATUSES,
+  POST_APPROVAL_STATUSES,
+} from "../enums/statuses";
 import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
 
 interface ApprovalsTabProps {
@@ -422,7 +427,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const newRequests = expenses.filter(e => e.status === "SENT_TO_FINANCE" || e.status === "APPROVED");
   
   const processingRequests = expenses.filter(e => [
-    "UPLOADED_TO_BANK", "PENDING_EXCEPTIONAL", "INSUFFICIENT_BUDGET", "RETURNED", "BUDGET_CHECK", "PENDING_APPROVAL"
+    ...BANK_STAGE_STATUSES, ...OVER_BUDGET_STATUSES, "RETURNED", "BUDGET_CHECK", "PENDING_APPROVAL"
   ].includes(e.status));
 
   const completedRequests = expenses.filter(e => [
@@ -503,7 +508,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   // A department with no committed spend is a real ₦0; the previous `|| 545000`
   // fallback showed the design's sample figure whenever the total came to zero.
   const totalDeptSpend = deptExpenses
-    .filter(e => ["PAID", "CLOSED", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK"].includes(e.status))
+    .filter(e => POST_APPROVAL_STATUSES.includes(e.status))
     .reduce((sum, e) => sum + e.amount, 0);
 
   const isSelectedCompleted = selectedExpense ? ["PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(selectedExpense.status) : false;
@@ -518,20 +523,24 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     ? (budgetContext?.hasBudget
         ? selectedExpense.amount > (budgetContext.remaining ?? 0)
         : false) ||
-      ["INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL"].includes(selectedExpense.status)
+      OVER_BUDGET_STATUSES.includes(selectedExpense.status)
     : false;
 
   /**
    * The approval stepper, built from the request's real history so each stage
    * names the person who completed it and carries their timestamp.
    */
-  const stageFor = (actions: string[]) =>
-    (selectedExpense?.history ?? []).find((h: any) => actions.includes(h.action));
+  // Matched on `statusAfter`, not on `action`. The action text is prose the
+  // service composes per step ("Approve Step: Departmental Approval"), so the
+  // previous match against bare verbs like "APPROVE" never found an entry and
+  // every stage below rendered as still awaiting action.
+  const stageFor = (statusAfter: string) =>
+    (selectedExpense?.history ?? []).find((h: any) => h.statusAfter === statusAfter);
 
   const initiatedAt = selectedExpense?.createdAt;
-  const departmentStep = stageFor(["APPROVE", "APPROVED"]);
-  const financeStep = stageFor(["UPLOAD", "UPLOADED_TO_BANK", "VERIFY"]);
-  const disbursementStep = stageFor(["RELEASE", "PAID", "PAYMENT_RELEASED"]);
+  const departmentStep = stageFor("SENT_TO_FINANCE");
+  const financeStep = stageFor("UPLOADED_TO_BANK");
+  const disbursementStep = stageFor("PAID");
 
   const workflowStages = selectedExpense
     ? [
@@ -561,7 +570,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           desc: disbursementStep ? `by ${disbursementStep.actorName}` : "Pending approval…",
           date: disbursementStep ? formatDate(disbursementStep.timestamp) : "",
           active: Boolean(disbursementStep) || ["PAID", "CLOSED"].includes(selectedExpense.status),
-          current: selectedExpense.status === "UPLOADED_TO_BANK",
+          current: BANK_STAGE_STATUSES.includes(selectedExpense.status),
         },
       ]
     : [];
@@ -1246,7 +1255,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   // real ₦0 — the previous `|| 4850200` fallback reported the design's mock
   // figure whenever there was nothing to release.
   const pendingReleaseTotal = expenses
-    .filter(e => e.status === "UPLOADED_TO_BANK" || e.status === "SENT_TO_FINANCE")
+    .filter(e => BANK_STAGE_STATUSES.includes(e.status) || e.status === "SENT_TO_FINANCE")
     .reduce((sum, e) => sum + (e.amount || 0), 0);
 
   /**
@@ -1558,7 +1567,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                         <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
                         <button
                           onClick={() => {
-                            if (isFinanceManager && exp.status === "UPLOADED_TO_BANK") {
+                            if (isFinanceManager && BANK_STAGE_STATUSES.includes(exp.status)) {
                               focusReleaseItem(exp);
                               setBankRefNumber(exp.paymentReference || "");
                               setShowAuthorizeReleaseModal(true);
