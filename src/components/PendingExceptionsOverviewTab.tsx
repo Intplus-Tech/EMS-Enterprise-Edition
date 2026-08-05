@@ -11,6 +11,48 @@ import { isDecidableException } from "../enums/statuses";
 /** Rows shown per page in the exceptions queue. */
 const ROWS_PER_PAGE = 8;
 
+/**
+ * Sized column widths for the queue table, in px (border-box, padding included).
+ *
+ * `table-fixed` gives each column its declared width and hands what is left to
+ * the single unsized one â€” REQUEST TITLE. That only works while the sized
+ * columns actually leave something behind, and they had stopped doing so: they
+ * summed to 970px inside a ~1020px panel, so the title was left with ~50px, 40
+ * of which is its own padding. `wrap-anywhere` then broke each title one
+ * character per line rather than overflowing.
+ */
+const COLUMN_WIDTHS = {
+  deficit: 160,
+  reqId: 150, // "#EXP-2026-0007" has to sit on one line; 120px wrapped it
+  dept: 140,
+  amount: 145,
+  budget: 130,
+  wait: 95,
+  action: 140
+} as const;
+
+/** Narrowest REQUEST TITLE we consider readable â€” roughly three words per line. */
+const TITLE_MIN_WIDTH = 240;
+
+/**
+ * The floor that keeps the title column from being starved again. Below this
+ * the table stops shrinking and `.table-container` scrolls sideways, which is
+ * the bounded failure mode; the unbounded one is a column collapsing to nothing.
+ * Derived rather than written out so it cannot drift from the widths above.
+ */
+const TABLE_MIN_WIDTH =
+  Object.values(COLUMN_WIDTHS).reduce((sum, width) => sum + width, 0) + TITLE_MIN_WIDTH;
+
+/** Shared header-cell styling; only width and alignment differ per column. */
+const headCellStyle: React.CSSProperties = {
+  padding: "1rem 1.25rem",
+  fontSize: "0.725rem",
+  fontWeight: "700",
+  color: "rgb(var(--color-text-dim))",
+  letterSpacing: "0.05em",
+  textTransform: "uppercase"
+};
+
 interface PendingExceptionsOverviewTabProps {
   currentUser?: any;
   expenses?: any[];
@@ -385,20 +427,23 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         }}
       >
         <div className="table-container" style={{ overflowX: "auto" }}>
-          <table className="data-table table-fixed" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <table
+            className="data-table table-fixed"
+            style={{ width: "100%", minWidth: `${TABLE_MIN_WIDTH}px`, borderCollapse: "collapse", textAlign: "left" }}
+          >
             <thead>
               {/* Every column but REQUEST TITLE is sized to its longest realistic
                   value, so the title absorbs the slack and wraps rather than
                   stretching the table past the panel. */}
               <tr style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)" }}>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "160px" }}>DEFICIT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "120px" }}>REQ ID</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQUEST TITLE</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "150px" }}>DEPT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "150px" }}>AMOUNT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "140px" }}>BUDGET</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "100px" }}>WAIT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "right", width: "150px" }}>ACTION</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.deficit }}>DEFICIT</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.reqId }}>REQ ID</th>
+                <th style={headCellStyle}>REQUEST TITLE</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.dept }}>DEPT</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.amount }}>AMOUNT</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.budget }}>BUDGET</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.wait }}>WAIT</th>
+                <th style={{ ...headCellStyle, textAlign: "right", width: COLUMN_WIDTHS.action }}>ACTION</th>
               </tr>
             </thead>
             <tbody>
