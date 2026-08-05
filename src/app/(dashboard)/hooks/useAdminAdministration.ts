@@ -11,6 +11,7 @@
 import { useCallback, useState } from "react";
 import { AdminClient, BudgetPeriodInput, DepartmentInput, UserProfileInput } from "../../../services/admin.client";
 import { toErrorMessage } from "../../../services/http";
+import { currentFiscalPeriod } from "../../../domains/budget/fiscalPeriod";
 import { SystemRole } from "../../../enums/roles";
 import { PermissionAction, PermissionResource } from "../../../enums/permissions";
 import {
@@ -345,19 +346,5 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     deleteUser,
     saveBudgetPeriod,
     saveRolePermissions,
-  };
-}
-
-/**
- * Default budget window when a screen does not ask for a specific one.
- * The admin modals set an annual allocation, so the period is the calendar
- * year — named `FY-<year>` to match the `periodName` shown in the designs.
- */
-function currentFiscalPeriod() {
-  const year = new Date().getFullYear();
-  return {
-    periodName: `FY-${year}`,
-    startDate: new Date(Date.UTC(year, 0, 1)).toISOString(),
-    endDate: new Date(Date.UTC(year, 11, 31, 23, 59, 59)).toISOString(),
   };
 }

@@ -8,8 +8,14 @@
 import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
-import { formatNaira, formatNairaPrecise } from "../../ui/format";
+import { formatNaira, formatNairaPrecise, formatDate } from "../../ui/format";
 import { BudgetPeriodDto } from "../../../types/api";
+import {
+  FiscalPeriod,
+  currentFiscalPeriod,
+  fiscalPeriodFor,
+  periodCovers,
+} from "../../../domains/budget/fiscalPeriod";
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
 
 interface AdminSetBudgetModalProps {
@@ -20,7 +26,13 @@ interface AdminSetBudgetModalProps {
   budgetPeriods?: BudgetPeriodDto[];
   /** Optional department ID to pre-select when opening the modal. */
   initialDepartmentId?: string;
-  onSetBudget: (departmentId: string, totalAmount: number, lineItems: any[]) => void;
+  onSetBudget: (
+    departmentId: string,
+    totalAmount: number,
+    lineItems: any[],
+    /** The fiscal window the allocation belongs to — periods are keyed by it. */
+    period: FiscalPeriod
+  ) => void;
 }
 
 export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
@@ -39,8 +51,12 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
    * against them. Loaded on mount and on each department change rather than in
    * an effect, so the admin's edits are never overwritten by a re-render.
    */
-  const itemsForDepartment = (departmentId: string) =>
-    (budgetPeriods.find((p) => p.departmentId === departmentId)?.lineItems ?? []).map(
+  const itemsFor = (departmentId: string, periodName: string) =>
+    (
+      budgetPeriods.find(
+        (p) => p.departmentId === departmentId && p.periodName === periodName
+      )?.lineItems ?? []
+    ).map(
       (item, index) => ({
         // `key` is local to this list; `itemId` is the item's real identity and
         // is sent back on save. Without it a rename reads as a delete plus an
@@ -65,29 +81,84 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
     return departments[0]?._id || departments[0]?.id || "";
   };
 
+  /**
+   * Windows the admin may allocate against: last year, this year and next, plus
+   * anything the department already holds. An existing period contributes its
+   * stored dates rather than the generated ones — the server keys a period by
+   * (department, name), so re-sending a different window would silently move the
+   * boundaries every request already booked against it is measured by.
+   */
+  const periodOptionsFor = (departmentId: string): FiscalPeriod[] => {
+    const year = new Date().getFullYear();
+    const byName = new Map<string, FiscalPeriod>(
+      [year - 1, year, year + 1]
+        .map((y) => fiscalPeriodFor(y))
+        .map((p) => [p.periodName, p])
+    );
+
+    budgetPeriods
+      .filter((p) => p.departmentId === departmentId)
+      .forEach((p) =>
+        byName.set(p.periodName, {
+          periodName: p.periodName,
+          startDate: p.startDate,
+          endDate: p.endDate,
+        })
+      );
+
+    return [...byName.values()].sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate));
+  };
+
+  /**
+   * Opens on whichever of the department's periods covers today, so a funded
+   * department shows its live allocation; otherwise on the current fiscal year,
+   * which is the one a new allocation almost always belongs to.
+   */
+  const defaultPeriodName = (departmentId: string) =>
+    budgetPeriods.find((p) => p.departmentId === departmentId && periodCovers(p))?.periodName ??
+    currentFiscalPeriod().periodName;
+
   const [selectedDeptId, setSelectedDeptId] = useState(getTargetDeptId);
-  const [lineItems, setLineItems] = useState<any[]>(() => itemsForDepartment(getTargetDeptId()));
+  const [selectedPeriodName, setSelectedPeriodName] = useState(() =>
+    defaultPeriodName(getTargetDeptId())
+  );
+  const [lineItems, setLineItems] = useState<any[]>(() =>
+    itemsFor(getTargetDeptId(), defaultPeriodName(getTargetDeptId()))
+  );
   const [showAddItem, setShowAddItem] = useState(false);
 
-  // Sync selected department and line items whenever the modal opens or target department changes
+  // Sync department, period and line items whenever the modal opens or target department changes
   useEffect(() => {
     if (isOpen) {
       const targetId = getTargetDeptId();
+      const periodName = defaultPeriodName(targetId);
       setSelectedDeptId(targetId);
-      setLineItems(itemsForDepartment(targetId));
+      setSelectedPeriodName(periodName);
+      setLineItems(itemsFor(targetId, periodName));
     }
   }, [isOpen, initialDepartmentId]);
 
   // Switching department replaces the rows with that department's own items.
   const handleDepartmentChange = (departmentId: string) => {
+    const periodName = defaultPeriodName(departmentId);
     setSelectedDeptId(departmentId);
-    setLineItems(itemsForDepartment(departmentId));
+    setSelectedPeriodName(periodName);
+    setLineItems(itemsFor(departmentId, periodName));
+  };
+
+  // Each period holds its own allocation, so switching one reloads its items.
+  const handlePeriodChange = (periodName: string) => {
+    setSelectedPeriodName(periodName);
+    setLineItems(itemsFor(selectedDeptId, periodName));
   };
 
   if (!isOpen) return null;
 
   const totalAllocation = lineItems.reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
   const selectedDept = departments.find((d: any) => (d._id || d.id) === selectedDeptId);
+  const periodOptions = periodOptionsFor(selectedDeptId);
+  const selectedPeriod =
+    periodOptions.find((p) => p.periodName === selectedPeriodName) ?? currentFiscalPeriod();
 
   const handleAddLineItem = (item: BudgetItemPayload) => {
     // No `itemId`: the server allocates one. Only the local key is set here.
@@ -119,7 +190,7 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   };
 
   const handleSubmit = () => {
-    onSetBudget(selectedDeptId, totalAllocation, lineItems);
+    onSetBudget(selectedDeptId, totalAllocation, lineItems, selectedPeriod);
     onClose();
   };
 
@@ -151,6 +222,29 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
               <option key={d._id || d.id} value={d._id || d.id}>{d.name}</option>
             ))}
           </select>
+        </div>
+
+        {/* Budget period — the allocation is held against a named fiscal window,
+            and a request is only checked against the period covering its payment
+            date, so the admin has to see and choose which year they are funding. */}
+        <div style={{ marginBottom: "1.5rem" }}>
+          <label className="form-label" htmlFor="budget-period">Budget Period</label>
+          <select
+            id="budget-period"
+            className="form-select"
+            value={selectedPeriodName}
+            onChange={(e) => handlePeriodChange(e.target.value)}
+          >
+            {periodOptions.map((p) => (
+              <option key={p.periodName} value={p.periodName}>
+                {p.periodName}
+                {periodCovers(p) ? " (current)" : ""}
+              </option>
+            ))}
+          </select>
+          <div style={{ marginTop: "0.35rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+            {formatDate(selectedPeriod.startDate)} – {formatDate(selectedPeriod.endDate)}
+          </div>
         </div>
 
         {/* Budget box — running total plus the composed line items */}

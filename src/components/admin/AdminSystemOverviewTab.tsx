@@ -1,14 +1,18 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { formatNaira, formatDateTime } from "../ui/format";
+import { BudgetPeriodDto } from "../../types/api";
+import { periodCovers } from "../../domains/budget/fiscalPeriod";
 
 interface AdminSystemOverviewTabProps {
   currentUser: any;
   systemUsersCount?: number;
   departmentsCount?: number;
   systemLogs?: any[];
-  /** Server-computed budget summaries, for the period and total tiles. */
-  budgets?: { totalBudget: number; periodLabel?: string }[];
+  /** Server-computed budget summaries, for the total tile. */
+  budgets?: { totalBudget: number }[];
+  /** The configured periods themselves — the only place the period name lives. */
+  budgetPeriods?: BudgetPeriodDto[];
   onOpenAddUser: () => void;
   onOpenCreateDept: () => void;
   onOpenSetBudget: () => void;
@@ -20,6 +24,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
   departmentsCount = 0,
   systemLogs = [],
   budgets = [],
+  budgetPeriods = [],
   onOpenAddUser,
   onOpenCreateDept,
   onOpenSetBudget
@@ -37,7 +42,28 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
   // Enterprise allocation, summed from the real budget periods. This tile read
   // a hardcoded ₦250,000,000, and the period beside it a hardcoded "FY 2026".
   const totalBudget = budgets.reduce((sum, b) => sum + (b.totalBudget || 0), 0);
-  const periodLabel = budgets.find((b) => b.periodLabel)?.periodLabel;
+
+  /**
+   * The fiscal period the enterprise is currently operating in.
+   *
+   * Read from the periods themselves: this tile used to look for a `periodLabel`
+   * on the departmental spend summaries, which never carried one, so it said
+   * "Not set" even once every department was funded. Departments are normally
+   * allocated against the same year, so distinct names are reported as a count
+   * rather than by arbitrarily picking one; with nothing covering today the
+   * newest configured period is shown so a closed or future year still reads.
+   */
+  const activeNames = [
+    ...new Set(budgetPeriods.filter((p) => periodCovers(p)).map((p) => p.periodName)),
+  ];
+  const latestName = [...budgetPeriods]
+    .sort((a, b) => Date.parse(b.startDate) - Date.parse(a.startDate))[0]?.periodName;
+  const periodLabel =
+    activeNames.length === 1
+      ? activeNames[0]
+      : activeNames.length > 1
+        ? `${activeNames.length} active`
+        : latestName;
 
   const recentActivities: any[] = systemLogs.slice(0, 5).map((l: any, idx: number) => ({
     id: l._id || `act-${idx}`,

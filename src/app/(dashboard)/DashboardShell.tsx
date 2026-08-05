@@ -35,6 +35,7 @@ import { AdminDeleteUserModal } from "../../components/admin/modals/AdminDeleteU
 import { AdminSuspendUserModal } from "../../components/admin/modals/AdminSuspendUserModal";
 import { AdminEditRoleModal } from "../../components/admin/modals/AdminEditRoleModal";
 import { AdminSetBudgetModal } from "../../components/admin/modals/AdminSetBudgetModal";
+import { FiscalPeriod } from "../../domains/budget/fiscalPeriod";
 
 import { useDashboard } from "./DashboardProvider";
 
@@ -657,9 +658,17 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           departments={departments}
           budgetPeriods={budgetPeriods}
           initialDepartmentId={selectedAdminDept?.id || selectedAdminDept?._id}
-          onSetBudget={(departmentId: string, totalAmount: number, lineItems: any[]) =>
+          onSetBudget={(
+            departmentId: string,
+            totalAmount: number,
+            lineItems: any[],
+            period: FiscalPeriod
+          ) =>
             saveBudgetPeriod({
               departmentId,
+              // The window the admin chose, rather than the hook's default —
+              // otherwise every allocation landed on the current calendar year.
+              ...period,
               totalBudget: totalAmount,
               lineItems: lineItems.map((item) => ({
                 // Sent back so the server can match an edited item to the one it
