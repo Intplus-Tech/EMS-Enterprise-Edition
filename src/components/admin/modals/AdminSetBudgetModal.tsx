@@ -5,7 +5,7 @@
  * (Set Budget, Edit Department) collect identical fields.
  * Design source: designs/system-admin/Set Budget.png
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
 import { formatNaira, formatNairaPrecise } from "../../ui/format";
@@ -18,6 +18,8 @@ interface AdminSetBudgetModalProps {
   departments: any[];
   /** Existing periods, so a funded department opens on its current items. */
   budgetPeriods?: BudgetPeriodDto[];
+  /** Optional department ID to pre-select when opening the modal. */
+  initialDepartmentId?: string;
   onSetBudget: (departmentId: string, totalAmount: number, lineItems: any[]) => void;
 }
 
@@ -26,6 +28,7 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   onClose,
   departments,
   budgetPeriods = [],
+  initialDepartmentId,
   onSetBudget
 }) => {
   /**
@@ -55,10 +58,25 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
       })
     );
 
-  const initialDeptId = departments[0]?._id || departments[0]?.id || "";
-  const [selectedDeptId, setSelectedDeptId] = useState(initialDeptId);
-  const [lineItems, setLineItems] = useState<any[]>(() => itemsForDepartment(initialDeptId));
+  const getTargetDeptId = () => {
+    if (initialDepartmentId && departments.some((d: any) => (d._id || d.id) === initialDepartmentId)) {
+      return initialDepartmentId;
+    }
+    return departments[0]?._id || departments[0]?.id || "";
+  };
+
+  const [selectedDeptId, setSelectedDeptId] = useState(getTargetDeptId);
+  const [lineItems, setLineItems] = useState<any[]>(() => itemsForDepartment(getTargetDeptId()));
   const [showAddItem, setShowAddItem] = useState(false);
+
+  // Sync selected department and line items whenever the modal opens or target department changes
+  useEffect(() => {
+    if (isOpen) {
+      const targetId = getTargetDeptId();
+      setSelectedDeptId(targetId);
+      setLineItems(itemsForDepartment(targetId));
+    }
+  }, [isOpen, initialDepartmentId]);
 
   // Switching department replaces the rows with that department's own items.
   const handleDepartmentChange = (departmentId: string) => {

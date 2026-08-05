@@ -33,6 +33,7 @@ interface AdminDepartmentalSpendTabProps {
   /** Every request, used by the per-department analytics drill-down. */
   expenses?: PopulatedExpenseDto[];
   onOpenCreateDept: () => void;
+  onOpenSetBudget?: (dept?: AdminDepartmentRow) => void;
   onOpenEditDept: (dept: AdminDepartmentRow) => void;
   onOpenDeleteDept: (dept: AdminDepartmentRow) => void;
   /** Reactivates an archived department — no confirmation, it is reversible. */
@@ -43,6 +44,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
   departments,
   expenses = [],
   onOpenCreateDept,
+  onOpenSetBudget,
   onOpenEditDept,
   onOpenDeleteDept,
   onRestoreDept
@@ -426,25 +428,48 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             View and manage Departmental budget spend
           </p>
         </div>
-        <button
-          onClick={onOpenCreateDept}
-          style={{
-            padding: "0.65rem 1.25rem",
-            borderRadius: "0.5rem",
-            border: "none",
-            backgroundColor: "#2563eb",
-            color: "#ffffff",
-            fontWeight: "600",
-            fontSize: "0.9rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
-          }}
-        >
-          <Icons.Plus size={18} /> New Department
-        </button>
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          {onOpenSetBudget && (
+            <button
+              onClick={() => onOpenSetBudget()}
+              className="btn btn-secondary"
+              style={{
+                padding: "0.65rem 1.25rem",
+                borderRadius: "0.5rem",
+                border: "1px solid rgb(var(--color-card-border))",
+                backgroundColor: "rgb(var(--color-surface))",
+                color: "rgb(var(--color-text))",
+                fontWeight: "600",
+                fontSize: "0.9rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                cursor: "pointer",
+              }}
+            >
+              <Icons.Landmark size={18} /> Set Budget
+            </button>
+          )}
+          <button
+            onClick={onOpenCreateDept}
+            style={{
+              padding: "0.65rem 1.25rem",
+              borderRadius: "0.5rem",
+              border: "none",
+              backgroundColor: "#2563eb",
+              color: "#ffffff",
+              fontWeight: "600",
+              fontSize: "0.9rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
+            }}
+          >
+            <Icons.Plus size={18} /> New Department
+          </button>
+        </div>
       </div>
 
       {/* Summary KPI Cards */}
@@ -599,6 +624,17 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+                        {/* Set Budget Button */}
+                        {onOpenSetBudget && (
+                          <button
+                            onClick={() => onOpenSetBudget(d)}
+                            title="Set Department Budget"
+                            aria-label={`Set Budget for ${d.name}`}
+                            style={{ background: "none", border: "none", color: "#f59e0b", cursor: "pointer", padding: "0.25rem" }}
+                          >
+                            <Icons.Landmark size={16} />
+                          </button>
+                        )}
                         {/* Edit Button */}
                         <button
                           onClick={() => onOpenEditDept(d)}

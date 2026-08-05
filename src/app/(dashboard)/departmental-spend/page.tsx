@@ -23,6 +23,7 @@ export default function DepartmentalSpendPage() {
     loadDashboardData,
     setSelectedAdminDept,
     setShowAdminCreateDeptModal,
+    setShowAdminSetBudgetModal,
     setShowAdminEditDeptModal,
     setShowAdminDeleteDeptModal,
     restoreDepartment,
@@ -54,6 +55,11 @@ export default function DepartmentalSpendPage() {
         departments={departmentRows}
         expenses={expenses}
         onOpenCreateDept={() => setShowAdminCreateDeptModal(true)}
+        onOpenSetBudget={(dept) => {
+          if (dept) setSelectedAdminDept(dept);
+          else setSelectedAdminDept(null);
+          setShowAdminSetBudgetModal(true);
+        }}
         onOpenEditDept={(dept) => {
           setSelectedAdminDept(dept);
           setShowAdminEditDeptModal(true);

@@ -656,6 +656,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           onClose={() => setShowAdminSetBudgetModal(false)}
           departments={departments}
           budgetPeriods={budgetPeriods}
+          initialDepartmentId={selectedAdminDept?.id || selectedAdminDept?._id}
           onSetBudget={(departmentId: string, totalAmount: number, lineItems: any[]) =>
             saveBudgetPeriod({
               departmentId,
