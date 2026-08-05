@@ -8,13 +8,16 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
-import { formatNairaPrecise } from "../../ui/format";
+import { formatNaira, formatNairaPrecise } from "../../ui/format";
+import { BudgetPeriodDto } from "../../../types/api";
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
 
 interface AdminSetBudgetModalProps {
   isOpen: boolean;
   onClose: () => void;
   departments: any[];
+  /** Existing periods, so a funded department opens on its current items. */
+  budgetPeriods?: BudgetPeriodDto[];
   onSetBudget: (departmentId: string, totalAmount: number, lineItems: any[]) => void;
 }
 
@@ -22,11 +25,46 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   isOpen,
   onClose,
   departments,
+  budgetPeriods = [],
   onSetBudget
 }) => {
-  const [selectedDeptId, setSelectedDeptId] = useState(departments[0]?._id || departments[0]?.id || "");
-  const [lineItems, setLineItems] = useState<any[]>([]);
+  /**
+   * The department's existing items, as editable rows.
+   *
+   * Without this the modal always opened on an empty list, so re-saving a
+   * funded department wiped every item it had along with the spend recorded
+   * against them. Loaded on mount and on each department change rather than in
+   * an effect, so the admin's edits are never overwritten by a re-render.
+   */
+  const itemsForDepartment = (departmentId: string) =>
+    (budgetPeriods.find((p) => p.departmentId === departmentId)?.lineItems ?? []).map(
+      (item, index) => ({
+        // `key` is local to this list; `itemId` is the item's real identity and
+        // is sent back on save. Without it a rename reads as a delete plus an
+        // insert server-side, losing the item's ledger and orphaning every
+        // request booked against it.
+        key: item.id || `new-${index}`,
+        itemId: item.id,
+        name: item.name,
+        description: item.description ?? "",
+        amount: item.amount,
+        // Carried so the reader can see what an item has actually consumed.
+        utilised: item.utilised ?? 0,
+        pending: item.pending ?? 0,
+        expansionsGranted: item.expansionsGranted ?? 0,
+      })
+    );
+
+  const initialDeptId = departments[0]?._id || departments[0]?.id || "";
+  const [selectedDeptId, setSelectedDeptId] = useState(initialDeptId);
+  const [lineItems, setLineItems] = useState<any[]>(() => itemsForDepartment(initialDeptId));
   const [showAddItem, setShowAddItem] = useState(false);
+
+  // Switching department replaces the rows with that department's own items.
+  const handleDepartmentChange = (departmentId: string) => {
+    setSelectedDeptId(departmentId);
+    setLineItems(itemsForDepartment(departmentId));
+  };
 
   if (!isOpen) return null;
 
@@ -34,20 +72,32 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   const selectedDept = departments.find((d: any) => (d._id || d.id) === selectedDeptId);
 
   const handleAddLineItem = (item: BudgetItemPayload) => {
-    setLineItems([...lineItems, { id: Date.now().toString(), name: item.category, description: item.description, amount: item.amount }]);
+    // No `itemId`: the server allocates one. Only the local key is set here.
+    setLineItems([
+      ...lineItems,
+      {
+        key: `new-${Date.now()}`,
+        name: item.category,
+        description: item.description,
+        amount: item.amount,
+        utilised: 0,
+        pending: 0,
+        expansionsGranted: 0,
+      },
+    ]);
   };
 
-  const handleItemChange = (id: string, field: string, value: any) => {
+  const handleItemChange = (key: string, field: string, value: any) => {
     setLineItems(lineItems.map(item => {
-      if (item.id === id) {
+      if (item.key === key) {
         return { ...item, [field]: field === "amount" ? Number(value) || 0 : value };
       }
       return item;
     }));
   };
 
-  const handleRemoveItem = (id: string) => {
-    setLineItems(lineItems.filter(item => item.id !== id));
+  const handleRemoveItem = (key: string) => {
+    setLineItems(lineItems.filter(item => item.key !== key));
   };
 
   const handleSubmit = () => {
@@ -77,7 +127,7 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
         {/* Department Selection */}
         <div style={{ marginBottom: "1.5rem" }}>
           <label className="form-label">Department Name</label>
-          <select className="form-select" value={selectedDeptId} onChange={(e) => setSelectedDeptId(e.target.value)}>
+          <select className="form-select" value={selectedDeptId} onChange={(e) => handleDepartmentChange(e.target.value)}>
             <option value="">Select Department</option>
             {departments.map((d: any) => (
               <option key={d._id || d.id} value={d._id || d.id}>{d.name}</option>
@@ -112,40 +162,66 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
 
             {lineItems.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1rem" }}>
-                {lineItems.map(item => (
-                  <div key={item.id} style={{
-                    background: "rgb(var(--color-surface-secondary) / 0.5)",
-                    border: "1px solid rgb(var(--color-card-border))",
-                    borderRadius: "0.5rem",
-                    padding: "0.65rem 0.85rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "0.5rem"
-                  }}>
-                    <input
-                      type="text"
-                      value={item.name}
-                      onChange={(e) => handleItemChange(item.id, "name", e.target.value)}
-                      aria-label="Budget item name"
-                      style={{ background: "none", border: "none", color: "rgb(var(--color-text))", fontWeight: 600, fontSize: "0.85rem", flexGrow: 1, outline: "none" }}
-                    />
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>₦</span>
-                      <input
-                        type="number"
-                        value={item.amount}
-                        onChange={(e) => handleItemChange(item.id, "amount", e.target.value)}
-                        aria-label="Budget item amount"
-                        className="form-input"
-                        style={{ width: "120px", padding: "0.25rem 0.5rem", fontSize: "0.85rem", textAlign: "right" }}
-                      />
-                      <button type="button" onClick={() => handleRemoveItem(item.id)} aria-label={`Remove ${item.name}`} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer" }}>
-                        <Icons.Trash2 size={14} />
-                      </button>
+                {lineItems.map(item => {
+                  // Spend already booked against this item. An item carrying
+                  // commitments cannot be cut below them, and the admin needs to
+                  // see that before editing rather than on a rejected save.
+                  const committed = (item.utilised || 0) + (item.pending || 0);
+
+                  return (
+                    <div key={item.key} style={{
+                      background: "rgb(var(--color-surface-secondary) / 0.5)",
+                      border: "1px solid rgb(var(--color-card-border))",
+                      borderRadius: "0.5rem",
+                      padding: "0.65rem 0.85rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.4rem"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => handleItemChange(item.key,"name", e.target.value)}
+                          aria-label="Budget item name"
+                          style={{ background: "none", border: "none", color: "rgb(var(--color-text))", fontWeight: 600, fontSize: "0.85rem", flexGrow: 1, outline: "none" }}
+                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                          <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>₦</span>
+                          <input
+                            type="number"
+                            value={item.amount}
+                            onChange={(e) => handleItemChange(item.key,"amount", e.target.value)}
+                            aria-label="Budget item amount"
+                            className="form-input"
+                            style={{ width: "120px", padding: "0.25rem 0.5rem", fontSize: "0.85rem", textAlign: "right" }}
+                          />
+                          <button type="button" onClick={() => handleRemoveItem(item.key)} aria-label={`Remove ${item.name}`} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer" }}>
+                            <Icons.Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Ledger line — only for items that have seen activity */}
+                      {(committed > 0 || item.expansionsGranted > 0) && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.85rem", fontSize: "0.72rem", color: "rgb(var(--color-text-muted))" }}>
+                          <span>Utilised {formatNaira(item.utilised)}</span>
+                          <span>Locked {formatNaira(item.pending)}</span>
+                          {item.expansionsGranted > 0 && (
+                            <span style={{ color: "rgb(var(--color-warning))", fontWeight: 600 }}>
+                              +{formatNaira(item.expansionsGranted)} granted expansion
+                            </span>
+                          )}
+                          {Number(item.amount) < committed && (
+                            <span style={{ color: "rgb(var(--color-danger))", fontWeight: 600 }}>
+                              Below the {formatNaira(committed)} already committed
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

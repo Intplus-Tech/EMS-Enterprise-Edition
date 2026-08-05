@@ -116,22 +116,24 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
   const createDepartment = useCallback(
     (input: DepartmentInput & { totalBudget?: number; lineItems?: { name: string; description?: string; amount: number }[] }) =>
       run(async () => {
-        const department = await AdminClient.createDepartment({
+        // A department is created *with* its budget in one call. Doing it as two
+        // meant a rejected allocation left the department standing with none —
+        // and a department with no budget period cannot accept a single request,
+        // because every submission fails the budget check outright. The server
+        // rolls the department back if the allocation is refused.
+        await AdminClient.createDepartment({
           name: input.name,
           description: input.description,
           headUserId: input.headUserId,
+          budget:
+            input.totalBudget && input.totalBudget > 0
+              ? {
+                  ...currentFiscalPeriod(),
+                  totalBudget: input.totalBudget,
+                  lineItems: input.lineItems ?? [],
+                }
+              : undefined,
         });
-
-        // The Create Department modal captures an opening allocation alongside
-        // the department itself, so persist it as the department's first period.
-        if (input.totalBudget && input.totalBudget > 0) {
-          await AdminClient.saveBudgetPeriod({
-            departmentId: department.id,
-            ...currentFiscalPeriod(),
-            totalBudget: input.totalBudget,
-            lineItems: input.lineItems ?? [],
-          });
-        }
 
         await Promise.all([loadDepartments(), loadBudgets()]);
       }, `Department "${input.name}" created.`),

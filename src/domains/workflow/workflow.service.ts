@@ -8,19 +8,17 @@ import { SystemRole } from "../../enums/roles";
  * Roles whose stage in the request flow is served by a dedicated route, not by
  * the generic approval chain.
  *
- * The Finance Officer acts through `/upload` (SENT_TO_FINANCE →
- * UPLOADED_TO_BANK) and the Finance Manager through `/release`
- * (AWAITING_RELEASE → PAID). Listing either of them as an approval step as well
- * strands the request: `processWorkflowAction` keeps it at PENDING_APPROVAL
- * waiting for a finance "approval" that no screen offers, while every finance
- * queue in the app is looking for SENT_TO_FINANCE. Filtering them out here
- * repairs configurations already saved with those steps, so existing databases
- * do not need a migration.
+ * Only the Finance Manager. They do not rule on a request: they receive an
+ * approved one and release the payment through `/release` (AWAITING_RELEASE →
+ * PAID). Listing them as an approval step strands the request at
+ * PENDING_APPROVAL waiting for a decision no screen offers.
+ *
+ * The Finance Officer *is* an approval step — they approve, reject or ask for
+ * justification on every request — so they are deliberately absent here. Their
+ * approval is what performs the bank upload and hands over to the Manager; see
+ * `ExpenseService.processWorkflowAction`.
  */
-const DEDICATED_STAGE_ROLES: SystemRole[] = [
-  SystemRole.FINANCE_OFFICER,
-  SystemRole.FINANCE_MANAGER,
-];
+const DEDICATED_STAGE_ROLES: SystemRole[] = [SystemRole.FINANCE_MANAGER];
 
 export class WorkflowService {
   /**
@@ -33,9 +31,10 @@ export class WorkflowService {
     let config = await WorkflowConfig.findOne({ isActive: true });
 
     if (!config) {
-      // The approval chain only — the "Approval workflow" box in the request
-      // flow. Finance processing and payment release are fixed stages that
-      // follow it, so they are not steps here.
+      // The two roles that rule on a request: the departmental approver, who
+      // also books it against a budget item, and then the Finance Officer.
+      // Payment release is not a step — the Finance Manager receives an already
+      // approved request rather than deciding on it.
       config = new WorkflowConfig({
         name: "Standard Lifecycle Flow",
         isActive: true,
@@ -44,6 +43,13 @@ export class WorkflowService {
             stepIndex: 0,
             stepName: "Departmental Approval",
             role: SystemRole.APPROVER,
+            minAmount: 0,
+            requiresAllApprovals: false
+          },
+          {
+            stepIndex: 1,
+            stepName: "Finance Officer Review",
+            role: SystemRole.FINANCE_OFFICER,
             minAmount: 0,
             requiresAllApprovals: false
           }

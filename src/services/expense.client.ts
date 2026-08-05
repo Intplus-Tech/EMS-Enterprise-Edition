@@ -7,7 +7,14 @@
  */
 import { http } from "./http";
 import { WorkflowActionType } from "../enums/workflowActions";
-import { AttachmentDto, AttachmentInput, BudgetContextDto, ExpenseRequestDto, ThreadEntryDto } from "../types/api";
+import {
+  AttachmentDto,
+  AttachmentInput,
+  BudgetContextDto,
+  BudgetItemOptionDto,
+  ExpenseRequestDto,
+  ThreadEntryDto,
+} from "../types/api";
 import { MAX_ATTACHMENT_BYTES } from "../domains/attachments/attachment.rules";
 
 export interface ExpenseInput {
@@ -60,8 +67,29 @@ export const ExpenseClient = {
    * `signature` is the approver's account password, re-confirmed in the dialog
    * and verified server-side before the transition is applied.
    */
-  workflowAction: (id: string, action: WorkflowActionType, comment: string | undefined, signature: string) =>
-    http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/workflow`, { action, comment, signature }),
+  workflowAction: (
+    id: string,
+    action: WorkflowActionType,
+    comment: string | undefined,
+    signature: string,
+    /** Required of the departmental approver: the item the spend is booked to. */
+    budgetItemId?: string
+  ) =>
+    http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/workflow`, {
+      action,
+      comment,
+      signature,
+      budgetItemId,
+    }),
+
+  /** Budget items the approver can book a request against, with live headroom. */
+  budgetItems: (id: string) =>
+    http
+      .get<{ items: BudgetItemOptionDto[] }>(`/api/expenses/${id}/budget-item`)
+      .then((r) => r.items),
+
+  attachBudgetItem: (id: string, budgetItemId: string) =>
+    http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/budget-item`, { budgetItemId }),
 
   /** Finance Head decision on an over-budget request. */
   exceptionalAction: (

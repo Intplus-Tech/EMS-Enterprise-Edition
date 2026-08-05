@@ -30,11 +30,29 @@ export interface IDepartment {
   createdAt?: Date;
 }
 
-/** A single allocation line inside a department's budget period. */
+/** A one-time increase granted against a budget item. */
+export interface IBudgetExpansion {
+  requestId: string;
+  amount: number;
+  approvedById?: string;
+  approvedByName?: string;
+  reason?: string;
+  approvedAt?: Date;
+}
+
+/**
+ * One budget item — the unit a department's budget is composed of, and what an
+ * approver books each request against. Carries its own ledger; the period's
+ * totals are the roll-up of these.
+ */
 export interface IBudgetLineItem {
+  _id?: string;
   name: string;
   description?: string;
   amount: number;
+  utilisedAmount?: number;
+  pendingAmount?: number;
+  expansions?: IBudgetExpansion[];
 }
 
 export interface IBudgetPeriod {
@@ -121,6 +139,12 @@ export interface IExpenseRequest {
   vendorBankDetails: IVendorBankDetails;
   requiredPaymentDate: Date;
   status: RequestStatus;
+
+  /** The budget item the approver booked this request against. */
+  budgetItemId?: string;
+  budgetItemName?: string;
+  /** Deficit this request leaves on that item; 0 when it fits. */
+  budgetShortfall?: number;
 
   // Exceptional budget details
   exceptionalBudgetApproved?: boolean;

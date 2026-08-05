@@ -6,6 +6,7 @@ import { withErrorHandling } from "../../../../middlewares/errors";
 import { SystemRole } from "../../../../enums/roles";
 import { POST_APPROVAL_STATUSES, RequestStatus } from "../../../../enums/statuses";
 import { ExpenseInitiateSchema } from "../../../../validators/validation";
+import { scopeForFinanceManager } from "../../../../domains/expense/finance-manager.view";
 import { LoggerService } from "../../../../domains/logs/logger.service";
 import { AuditAction } from "../../../../enums/auditActions";
 
@@ -37,6 +38,12 @@ export const GET = withErrorHandling(async (req: NextRequest, { params }: { para
     !POST_APPROVAL_STATUSES.includes(expense.status)
   ) {
     throw new Error("Forbidden: You do not have permission to view this request.");
+  }
+
+  // Same permitted field set as the list route — fetching by id must not be a
+  // way around the Finance Manager's restricted view.
+  if (user.role === SystemRole.FINANCE_MANAGER) {
+    return NextResponse.json({ success: true, expense: scopeForFinanceManager(expense) });
   }
 
   return NextResponse.json({ success: true, expense });

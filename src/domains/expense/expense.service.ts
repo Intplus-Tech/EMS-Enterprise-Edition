@@ -23,6 +23,31 @@ const getActorId = (actor: WorkflowActor): string => {
   return (actor?._id || actor?.id)?.toString() || "";
 };
 
+/** Naira amounts in log lines, matching how the UI renders them. */
+const money = (amount: number) => `₦${Number(amount || 0).toLocaleString()}`;
+
+/**
+ * The part of a request document the workflow helpers touch — enough to push
+ * history and persist, without pulling in Mongoose's full document generics.
+ */
+type WorkflowRequestDoc = {
+  requestNumber: string;
+  status: RequestStatus;
+  history: {
+    push(entry: {
+      statusBefore: RequestStatus;
+      statusAfter: RequestStatus;
+      actorId: string;
+      actorName: string;
+      actorRole: SystemRole;
+      action: string;
+      comment?: string;
+      timestamp: Date;
+    }): unknown;
+  };
+  save(): Promise<unknown>;
+};
+
 /**
  * Accepts either shape of supporting-document payload.
  *
@@ -215,45 +240,18 @@ export class ExpenseService {
       request.requiredPaymentDate
     );
 
-    if (budgetCheck.isValid) {
-      // Sufficient budget -> Lock budget and move to first step of workflow
-      await BudgetService.lockBudget(request._id.toString());
-      
-      const nextRouting = await WorkflowService.getNextStepForRequest(request);
-      if (nextRouting) {
-        request.status = RequestStatus.PENDING_APPROVAL;
-        request.currentStepIndex = nextRouting.index;
-        
-        request.history.push({
-          statusBefore: RequestStatus.BUDGET_CHECK,
-          statusAfter: RequestStatus.PENDING_APPROVAL,
-          actorId: actorId,
-          actorName: "System Engine",
-          actorRole: SystemRole.ADMIN,
-          action: `Budget Validated. Routed to: ${nextRouting.step.stepName}`,
-          timestamp: new Date()
-        });
-        
-        await request.save();
-        await LoggerService.logAudit(
-          AuditAction.EXPENSE_SUBMITTED_APPROVED_BUDGET,
-          `Request ${request.requestNumber} passed budget check and routed to ${nextRouting.step.stepName}`,
-          undefined,
-          logActor
-        );
-      } else {
-        // No steps configured -> Auto approve to finance
-        request.status = RequestStatus.APPROVED;
-        await request.save();
-      }
-    } else {
-      // Insufficient budget -> flag the overrun, then route to the Finance Head.
-      //
-      // These are two distinct stages of the flow and both are recorded: the
-      // flag is what the request breached, the routing is who now owns it. The
-      // flag transition used to be skipped entirely, so INSUFFICIENT_BUDGET
-      // never appeared in any history even though the exception queues, the
-      // over-budget badges and the budget-overrun audit all key off it.
+    // The shortfall is recorded but does not divert the request: an overrun is
+    // visible from the moment it is submitted, while the decision to fund it
+    // waits until the Approver and Finance Officer have passed it. Nobody is
+    // asked to authorise an exception for a request the business may still
+    // reject on its merits.
+    request.budgetShortfall = budgetCheck.isValid ? 0 : Math.max(0, budgetCheck.variance ?? 0);
+
+    if (!budgetCheck.isValid) {
+      // Flagged, not rerouted. The status still passes through
+      // INSUFFICIENT_BUDGET so the overrun is on the record and the
+      // budget-overrun audit, over-budget badges and exception reporting all
+      // have the event they key off.
       request.status = RequestStatus.INSUFFICIENT_BUDGET;
       request.history.push({
         statusBefore: RequestStatus.BUDGET_CHECK,
@@ -268,22 +266,53 @@ export class ExpenseService {
 
       await LoggerService.logAudit(
         AuditAction.BUDGET_OVERRUN,
-        `Request ${request.requestNumber} triggered a budget overrun alert. Flagged: INSUFFICIENT_BUDGET`,
+        `Request ${request.requestNumber} triggered a budget overrun alert. Flagged for exceptional approval after the approval chain.`,
         { budgetCheck },
         logActor
       );
+    }
 
-      // Exception approval required -> the Finance Head's queue.
-      request.status = RequestStatus.PENDING_EXCEPTIONAL;
+    // Reserve the amount either way. An over-budget request still commits the
+    // department to the spend while it is in flight — leaving it unreserved
+    // would let a second request be measured against funds this one is already
+    // claiming, and understate the deficit the Finance Head is later shown.
+    await BudgetService.lockBudget(request._id.toString());
+
+    const nextRouting = await WorkflowService.getNextStepForRequest(request);
+    if (nextRouting) {
+      const statusBefore = request.status;
+      request.status = RequestStatus.PENDING_APPROVAL;
+      request.currentStepIndex = nextRouting.index;
+
       request.history.push({
-        statusBefore: RequestStatus.INSUFFICIENT_BUDGET,
-        statusAfter: RequestStatus.PENDING_EXCEPTIONAL,
+        statusBefore,
+        statusAfter: RequestStatus.PENDING_APPROVAL,
         actorId: actorId,
         actorName: "System Engine",
         actorRole: SystemRole.ADMIN,
-        action: "Routed to Finance Head for exceptional budget approval",
+        action: budgetCheck.isValid
+          ? `Budget Validated. Routed to: ${nextRouting.step.stepName}`
+          : `Routed to ${nextRouting.step.stepName} carrying a budget overrun`,
         timestamp: new Date()
       });
+
+      await request.save();
+
+      if (budgetCheck.isValid) {
+        await LoggerService.logAudit(
+          AuditAction.EXPENSE_SUBMITTED_APPROVED_BUDGET,
+          `Request ${request.requestNumber} passed budget check and routed to ${nextRouting.step.stepName}`,
+          undefined,
+          logActor
+        );
+
+        // Budget approved and allocation deducted — the flow notifies the
+        // requestor (below, with every other transition) *and* finance.
+        await RequestNotifier.notifyFinanceOfAllocation(request);
+      }
+    } else {
+      // No steps configured -> Auto approve to finance
+      request.status = RequestStatus.APPROVED;
       await request.save();
     }
 
@@ -327,40 +356,59 @@ export class ExpenseService {
         request.amount = adjustedAmount;
       }
 
-      // Capture the shortfall being granted *before* the budget is locked —
-      // afterwards the remaining balance already reflects this request, so the
-      // gap can no longer be recovered. The exception history reports this.
-      const contextBeforeLock = await BudgetService.getBudgetContextForRequest(request._id.toString());
-      request.exceptionalBudgetAmount = contextBeforeLock?.hasBudget
-        ? Math.max(0, request.amount - contextBeforeLock.remaining)
-        : request.amount;
+      // The deficit still outstanding on the item this request is booked
+      // against, measured the same way the routing decision measured it.
+      const shortfall = await BudgetService.getItemShortfallForRequest(request._id.toString());
+      request.exceptionalBudgetAmount = shortfall;
 
-      // Lock budget (bypassing normal checks, locks whatever amount is now approved)
-      await BudgetService.lockBudget(request._id.toString());
+      // "One-time budget increase granted... Allocation adjusted." Raising the
+      // item's ceiling by exactly the deficit is what brings the reservation
+      // back inside budget: without it the grant was recorded only on the
+      // request, and the department read as permanently over-committed.
+      if (shortfall > 0) {
+        await BudgetService.grantOneTimeExpansion(
+          request._id.toString(),
+          shortfall,
+          logActor,
+          comment
+        );
+      }
 
-      // Move to regular workflow approvals starting at step 0
-      request.status = RequestStatus.PENDING_APPROVAL;
-      request.currentStepIndex = 0;
-      
+      // The exception is raised only after every approver has signed off, so a
+      // granted expansion sends the request onward to Finance for payment
+      // rather than back through an approval chain it has already cleared.
+      request.budgetShortfall = 0;
+      request.status = RequestStatus.SENT_TO_FINANCE;
+
       request.history.push({
         statusBefore: previousStatus,
-        statusAfter: RequestStatus.PENDING_APPROVAL,
+        statusAfter: RequestStatus.SENT_TO_FINANCE,
         actorId: actorId,
         actorName: actor.name,
         actorRole: actor.role,
-        action: "Approve One-Time Budget Expansion",
+        action: "Approve One-Time Budget Item Expansion",
         comment,
         timestamp: new Date()
       });
-      
+
       await request.save();
       await LoggerService.logAudit(
         AuditAction.EXCEPTIONAL_BUDGET_APPROVED,
-        `Finance Head approved exceptional budget expansion for request ${request.requestNumber}`,
-        { comment, amount: request.amount },
+        `Finance Head granted a ${money(shortfall)} expansion on '${request.budgetItemName ?? "the budget item"}' for request ${request.requestNumber}. Sent to Finance.`,
+        { comment, amount: request.amount, shortfall },
         logActor
       );
+
+      // The officer approved before this reached the Finance Head, so funding
+      // the deficit resumes the bank leg rather than sending it back for a
+      // review that has already happened.
+      await this.advanceToBankStage(request, actor, logActor);
     } else if (action === WorkflowActionType.REJECT) {
+      // Give the reservation back. The amount was locked at submission, so a
+      // refused request that kept it would hold its budget item short by the
+      // full amount for the rest of the period — the request is dead, but the
+      // money would stay committed to it.
+      await BudgetService.unlockBudget(request._id.toString());
       request.status = RequestStatus.REJECTED;
       request.history.push({
         statusBefore: previousStatus,
@@ -372,7 +420,7 @@ export class ExpenseService {
         comment,
         timestamp: new Date()
       });
-      
+
       await request.save();
       await LoggerService.logAudit(
         AuditAction.EXCEPTIONAL_BUDGET_REJECTED,
@@ -381,7 +429,10 @@ export class ExpenseService {
         logActor
       );
     } else {
-      // RETURN to initiator
+      // RETURN to initiator. Same reasoning as the rejection above: the
+      // reservation is released while the request sits with the initiator and
+      // is re-taken when they resubmit.
+      await BudgetService.unlockBudget(request._id.toString());
       request.status = RequestStatus.RETURNED;
       request.history.push({
         statusBefore: previousStatus,
@@ -393,7 +444,7 @@ export class ExpenseService {
         comment,
         timestamp: new Date()
       });
-      
+
       await request.save();
       await LoggerService.logAudit(
         AuditAction.EXCEPTIONAL_BUDGET_RETURNED,
@@ -410,12 +461,76 @@ export class ExpenseService {
   }
 
   /**
+   * Moves an approved request through the bank leg into the Finance Manager's
+   * queue: instruction uploaded, cash not yet released.
+   *
+   * The Finance Officer's approval *is* this step — their review confirms the
+   * payee and documents, and approving uploads the instruction. Both source
+   * flows agree: the officer's stage spans SENT_TO_FINANCE → UPLOADED, and an
+   * approved request "is sent to the Finance Manager". Keeping it as one action
+   * is what stops the officer having to approve and then separately upload.
+   */
+  private static async advanceToBankStage(
+    request: WorkflowRequestDoc,
+    actor: WorkflowActor,
+    logActor: { id: string; name: string; role: SystemRole; ipAddress?: string }
+  ) {
+    const actorId = getActorId(actor);
+    // The officer is the one who confirms payee and documents. When the Finance
+    // Head's expansion is what unblocked the request, the upload is the system
+    // resuming a leg the officer already approved — attributing it to the Head
+    // would put them on the record as having done the officer's check.
+    const isOfficer = actor.role === SystemRole.FINANCE_OFFICER;
+
+    request.status = RequestStatus.UPLOADED_TO_BANK;
+    request.history.push({
+      statusBefore: RequestStatus.SENT_TO_FINANCE,
+      statusAfter: RequestStatus.UPLOADED_TO_BANK,
+      actorId,
+      actorName: isOfficer ? actor.name : "System Engine",
+      actorRole: isOfficer ? actor.role : SystemRole.ADMIN,
+      action: isOfficer
+        ? "Confirm Documentation & Upload Instruction to Bank Platform"
+        : "Budget expansion granted — instruction released to the bank platform",
+      timestamp: new Date(),
+    });
+    await request.save();
+
+    await LoggerService.logAudit(
+      AuditAction.EXPENSE_BANK_UPLOADED,
+      `Payment file for request ${request.requestNumber} uploaded to the bank platform`,
+      undefined,
+      logActor
+    );
+
+    // Segregation of duties: whoever prepared the instruction does not release
+    // the cash, so the request moves into the Finance Manager's queue.
+    request.status = RequestStatus.AWAITING_RELEASE;
+    request.history.push({
+      statusBefore: RequestStatus.UPLOADED_TO_BANK,
+      statusAfter: RequestStatus.AWAITING_RELEASE,
+      actorId,
+      actorName: "System Engine",
+      actorRole: SystemRole.ADMIN,
+      action: "Awaiting Finance Manager release on the bank platform",
+      timestamp: new Date(),
+    });
+    await request.save();
+  }
+
+  /**
    * Processes a standard workflow step action (Approve, Reject, Return) by an approver
    */
-  public static async processWorkflowAction(requestId: string, actor: WorkflowActor, action: WorkflowActionType, comment?: string) {
+  public static async processWorkflowAction(
+    requestId: string,
+    actor: WorkflowActor,
+    action: WorkflowActionType,
+    comment?: string,
+    budgetItemId?: string
+  ) {
     await connectToDatabase();
-    
-    const request = await ExpenseRequest.findById(requestId);
+
+    let request = await ExpenseRequest.findById(requestId);
     if (!request) throw new Error("Request not found");
     if (request.status !== RequestStatus.PENDING_APPROVAL) {
       throw new Error("Request is not awaiting standard workflow approval.");
@@ -438,11 +553,34 @@ export class ExpenseService {
     // the real client address; the viewer no longer substitutes a fake one.
     const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
 
+    // The approver books the request against a budget item as part of approving
+    // it. Done before the transition so a rejected attachment (wrong department,
+    // unknown item) fails the whole decision rather than advancing a request
+    // that nothing draws down.
+    if (action === WorkflowActionType.APPROVE && actor.role === SystemRole.APPROVER) {
+      if (budgetItemId) {
+        await BudgetService.attachRequestToItem(requestId, budgetItemId, logActor);
+        request = await ExpenseRequest.findById(requestId);
+      }
+
+      if (!request.budgetItemId) {
+        throw new Error(
+          "Select the budget item this request draws on before approving it. Every request must be attached to a budget item."
+        );
+      }
+    }
+
     if (action === WorkflowActionType.APPROVE) {
       // Look up next step in the sequence
       request.currentStepIndex = nextRouting.index + 1;
       const nextStep = await WorkflowService.getNextStepForRequest(request);
-      
+
+      // Re-measured against the item the approver attached rather than the
+      // department total the submit-time check saw — an item can be exhausted
+      // while the department still has room, and vice versa.
+      const itemShortfall = nextStep ? 0 : await BudgetService.getItemShortfallForRequest(requestId);
+      request.budgetShortfall = itemShortfall;
+
       if (nextStep) {
         // More approvals needed
         request.history.push({
@@ -463,8 +601,33 @@ export class ExpenseService {
           undefined,
           logActor
         );
+      } else if (itemShortfall > 0 && !request.exceptionalBudgetApproved) {
+        // Approvals are done but the request overruns its budget item, so the
+        // last approver's sign-off sends it to the Finance Head rather than on
+        // to payment. This is the one point in the flow where an exception is
+        // raised: by now the business has agreed the spend is warranted, and
+        // the only remaining question is whether to fund the deficit.
+        request.status = RequestStatus.PENDING_EXCEPTIONAL;
+        request.history.push({
+          statusBefore: previousStatus,
+          statusAfter: RequestStatus.PENDING_EXCEPTIONAL,
+          actorId: actorId,
+          actorName: actor.name,
+          actorRole: actor.role,
+          action: `Approved — routed to Finance Head for budget item expansion`,
+          comment,
+          timestamp: new Date()
+        });
+        await request.save();
+
+        await LoggerService.logAudit(
+          AuditAction.EXPENSE_STEP_APPROVED,
+          `Request ${request.requestNumber} cleared approvals with a ${money(request.budgetShortfall)} overrun on '${request.budgetItemName ?? "its budget item"}'. Sent to the Finance Head for expansion.`,
+          undefined,
+          logActor
+        );
       } else {
-        // Workflow completed -> Ready for Finance processing
+        // Workflow completed and funded -> on to Finance for payment
         request.status = RequestStatus.SENT_TO_FINANCE;
         request.history.push({
           statusBefore: previousStatus,
@@ -477,13 +640,20 @@ export class ExpenseService {
           timestamp: new Date()
         });
         await request.save();
-        
+
         await LoggerService.logAudit(
           AuditAction.EXPENSE_WORKFLOW_COMPLETED,
           `Request ${request.requestNumber} completed all workflow approvals. Sent to Finance.`,
           undefined,
           logActor
         );
+
+        // The Finance Officer's approval carries the request across the bank
+        // leg and into the Manager's queue. Any other role finishing the chain
+        // leaves it at SENT_TO_FINANCE for an officer to pick up.
+        if (actor.role === SystemRole.FINANCE_OFFICER) {
+          await this.advanceToBankStage(request, actor, logActor);
+        }
       }
     } else if (action === WorkflowActionType.REJECT) {
       // Unlock budget and mark request as rejected

@@ -9,6 +9,7 @@ import { ApprovalsTab } from "../../../components/ApprovalsTab";
 import { useDashboard } from "../DashboardProvider";
 import { SystemRole } from "../../../enums/roles";
 import { useBudgetContext } from "../hooks/useBudgetContext";
+import { useBudgetItems } from "../hooks/useBudgetItems";
 import { useRequestThread } from "../hooks/useRequestThread";
 
 export default function ApprovalsPage() {
@@ -30,6 +31,10 @@ export default function ApprovalsPage() {
   // Real budget position for whichever request is open, so the approval and
   // expansion dialogs show the department's actual figures.
   const { budgetContext } = useBudgetContext(selectedExpense?._id);
+
+  // The department's budget items, so the approver's "Approve Financial
+  // Request" dialog can offer real allocations with their live headroom.
+  const { budgetItems, budgetItemsLoading } = useBudgetItems(selectedExpense?._id);
 
   // The Completed list opens the release and communication-thread dialogs
   // without selecting a request, so the tab reports which one it is showing.
@@ -58,6 +63,8 @@ export default function ApprovalsPage() {
       selectedExpense={selectedExpense}
       actions={expenseActions}
       budgetContext={budgetContext}
+      budgetItems={budgetItems}
+      budgetItemsLoading={budgetItemsLoading}
       thread={thread}
       threadLoading={threadLoading}
       threadSending={threadSending}

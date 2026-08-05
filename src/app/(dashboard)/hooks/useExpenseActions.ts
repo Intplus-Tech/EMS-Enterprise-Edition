@@ -57,20 +57,40 @@ export function useExpenseActions({ currentUser, reload, onSuccess, onError }: E
    * server rejects the transition if it does not match the caller's password.
    */
   const decide = useCallback(
-    (id: string, action: WorkflowActionType, comment: string, signature: string, successMessage: string) =>
+    (
+      id: string,
+      action: WorkflowActionType,
+      comment: string,
+      signature: string,
+      successMessage: string,
+      budgetItemId?: string
+    ) =>
       perform(
         () =>
           isFinanceHead
             ? ExpenseClient.exceptionalAction(id, action, comment, signature)
-            : ExpenseClient.workflowAction(id, action, comment, signature),
+            : ExpenseClient.workflowAction(id, action, comment, signature, budgetItemId),
         successMessage
       ),
     [perform, isFinanceHead]
   );
 
+  /**
+   * `budgetItemId` is the item the departmental approver books the spend
+   * against. It travels with the decision rather than as a separate call so a
+   * rejected attachment fails the approval instead of advancing a request that
+   * draws on nothing.
+   */
   const approve = useCallback(
-    (id: string, comment: string, signature: string) =>
-      decide(id, WorkflowActionType.APPROVE, comment, signature, "Request approved and forwarded to the next stage."),
+    (id: string, comment: string, signature: string, budgetItemId?: string) =>
+      decide(
+        id,
+        WorkflowActionType.APPROVE,
+        comment,
+        signature,
+        "Request approved and forwarded to the next stage.",
+        budgetItemId
+      ),
     [decide]
   );
 

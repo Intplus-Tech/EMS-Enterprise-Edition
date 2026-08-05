@@ -7,8 +7,12 @@ interface RejectExpansionModalProps {
   onClose: () => void;
   requestNumber?: string;
   requestAmount?: number;
+  /** Headroom on the budget item under review, not the department's. */
   remainingBudget?: number;
+  /** Deficit on that item — the expansion being refused. */
   deficitAmount?: number;
+  /** The item the refused expansion would have been granted against. */
+  budgetItemName?: string;
   /** Receives the reason plus the signature the server verifies. */
   onConfirm?: (reason: string, signature: string) => void;
 }
@@ -23,6 +27,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
   requestAmount = 0,
   remainingBudget = 0,
   deficitAmount = 0,
+  budgetItemName,
   onConfirm
 }) => {
   const [rejectionReason, setRejectionReason] = useState(
@@ -147,7 +152,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
 
           <div>
             <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.3rem" }}>
-              REMAINING BUDGET
+              {budgetItemName ? "ITEM REMAINING" : "REMAINING BUDGET"}
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
               ₦{remainingBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

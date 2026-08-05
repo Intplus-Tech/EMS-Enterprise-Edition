@@ -20,6 +20,16 @@ import {
 } from "../types/api";
 import { IBudgetLineItem } from "../types/domain";
 
+/**
+ * A budget item as the admin screens send it.
+ *
+ * `id` is the item's own identity, round-tripped from the period so an edit
+ * keeps its ledger — a rename without it reads server-side as a delete plus an
+ * insert, discarding the item's recorded spend and orphaning every request
+ * booked against it. Omitted for an item the administrator has just added.
+ */
+export type BudgetItemInput = IBudgetLineItem & { id?: string };
+
 /** Everything `POST /api/admin/invite` needs, and all a retry has to replay. */
 export interface InviteInput {
   name: string;
@@ -32,6 +42,19 @@ export interface DepartmentInput {
   name: string;
   description?: string;
   headUserId?: string | null;
+  /**
+   * Opening allocation, created with the department in a single call.
+   *
+   * Accepted only on create: a department with no budget period cannot accept
+   * a request at all, so funding it in the same step is what makes it usable.
+   */
+  budget?: {
+    periodName: string;
+    totalBudget: number;
+    lineItems?: BudgetItemInput[];
+    startDate: string;
+    endDate: string;
+  };
 }
 
 export interface UserProfileInput {

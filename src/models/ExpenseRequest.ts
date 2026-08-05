@@ -63,6 +63,29 @@ const ExpenseRequestSchema = new Schema(
     requiredPaymentDate: { type: Date, required: true },
     status: { type: String, enum: Object.values(RequestStatus), required: true, default: RequestStatus.DRAFT },
 
+    /**
+     * The budget item this request draws on, chosen by the approver.
+     *
+     * Points at a `lineItems` subdocument of the department's budget period.
+     * Everything downstream keys off it: the item's ledger is only moved for
+     * attached requests, and a Finance Head can only expand an item a request
+     * is actually attached to.
+     */
+    budgetItemId: { type: Schema.Types.ObjectId },
+    /** Denormalised for display, so tables need not resolve the period. */
+    budgetItemName: { type: String },
+
+    /**
+     * Shortfall the budget check found at submission, if any.
+     *
+     * The check runs early so the overrun is visible from the start, but the
+     * request still travels the normal approval chain — nobody is asked to fund
+     * an exception until the business approvals have passed. The Finance
+     * Officer's approval reads this to decide whether the request goes on to
+     * the Finance Head or straight to the Finance Manager.
+     */
+    budgetShortfall: { type: Number, default: 0 },
+
     // Exceptional Approval parameters
     exceptionalBudgetApproved: { type: Boolean, default: false },
     exceptionalApprovedBy: { type: Schema.Types.ObjectId, ref: "User" },

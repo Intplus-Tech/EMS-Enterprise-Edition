@@ -6,7 +6,13 @@ import { ApproveRequestModal, ApproveRequestPayload } from "./modals/ApproveRequ
 import { RejectDecision, RejectOrClarifyModal, RejectOrClarifyPayload } from "./modals/RejectOrClarifyModal";
 import { CompletedReleaseModal } from "./modals/CompletedReleaseModal";
 import { Notice } from "./ui/NoticeBanner";
-import { AttachmentDto, AttachmentInput, BudgetContextDto, ThreadEntryDto } from "../types/api";
+import {
+  AttachmentDto,
+  AttachmentInput,
+  BudgetContextDto,
+  BudgetItemOptionDto,
+  ThreadEntryDto,
+} from "../types/api";
 import { AttachmentTarget } from "./modals/AttachmentViewModal";
 import { CommunicationThreadModal } from "./approvals/CommunicationThreadModal";
 import { RequestQueueTable } from "./approvals/RequestQueueTable";
@@ -18,7 +24,7 @@ import { Pagination } from "./ui/Pagination";
 import { StatCard } from "./ui/StatCard";
 import { EmptyState } from "./ui/EmptyState";
 import { formatFileSize } from "../domains/attachments/attachment.rules";
-import { formatNaira, formatDate, formatDateTime, humanizeStatus, statusBadgeClass } from "./ui/format";
+import { formatNaira, formatDate, formatDateTime, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import { ExpenseClient } from "../services/expense.client";
 import { toErrorMessage } from "../services/http";
@@ -44,6 +50,9 @@ interface ApprovalsTabProps {
   actions: ExpenseActions;
   /** Real budget position for the selected request; null while loading. */
   budgetContext?: BudgetContextDto | null;
+  /** Budget items the approver may book the selected request against. */
+  budgetItems?: BudgetItemOptionDto[];
+  budgetItemsLoading?: boolean;
   /** Persisted communication thread for whichever request is in focus. */
   thread: ThreadEntryDto[];
   threadLoading?: boolean;
@@ -96,6 +105,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   selectedExpense,
   actions,
   budgetContext,
+  budgetItems = [],
+  budgetItemsLoading = false,
   thread,
   threadLoading = false,
   threadSending = false,
@@ -181,18 +192,19 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const handleWorkflowClick = async (
     actionType: "APPROVE" | "INSUFFICIENT" | "CLARIFY" | "ESCALATE",
     signature: string,
-    decisionComment?: string
+    decisionComment?: string,
+    budgetItemId?: string
   ) => {
     if (!selectedExpense || actions.submitting) return;
     const id = selectedExpense._id;
 
     if (actionType === "APPROVE") {
-      // Finance roles each complete a different terminal step; everyone else
-      // simply advances the request to the next approver.
+      // The Finance Officer is an approval step like the departmental approver —
+      // their decision carries the request across the bank leg and into the
+      // Manager's queue in one action, so it routes through `approve` rather
+      // than the standalone upload endpoint that path used to call.
       let ok = false;
-      if (currentUser?.role === "FINANCE_OFFICER") {
-        ok = await actions.verifyAndUpload(id);
-      } else if (currentUser?.role === "FINANCE_MANAGER") {
+      if (currentUser?.role === "FINANCE_MANAGER") {
         // A release must carry a real bank reference, so this screen routes the
         // manager to the release dialog rather than inventing one.
         onNotify?.({
@@ -204,7 +216,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         setShowAuthorizeReleaseModal(true);
         return;
       } else {
-        ok = await actions.approve(id, decisionComment || "Approved.", signature);
+        ok = await actions.approve(id, decisionComment || "Approved.", signature, budgetItemId);
       }
       if (ok) setSelectedExpense(null);
       return;
@@ -254,12 +266,16 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   // Confirms the "Approve Financial Request" dialog and hands off to the shared
   // workflow handler so the role-specific endpoint routing stays in one place.
   const handleApproveConfirm = async (payload: ApproveRequestPayload) => {
-    const budgetNote = payload.budgetItem ? ` [Budget item: ${payload.budgetItem}]` : "";
     setShowApproveRequestModal(false);
+    // The budget item travels as an id on the decision itself. It used to be
+    // appended to the comment as prose ("[Budget item: …]"), which recorded the
+    // approver's choice as text nothing could act on — no ledger moved and no
+    // expansion could be measured against it.
     await handleWorkflowClick(
       "APPROVE",
       payload.signature,
-      `${payload.justification || "Approved."}${budgetNote}`
+      payload.justification || "Approved.",
+      payload.budgetItem || undefined
     );
   };
 
@@ -542,6 +558,25 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const financeStep = stageFor("UPLOADED_TO_BANK");
   const disbursementStep = stageFor("PAID");
 
+  /**
+   * The Finance Manager is not sent the approval history — they receive an
+   * already-approved instruction, not the record of who decided what. Their
+   * stepper is therefore driven by the status alone and carries no attribution,
+   * rather than reading every stage as "Awaiting action…" off an absent history.
+   */
+  const hasHistory = Array.isArray(selectedExpense?.history);
+  const reached = (statuses: string[]) =>
+    selectedExpense ? statuses.includes(selectedExpense.status) : false;
+
+  const stageDesc = (
+    step: { actorName?: string } | undefined,
+    fallback: string,
+    done: boolean
+  ) => {
+    if (hasHistory) return step ? `by ${step.actorName}` : fallback;
+    return done ? "Completed" : fallback;
+  };
+
   const workflowStages = selectedExpense
     ? [
         {
@@ -553,23 +588,31 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         },
         {
           label: "Department Approval",
-          desc: departmentStep ? `by ${departmentStep.actorName}` : "Awaiting action…",
+          desc: stageDesc(
+            departmentStep,
+            "Awaiting action…",
+            reached([...POST_APPROVAL_STATUSES, "PENDING_EXCEPTIONAL"])
+          ),
           date: departmentStep ? formatDate(departmentStep.timestamp) : "",
-          active: Boolean(departmentStep),
+          active: hasHistory
+            ? Boolean(departmentStep)
+            : reached([...POST_APPROVAL_STATUSES, "PENDING_EXCEPTIONAL"]),
           current: selectedExpense.status === "PENDING_APPROVAL",
         },
         {
           label: "Finance Verification",
-          desc: financeStep ? `by ${financeStep.actorName}` : "Awaiting action…",
+          desc: stageDesc(financeStep, "Awaiting action…", reached([...BANK_STAGE_STATUSES, "PAID", "CLOSED"])),
           date: financeStep ? formatDate(financeStep.timestamp) : "",
-          active: Boolean(financeStep),
+          active: hasHistory
+            ? Boolean(financeStep)
+            : reached([...BANK_STAGE_STATUSES, "PAID", "CLOSED"]),
           current: selectedExpense.status === "SENT_TO_FINANCE",
         },
         {
           label: "Final Disbursement",
-          desc: disbursementStep ? `by ${disbursementStep.actorName}` : "Pending approval…",
+          desc: stageDesc(disbursementStep, "Pending approval…", reached(["PAID", "CLOSED"])),
           date: disbursementStep ? formatDate(disbursementStep.timestamp) : "",
-          active: Boolean(disbursementStep) || ["PAID", "CLOSED"].includes(selectedExpense.status),
+          active: Boolean(disbursementStep) || reached(["PAID", "CLOSED"]),
           current: BANK_STAGE_STATUSES.includes(selectedExpense.status),
         },
       ]
@@ -1564,7 +1607,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.4rem" }}>
                         {/* The design shows the request's status alongside the
                             action; the button alone used to replace it. */}
-                        <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
+                        <span className={`badge ${statusBadgeClass(exp.status)}`}>{stageLabel(exp)}</span>
                         <button
                           onClick={() => {
                             if (isFinanceManager && BANK_STAGE_STATUSES.includes(exp.status)) {
@@ -1959,6 +2002,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         isOpen={showApproveRequestModal}
         onClose={() => setShowApproveRequestModal(false)}
         expense={selectedExpense}
+        budgetItems={budgetItems}
+        budgetItemsLoading={budgetItemsLoading}
+        // Only the departmental approver books the spend against an item; the
+        // Finance Officer reviews the choice they already made.
+        requiresBudgetItem={currentUser?.role === "APPROVER"}
         submitting={actions.submitting}
         onConfirm={handleApproveConfirm}
       />

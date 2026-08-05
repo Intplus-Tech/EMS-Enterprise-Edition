@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "../../../../../config/db";
 import { ExpenseRequest } from "../../../../../models/ExpenseRequest";
-import { BudgetService } from "../../../../../domains/budget/budget.service";
+import { BudgetService, LOCKED_STATUSES } from "../../../../../domains/budget/budget.service";
 import { LoggerService } from "../../../../../domains/logs/logger.service";
 import { AuditAction } from "../../../../../enums/auditActions";
 import { authenticate } from "../../../../../middlewares/auth";
@@ -37,15 +37,10 @@ export const POST = withErrorHandling(async (req: NextRequest, { params }: { par
 
   const previousStatus = expense.status;
 
-  // Unlock budget if it was currently locked (pending approval / processing stages)
-  const lockedStatuses = [
-    RequestStatus.PENDING_APPROVAL,
-    RequestStatus.APPROVED,
-    RequestStatus.SENT_TO_FINANCE,
-    RequestStatus.UPLOADED_TO_BANK,
-    RequestStatus.AWAITING_RELEASE
-  ];
-  if (lockedStatuses.includes(previousStatus as RequestStatus)) {
+  // Unlock budget if it was currently locked. Shares the service's own list so
+  // the two cannot drift — a status added there but not here would leak the
+  // reservation and leave the department permanently short of that amount.
+  if (LOCKED_STATUSES.includes(previousStatus as RequestStatus)) {
     await BudgetService.unlockBudget(expense._id.toString());
   }
 

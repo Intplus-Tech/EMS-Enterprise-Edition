@@ -19,7 +19,7 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { EmptyState } from "../ui/EmptyState";
-import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
+import { formatNaira, stageLabel, statusBadgeClass } from "../ui/format";
 import { OVER_BUDGET_STATUSES, isStatusIn } from "../../enums/statuses";
 
 interface RequestQueueTableProps {
@@ -32,7 +32,14 @@ interface RequestQueueTableProps {
 
 /** True when the request is flagged over budget, or was granted an expansion. */
 function isOverBudget(expense: any): boolean {
-  return isStatusIn(OVER_BUDGET_STATUSES, expense.status) || Boolean(expense.exceptionalBudgetApproved);
+  return (
+    isStatusIn(OVER_BUDGET_STATUSES, expense.status) ||
+    // Carried through the approval chain: a request can overrun its budget item
+    // while still sitting with an approver, and the flag is what tells them the
+    // decision will need a Finance Head expansion before it can be paid.
+    Number(expense.budgetShortfall ?? 0) > 0 ||
+    Boolean(expense.exceptionalBudgetApproved)
+  );
 }
 
 /** The approver who last signed the request off, for the "Approved by" line. */
@@ -93,6 +100,10 @@ export const RequestQueueTable: React.FC<RequestQueueTableProps> = ({
                     exp.departmentId?.name,
                     exp.initiatorId?.name ? `Requested by ${exp.initiatorId.name}` : null,
                     approver ? `Approved by ${approver}` : null,
+                    // The item the approver booked the spend to. Everyone after
+                    // them inherits the choice, so it travels with the row
+                    // rather than having to be looked up per request.
+                    exp.budgetItemName ? `Budget item: ${exp.budgetItemName}` : null,
                   ]
                     .filter(Boolean)
                     .join("  •  ") || "—"}
@@ -116,7 +127,7 @@ export const RequestQueueTable: React.FC<RequestQueueTableProps> = ({
 
             <td style={{ textAlign: "right" }}>
               <div style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem" }}>
-                <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
+                <span className={`badge ${statusBadgeClass(exp.status)}`}>{stageLabel(exp)}</span>
                 <button
                   onClick={() => onOpenRequest(exp)}
                   className="btn btn-primary"

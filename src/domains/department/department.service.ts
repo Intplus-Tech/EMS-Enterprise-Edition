@@ -8,6 +8,7 @@ import { RequestNotifier } from "../notifications/request-notifier";
 import { AuditAction } from "../../enums/auditActions";
 import { RequestStatus } from "../../enums/statuses";
 import { DepartmentDto } from "../../types/api";
+import { IBudgetLineItem } from "../../types/domain";
 
 /** Statuses that mean a request is still moving, so deletion cancels it. */
 const IN_FLIGHT_STATUSES = [
@@ -84,7 +85,19 @@ export class DepartmentService {
   }
 
   public static async create(
-    data: { name: string; description?: string; headUserId?: string | null },
+    data: {
+      name: string;
+      description?: string;
+      headUserId?: string | null;
+      /** Opening allocation, created alongside the department. */
+      budget?: {
+        periodName: string;
+        totalBudget: number;
+        lineItems?: IBudgetLineItem[];
+        startDate: string | Date;
+        endDate: string | Date;
+      };
+    },
     actor: ILogActor
   ) {
     await connectToDatabase();
@@ -111,6 +124,23 @@ export class DepartmentService {
       { departmentId: department._id },
       actor
     );
+
+    // A department is created *with* its budget: without a period covering the
+    // payment date, every request it raises fails the budget check outright, so
+    // funding it in the same step is what makes the department usable. If the
+    // allocation is rejected the department is rolled back rather than left
+    // standing in the unusable state the caller was trying to avoid.
+    if (data.budget) {
+      try {
+        await BudgetService.upsertBudgetPeriod(
+          { departmentId: department._id.toString(), ...data.budget },
+          actor
+        );
+      } catch (error) {
+        await Department.findByIdAndDelete(department._id);
+        throw error;
+      }
+    }
 
     return department;
   }

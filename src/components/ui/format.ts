@@ -51,6 +51,22 @@ export function humanizeStatus(status?: string | null): string {
 }
 
 /**
+ * What a request is actually waiting on, for badges and queue tables.
+ *
+ * PENDING_APPROVAL covers two distinct queues — the departmental approver and
+ * then the Finance Officer — so the bare status leaves a reader unable to tell
+ * which desk a request is sitting on. The server resolves the active step's
+ * name against the configured chain and sends it as `currentStageName`; this
+ * prefers it and falls back to the status for every other state.
+ */
+export function stageLabel(expense?: { status?: string; currentStageName?: string } | null): string {
+  if (!expense) return "";
+  return expense.currentStageName
+    ? expense.currentStageName.toUpperCase()
+    : humanizeStatus(expense.status);
+}
+
+/**
  * Maps a workflow status onto one of the `badge-*` classes in globals.css.
  * Centralised so a status never renders with a different colour on another screen.
  */

@@ -3,11 +3,13 @@ import { connectToDatabase } from "../../../config/db";
 import { ExpenseRequest } from "../../../models/ExpenseRequest";
 import { Department } from "../../../models/Department";
 import { ExpenseService } from "../../../domains/expense/expense.service";
+import { scopeForFinanceManager } from "../../../domains/expense/finance-manager.view";
 import { authenticate } from "../../../middlewares/auth";
 import { withErrorHandling } from "../../../middlewares/errors";
 import { ExpenseInitiateSchema } from "../../../validators/validation";
+import { WorkflowService } from "../../../domains/workflow/workflow.service";
 import { SystemRole } from "../../../enums/roles";
-import { POST_APPROVAL_STATUSES } from "../../../enums/statuses";
+import { POST_APPROVAL_STATUSES, RequestStatus } from "../../../enums/statuses";
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   await connectToDatabase();
@@ -45,10 +47,41 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     query = { $and: [query, { departmentId: { $nin: purgedDepartmentIds } }] };
   }
 
-  const expenses = await ExpenseRequest.find(query)
+  const found = await ExpenseRequest.find(query)
     .populate("departmentId", "name")
     .populate("initiatorId", "name email")
     .sort({ createdAt: -1 });
+
+  // PENDING_APPROVAL now covers two different queues — the departmental
+  // approver at step 0 and the Finance Officer at step 1 — so the raw status
+  // no longer says who a request is actually waiting on. The active step's name
+  // is resolved once here rather than the UI guessing from `currentStepIndex`,
+  // which would be wrong the moment an admin reconfigures the chain.
+  const workflow = await WorkflowService.getActiveWorkflow();
+  const steps = [...workflow.steps].sort(
+    (a: { stepIndex: number }, b: { stepIndex: number }) => a.stepIndex - b.stepIndex
+  );
+
+  const expenses = found.map((expense) => {
+    const json = expense.toJSON();
+    if (json.status === RequestStatus.PENDING_APPROVAL) {
+      json.currentStageName = steps[expense.currentStepIndex]?.stepName;
+    }
+    return json;
+  });
+
+  // The Finance Manager releases cash against an instruction that has already
+  // been approved and audited; they do not re-open the commercial decision. So
+  // they receive only what a release needs — who raised it, which department,
+  // the payee account, the description, the amount and the justifications — and
+  // not the vendor, category, budget position or approval history. Applied here
+  // rather than in the screens, which cannot stop a direct call to this route.
+  if (user.role === SystemRole.FINANCE_MANAGER) {
+    return NextResponse.json({
+      success: true,
+      expenses: expenses.map((e) => scopeForFinanceManager(e)),
+    });
+  }
 
   return NextResponse.json({ success: true, expenses });
 });

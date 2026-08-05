@@ -73,10 +73,23 @@ export const ExceptionalBudgetSchema = z.object({
   signature: SignatureSchema,
 });
 
+const ObjectIdString = z.string().regex(/^[a-f\d]{24}$/i, "Invalid identifier");
+
+/** The approver booking a request against one of the department's budget items. */
+export const BudgetItemAttachSchema = z.object({
+  budgetItemId: ObjectIdString,
+});
+
 export const WorkflowActionSchema = z.object({
   action: z.nativeEnum(WorkflowActionType),
   comment: z.string().optional(),
   signature: SignatureSchema,
+  /**
+   * Set by the approver when approving: the request must be attached to a
+   * budget item before it can travel on, so the decision and the attachment
+   * arrive together rather than as two calls that can half-fail.
+   */
+  budgetItemId: ObjectIdString.optional(),
 });
 
 export const PaymentReleaseSchema = z.object({
@@ -121,10 +134,48 @@ const OptionalObjectId = z
   .nullish()
   .transform((value) => value || null);
 
+/** One budget item. Declared here because department creation also accepts a budget. */
+export const BudgetLineItemSchema = z.object({
+  /**
+   * The item's own id, round-tripped by the Set Budget screen.
+   *
+   * Identity has to survive an edit: requests point at this id, and the item's
+   * ledger is matched on it. Without it a rename reads as a delete plus an
+   * insert — the new subdocument gets a fresh id, the spend recorded against
+   * the old one is lost, and every request booked to it is orphaned. Absent for
+   * an item the administrator has just added.
+   */
+  id: ObjectIdString.optional(),
+  name: z.string().trim().min(2, "Line item name is required").max(80),
+  description: z.string().trim().max(300).optional(),
+  amount: z.number().nonnegative("Line item amount cannot be negative"),
+});
+
 export const DepartmentCreateSchema = z.object({
   name: z.string().trim().min(2, "Department name is required").max(80),
   description: z.string().trim().max(500).optional(),
   headUserId: OptionalObjectId,
+  /**
+   * The department's opening budget, created in the same step.
+   *
+   * Optional so an administrator can still stand a department up first and fund
+   * it later, but offered here because a department with no budget period
+   * cannot accept a single request — every submission fails the budget check
+   * with "no active budget period configured".
+   */
+  budget: z
+    .object({
+      periodName: z.string().trim().min(2, "Period name is required").max(40),
+      totalBudget: z.number().nonnegative("Budget allocation cannot be negative"),
+      lineItems: z.array(BudgetLineItemSchema).optional().default([]),
+      startDate: z.string().refine((v) => !isNaN(Date.parse(v)), "Invalid start date"),
+      endDate: z.string().refine((v) => !isNaN(Date.parse(v)), "Invalid end date"),
+    })
+    .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
+      message: "The period end date must fall after the start date",
+      path: ["endDate"],
+    })
+    .optional(),
 });
 
 export const DepartmentUpdateSchema = z.object({
@@ -167,12 +218,6 @@ export const ProfileUpdateSchema = z.object({
   officialContact: z.string().trim().max(40).optional(),
   personalContact: z.string().trim().max(40).optional(),
   avatar: z.string().max(500).optional(),
-});
-
-export const BudgetLineItemSchema = z.object({
-  name: z.string().trim().min(2, "Line item name is required").max(80),
-  description: z.string().trim().max(300).optional(),
-  amount: z.number().nonnegative("Line item amount cannot be negative"),
 });
 
 export const BudgetPeriodUpsertSchema = z

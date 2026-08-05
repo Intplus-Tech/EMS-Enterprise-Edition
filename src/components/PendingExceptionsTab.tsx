@@ -94,6 +94,20 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   // while authorising an over-budget request were unrelated to the department.
   const hasBudget = Boolean(budgetContext?.hasBudget);
 
+  /**
+   * The decision on this screen is a *budget item* expansion, so every figure
+   * that describes the deficit is the item's, not the department's.
+   *
+   * These read `criticalGap` — the department gap — which is a different
+   * number: a department can have ample headroom while the one item the spend
+   * is charged to is exhausted, and in that case the department gap is ₦0. The
+   * Finance Head was shown "CRITICAL BUDGET GAP -₦0.00" while approving a real
+   * expansion, and the confirm dialogs quoted the same zero back at them.
+   */
+  const attachedItem = budgetContext?.attachedItem ?? null;
+  const expansionDeficit = budgetContext?.itemShortfall ?? 0;
+  const itemHeadroom = attachedItem?.remaining ?? budgetContext?.remaining ?? 0;
+
   const historyTimeline: any[] = targetExp?.history && targetExp.history.length > 0 ? targetExp.history.map((h: any, idx: number) => ({
     id: `hist-${idx}`,
     actor: `${h.actorName || "User"} (${h.actorRole || "Staff"})`,
@@ -447,7 +461,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               </div>
             </div>
 
-            {/* Critical Budget Gap Red Box */}
+            {/* Critical Budget Gap — the deficit on the item being expanded */}
             <div
               style={{
                 background: "rgba(254, 226, 226, 0.6)",
@@ -464,7 +478,14 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   CRITICAL BUDGET GAP
                 </span>
                 <span style={{ fontSize: "1.75rem", fontWeight: "800", color: "#DC2626", letterSpacing: "-0.02em" }}>
-                  {`-${formatNairaPrecise(budgetContext?.criticalGap)}`}
+                  {`-${formatNairaPrecise(expansionDeficit)}`}
+                </span>
+                {/* Names what is actually being expanded, so the figure above is
+                    attributable rather than reading as a department-wide gap. */}
+                <span style={{ fontSize: "0.75rem", color: "#B91C1C", display: "block", marginTop: "0.3rem" }}>
+                  {attachedItem
+                    ? <>on budget item <strong>{attachedItem.category}</strong> — {formatNaira(attachedItem.remaining)} of {formatNaira(attachedItem.allocated)} left</>
+                    : "This request is not attached to a budget item, so the gap is measured against the department."}
                 </span>
               </div>
 
@@ -488,8 +509,30 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   </thead>
                   <tbody>
                     {(budgetContext?.lineItems ?? []).map((item, idx, all) => (
-                      <tr key={item.category} style={{ borderBottom: idx < all.length - 1 ? "1px solid rgb(var(--color-card-border) / 0.3)" : "none" }}>
-                        <td style={{ padding: "0.6rem 0.75rem", fontWeight: "600", color: item.isRequestCategory ? "#2563EB" : "rgb(var(--color-text))" }}>{item.category}</td>
+                      <tr
+                        key={item.id}
+                        style={{
+                          borderBottom: idx < all.length - 1 ? "1px solid rgb(var(--color-card-border) / 0.3)" : "none",
+                          // The row under review is tinted, not merely coloured:
+                          // it is the one line the decision applies to.
+                          background: item.isRequestCategory ? "rgb(var(--color-primary) / 0.08)" : "transparent",
+                        }}
+                      >
+                        <td style={{ padding: "0.6rem 0.75rem", fontWeight: "600", color: item.isRequestCategory ? "#2563EB" : "rgb(var(--color-text))" }}>
+                          {item.category}
+                          {item.isRequestCategory && (
+                            <span style={{ display: "block", fontSize: "0.625rem", fontWeight: 800, letterSpacing: "0.05em", color: "#2563EB" }}>
+                              THIS REQUEST
+                            </span>
+                          )}
+                          {/* An item already carrying a grant, so the Finance
+                              Head can see this is not its first exception. */}
+                          {item.expansionsGranted > 0 && (
+                            <span style={{ display: "block", fontSize: "0.625rem", fontWeight: 700, color: "#B45309" }}>
+                              +{formatNaira(item.expansionsGranted)} previously granted
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", color: "rgb(var(--color-text-muted))" }}>{formatNaira(item.allocated)}</td>
                         <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", fontWeight: "700", color: item.remaining <= 0 ? "#DC2626" : "#2563EB" }}>
                           {formatNaira(item.remaining)}
@@ -620,8 +663,9 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         onClose={() => setShowApproveModal(false)}
         requestNumber={requestDetails.requestNumber}
         requestAmount={requestDetails.amount}
-        remainingBudget={budgetContext?.remaining ?? 0}
-        deficitAmount={budgetContext?.criticalGap ?? 0}
+        remainingBudget={itemHeadroom}
+        deficitAmount={expansionDeficit}
+        budgetItemName={attachedItem?.category}
         onConfirm={async (notes, signature) => {
           if (!targetExp?._id) return;
           // Only close on a confirmed save — the previous version reported
@@ -637,8 +681,9 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         onClose={() => setShowRejectModal(false)}
         requestNumber={requestDetails.requestNumber}
         requestAmount={requestDetails.amount}
-        remainingBudget={budgetContext?.remaining ?? 0}
-        deficitAmount={budgetContext?.criticalGap ?? 0}
+        remainingBudget={itemHeadroom}
+        deficitAmount={expansionDeficit}
+        budgetItemName={attachedItem?.category}
         onConfirm={async (reason, signature) => {
           if (!targetExp?._id) return;
           if (await actions.rejectExpansion(targetExp._id, reason, signature)) {

@@ -125,6 +125,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     showAdminEditRoleModal, setShowAdminEditRoleModal,
     selectedAdminRole,
     showAdminSetBudgetModal, setShowAdminSetBudgetModal,
+    // Existing allocations, so Set Budget opens on the department's real items
+    // instead of an empty list that would overwrite them on save.
+    budgetPeriods,
     alertDialog, setAlertDialog,
   } = useDashboard();
 
@@ -644,22 +647,32 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onOpenMatrix={() => navTo("/users-roles")}
       />
 
-      <AdminSetBudgetModal
-        isOpen={showAdminSetBudgetModal}
-        onClose={() => setShowAdminSetBudgetModal(false)}
-        departments={departments}
-        onSetBudget={(departmentId: string, totalAmount: number, lineItems: any[]) =>
-          saveBudgetPeriod({
-            departmentId,
-            totalBudget: totalAmount,
-            lineItems: lineItems.map((item) => ({
-              name: item.name,
-              description: item.description,
-              amount: Number(item.amount) || 0,
-            })),
-          })
-        }
-      />
+      {/* Mounted only while open: the dialog seeds its rows from the selected
+          department's existing items on mount, so a stale copy must not survive
+          a save-and-reopen and overwrite the allocation that was just stored. */}
+      {showAdminSetBudgetModal && (
+        <AdminSetBudgetModal
+          isOpen={showAdminSetBudgetModal}
+          onClose={() => setShowAdminSetBudgetModal(false)}
+          departments={departments}
+          budgetPeriods={budgetPeriods}
+          onSetBudget={(departmentId: string, totalAmount: number, lineItems: any[]) =>
+            saveBudgetPeriod({
+              departmentId,
+              totalBudget: totalAmount,
+              lineItems: lineItems.map((item) => ({
+                // Sent back so the server can match an edited item to the one it
+                // already holds. Dropping it made every rename look like a new
+                // item, discarding its ledger and orphaning attached requests.
+                id: item.itemId,
+                name: item.name,
+                description: item.description,
+                amount: Number(item.amount) || 0,
+              })),
+            })
+          }
+        />
+      )}
 
       <GlobalAlertDialogModal
         alertDialog={alertDialog}

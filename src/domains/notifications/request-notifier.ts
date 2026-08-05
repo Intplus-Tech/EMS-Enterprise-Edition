@@ -2,6 +2,7 @@ import { User } from "../../models/User";
 import { EmailService } from "../email/email.service";
 import { LoggerService } from "../logs/logger.service";
 import { RequestStatus } from "../../enums/statuses";
+import { SystemRole } from "../../enums/roles";
 import { humanizeRequestStatus } from "./status-labels";
 import { isNotifiableStatus } from "./notifiable-events";
 
@@ -56,6 +57,52 @@ export class RequestNotifier {
       await LoggerService.logException(
         "EXPENSE_NOTIFICATION_FAILED",
         `Could not email the initiator about request ${request.requestNumber}`,
+        error
+      );
+    }
+  }
+
+  /**
+   * Tells the budget owners that an allocation has just been committed.
+   *
+   * The budget-validation flow ends its approval scenario with "notification
+   * sent to Requestor *and Finance*" — only the requestor was ever told, so the
+   * people accountable for the allocation learned of a deduction against it
+   * whenever they next happened to open the dashboard.
+   *
+   * Never throws, for the same reason as `notifyInitiator`: a mail outage must
+   * not roll back a budget decision that has already been applied.
+   */
+  public static async notifyFinanceOfAllocation(
+    request: { requestNumber: string; amount: number; status: RequestStatus },
+    origin?: string
+  ): Promise<void> {
+    try {
+      const owners = await User.find({
+        role: SystemRole.FINANCE_HEAD,
+        isActive: true,
+      }).select("email name");
+
+      const actionUrl = origin ? `${origin}/departmental-spend` : undefined;
+
+      await Promise.all(
+        owners
+          .filter((owner: { email?: string }) => Boolean(owner.email))
+          .map((owner: { email: string; name: string }) =>
+            EmailService.sendExpenseNotification(
+              owner.email,
+              owner.name,
+              request.requestNumber,
+              `Budget approved — allocation deducted`,
+              actionUrl,
+              origin
+            )
+          )
+      );
+    } catch (error) {
+      await LoggerService.logException(
+        "BUDGET_NOTIFICATION_FAILED",
+        `Could not notify finance about the allocation for request ${request.requestNumber}`,
         error
       );
     }
