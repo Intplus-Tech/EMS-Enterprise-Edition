@@ -80,7 +80,7 @@ const ROWS_PER_PAGE = 10;
 
 /**
  * Payment method for a released request. Nothing on the model stores it yet, so
- * it is inferred from the reference prefix — the same rule PaymentHistoryTab
+ * it is inferred from the reference prefix â€” the same rule PaymentHistoryTab
  * uses, kept identical so the two screens never disagree.
  */
 function resolvePaymentMethod(expense: any): string {
@@ -130,7 +130,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [newComment, setNewComment] = useState("");
   // Submission state now lives in useExpenseActions, alongside the I/O it guards.
 
-  // Bulk decision confirmation — one signature authorises the whole batch.
+  // Bulk decision confirmation â€” one signature authorises the whole batch.
   const [bulkDecision, setBulkDecision] = useState<"APPROVE" | "REJECT" | null>(null);
   const [bulkSignature, setBulkSignature] = useState("");
 
@@ -152,7 +152,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const [showApproveRequestModal, setShowApproveRequestModal] = useState(false);
   const [showRejectClarifyModal, setShowRejectClarifyModal] = useState(false);
   // Which chip the dialog opens on. "Insufficient Budget" returns the request to
-  // the initiator, "Reject" closes it — two different outcomes that both used to
+  // the initiator, "Reject" closes it â€” two different outcomes that both used to
   // open the dialog on its REJECT default, so the budget button silently
   // rejected requests it was only meant to send back.
   const [rejectClarifyIntent, setRejectClarifyIntent] = useState<RejectDecision>("REJECT");
@@ -160,7 +160,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
   /**
    * Opens the release/thread dialogs on a request. The focus callback is what
-   * points the page's thread fetch at it — these dialogs are opened from the
+   * points the page's thread fetch at it â€” these dialogs are opened from the
    * list, where `selectedExpense` is null.
    */
   const focusReleaseItem = (expense: any) => {
@@ -168,7 +168,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     onFocusThreadRequest?.(expense ? String(expense._id) : null);
   };
 
-  // The uploaded transfer evidence — a real stored document, not a filename.
+  // The uploaded transfer evidence â€” a real stored document, not a filename.
   // The reference, debit confirmation and signature are collected by the dialog.
   const [receipt, setReceipt] = useState<AttachmentInput | null>(null);
   const [receiptUploading, setReceiptUploading] = useState(false);
@@ -195,7 +195,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   // The communication thread (history + comments, merged and access-filtered)
   // is served by /api/expenses/[id]/comments via the `thread` prop.
 
-  // Handler for the primary decision buttons. All I/O and role→endpoint routing
+  // Handler for the primary decision buttons. All I/O and roleâ†’endpoint routing
   // is delegated to `actions` (useExpenseActions); this only decides which
   // action the button maps to and clears local dialog state on success.
   //
@@ -212,7 +212,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     const id = selectedExpense._id;
 
     if (actionType === "APPROVE") {
-      // The Finance Officer is an approval step like the departmental approver —
+      // The Finance Officer is an approval step like the departmental approver â€”
       // their decision carries the request across the bank leg and into the
       // Manager's queue in one action, so it routes through `approve` rather
       // than the standalone upload endpoint that path used to call.
@@ -259,7 +259,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       return;
     }
 
-    // ESCALATE — approving at the officer step forwards to the Finance Head queue.
+    // ESCALATE â€” approving at the officer step forwards to the Finance Head queue.
     const ok = await actions.approve(
       id,
       `[Officer Escalation] Justification: ${escalateJustification}`,
@@ -279,8 +279,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const handleApproveConfirm = async (payload: ApproveRequestPayload) => {
     setShowApproveRequestModal(false);
     // The budget item travels as an id on the decision itself. It used to be
-    // appended to the comment as prose ("[Budget item: …]"), which recorded the
-    // approver's choice as text nothing could act on — no ledger moved and no
+    // appended to the comment as prose ("[Budget item: â€¦]"), which recorded the
+    // approver's choice as text nothing could act on â€” no ledger moved and no
     // expansion could be measured against it.
     await handleWorkflowClick(
       "APPROVE",
@@ -313,7 +313,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   /**
    * Bulk approve/reject from the floating selection bar.
    *
-   * Each request is decided individually and the outcome is tallied — the
+   * Each request is decided individually and the outcome is tallied â€” the
    * previous version fired the calls and discarded every response, so a batch
    * where the server rejected half the items still reported a clean success.
    * One signature covers the batch; it is verified per request server-side.
@@ -340,7 +340,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         ? { tone: "success", message: `${succeeded} request(s) ${decision.toLowerCase()}d.` }
         : {
             tone: "error",
-            message: `${succeeded} of ${ids.length} request(s) ${decision.toLowerCase()}d. ${failed} could not be processed — they may have moved to another stage.`,
+            message: `${succeeded} of ${ids.length} request(s) ${decision.toLowerCase()}d. ${failed} could not be processed â€” they may have moved to another stage.`,
           }
     );
   };
@@ -512,7 +512,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     return e.departmentId?._id === dId || e.departmentId === dId;
   });
   
-  // A department with no committed spend is a real ₦0; the previous `|| 545000`
+  // A department with no committed spend is a real â‚¦0; the previous `|| 545000`
   // fallback showed the design's sample figure whenever the total came to zero.
   const totalDeptSpend = deptExpenses
     .filter(e => POST_APPROVAL_STATUSES.includes(e.status))
@@ -522,7 +522,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
   /**
    * Whether the request exceeds its department's budget. This was `amount >
-   * 30000` — an invented threshold unrelated to any department's allocation.
+   * 30000` â€” an invented threshold unrelated to any department's allocation.
    * The server-computed context is authoritative; the status flags remain as a
    * fallback for requests already routed down the exception path.
    */
@@ -550,10 +550,10 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const disbursementStep = stageFor("PAID");
 
   /**
-   * The Finance Manager is not sent the approval history — they receive an
+   * The Finance Manager is not sent the approval history â€” they receive an
    * already-approved instruction, not the record of who decided what. Their
    * stepper is therefore driven by the status alone and carries no attribution,
-   * rather than reading every stage as "Awaiting action…" off an absent history.
+   * rather than reading every stage as "Awaiting actionâ€¦" off an absent history.
    */
   const hasHistory = Array.isArray(selectedExpense?.history);
   const reached = (statuses: string[]) =>
@@ -572,7 +572,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     ? [
         {
           label: "Request Initiated",
-          desc: `by ${selectedExpense.initiatorId?.name || "—"}`,
+          desc: `by ${selectedExpense.initiatorId?.name || "â€”"}`,
           date: formatDate(initiatedAt),
           active: true,
           current: false,
@@ -581,7 +581,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           label: "Department Approval",
           desc: stageDesc(
             departmentStep,
-            "Awaiting action…",
+            "Awaiting actionâ€¦",
             reached([...POST_APPROVAL_STATUSES, "PENDING_EXCEPTIONAL"])
           ),
           date: departmentStep ? formatDate(departmentStep.timestamp) : "",
@@ -592,7 +592,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         },
         {
           label: "Finance Verification",
-          desc: stageDesc(financeStep, "Awaiting action…", reached([...BANK_STAGE_STATUSES, "PAID", "CLOSED"])),
+          desc: stageDesc(financeStep, "Awaiting actionâ€¦", reached([...BANK_STAGE_STATUSES, "PAID", "CLOSED"])),
           date: financeStep ? formatDate(financeStep.timestamp) : "",
           active: hasHistory
             ? Boolean(financeStep)
@@ -601,7 +601,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         },
         {
           label: "Final Disbursement",
-          desc: stageDesc(disbursementStep, "Pending approval…", reached(["PAID", "CLOSED"])),
+          desc: stageDesc(disbursementStep, "Pending approvalâ€¦", reached(["PAID", "CLOSED"])),
           date: disbursementStep ? formatDate(disbursementStep.timestamp) : "",
           active: Boolean(disbursementStep) || reached(["PAID", "CLOSED"]),
           current: BANK_STAGE_STATUSES.includes(selectedExpense.status),
@@ -614,7 +614,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
    * views below.
    *
    * They used to live only at the end of the list-view branch, past the early
-   * return for the request profile — so a reviewer who opened a request and
+   * return for the request profile â€” so a reviewer who opened a request and
    * pressed Approve, Reject or Authorize Expansion flipped the dialog's state
    * flag and nothing appeared. That is what left the approver with no way to
    * pick a budget item, and therefore no way to approve at all: the server
@@ -622,7 +622,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
    */
   const workflowDialogs = (
     <>
-      {/* Finance Manager release — designs/finance-manager/Finance Manager Release Review Modal.png.
+      {/* Finance Manager release â€” designs/finance-manager/Finance Manager Release Review Modal.png.
           Mounted only while open so each release starts from an empty form. */}
       {showAuthorizeReleaseModal && activeReleaseItem && (
         <AuthorizeReleaseModal
@@ -639,7 +639,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         />
       )}
 
-      {/* Completed release — the read-only receipt view for a disbursed request */}
+      {/* Completed release â€” the read-only receipt view for a disbursed request */}
       <CompletedReleaseModal
         isOpen={showCompletedReleaseModal}
         onClose={() => { setShowCompletedReleaseModal(false); focusReleaseItem(null); }}
@@ -657,7 +657,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         onExport={handleExportThread}
       />
 
-      {/* Approver decision dialogs — every approve/reject is signed off in a modal */}
+      {/* Approver decision dialogs â€” every approve/reject is signed off in a modal */}
       <ApproveRequestModal
         isOpen={showApproveRequestModal}
         onClose={() => setShowApproveRequestModal(false)}
@@ -870,11 +870,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <div>
                     <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Department</span>
-                    <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.departmentId?.name || "—"}</strong>
+                    <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.departmentId?.name || "â€”"}</strong>
                   </div>
                   <div>
                     <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Initiator</span>
-                    <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.initiatorId?.name || "—"}</strong>
+                    <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.initiatorId?.name || "â€”"}</strong>
                   </div>
                   <div>
                     <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Submission Date</span>
@@ -981,7 +981,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     <SubmitButton
                       type="submit"
                       loading={threadSending}
-                      loadingLabel="Sending…"
+                      loadingLabel="Sendingâ€¦"
                       disabled={!newComment.trim()}
                       style={{ padding: "0.6rem 1.2rem", background: "#2563EB", border: "none" }}
                     >
@@ -1022,7 +1022,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   <label className="form-label" style={{ fontSize: "0.8rem", marginBottom: "0.25rem" }}>Your Question</label>
                   {/* The bold/italic/list/link toolbar the design shows here had
                       no handlers, and the comment is stored and rendered as
-                      plain text everywhere it is read — four buttons that
+                      plain text everywhere it is read â€” four buttons that
                       silently do nothing are worse than none. */}
                   <textarea
                     rows={4}
@@ -1091,19 +1091,19 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       {selectedExpense.initiatorId?.name?.charAt(0) || "?"}
                     </div>
                     <div>
-                      <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: "700" }}>{selectedExpense.initiatorId?.name || "—"}</h4>
-                      <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>ID: {selectedExpense.initiatorId?.employeeId || selectedExpense.initiatorId?.email || "—"}</span>
+                      <h4 style={{ margin: 0, fontSize: "0.95rem", fontWeight: "700" }}>{selectedExpense.initiatorId?.name || "â€”"}</h4>
+                      <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>ID: {selectedExpense.initiatorId?.employeeId || selectedExpense.initiatorId?.email || "â€”"}</span>
                     </div>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem", fontSize: "0.8rem", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", paddingTop: "0.75rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span style={{ color: "rgb(var(--color-text-muted))" }}>Account Number</span>
-                      <strong>{selectedExpense.vendorBankDetails?.accountNumber || "—"}</strong>
+                      <strong>{selectedExpense.vendorBankDetails?.accountNumber || "â€”"}</strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span style={{ color: "rgb(var(--color-text-muted))" }}>Bank Name</span>
-                      <strong>{selectedExpense.vendorBankDetails?.bankName || "—"}</strong>
+                      <strong>{selectedExpense.vendorBankDetails?.bankName || "â€”"}</strong>
                     </div>
                   </div>
                 </div>
@@ -1111,7 +1111,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 {/* Dept Budget Card */}
                 <div className="glass-panel" style={{ padding: "1.25rem" }}>
                   {/* Allocation comes from the request's own budget period; the
-                      badge previously showed a hardcoded ₦12,545,000. */}
+                      badge previously showed a hardcoded â‚¦12,545,000. */}
                   <span style={{ fontSize: "0.75rem", textTransform: "uppercase", fontWeight: "700", color: "rgb(var(--color-text-muted))", display: "block", marginBottom: "0.25rem" }}>
                     DEPT BUDGET{budgetContext?.periodLabel ? ` (${budgetContext.periodLabel.split(" - ").pop()})` : ""}
                   </span>
@@ -1133,7 +1133,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
                   {/* Real document set. Previously this listed the request's
                       single filename plus two invented files with made-up sizes
-                      ("Maintenance_Justification.docx • 846 KB"). Reviewers can
+                      ("Maintenance_Justification.docx â€¢ 846 KB"). Reviewers can
                       now attach their own evidence here. */}
                   <AttachmentList
                     label=""
@@ -1179,7 +1179,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     {/* Stepper text */}
                     <div>
                       <h5 style={{ margin: 0, fontSize: "0.8rem", fontWeight: "700", color: step.active ? "inherit" : "rgb(var(--color-text-muted))" }}>{step.label}</h5>
-                      <p style={{ margin: 0, fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>{step.desc} {step.date && `• ${step.date}`}</p>
+                      <p style={{ margin: 0, fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>{step.desc} {step.date && `â€¢ ${step.date}`}</p>
                     </div>
                   </div>
                 ))}
@@ -1273,11 +1273,11 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                   <div style={{ background: "rgb(var(--color-card-border) / 0.08)", border: "1px solid rgb(var(--color-card-border) / 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</span>
-                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.departmentId?.name || "—"}</strong>
+                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.departmentId?.name || "â€”"}</strong>
                   </div>
                   <div style={{ background: "rgb(var(--color-card-border) / 0.08)", border: "1px solid rgb(var(--color-card-border) / 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGET ITEM</span>
-                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.category || "—"}</strong>
+                    <strong style={{ fontSize: "0.85rem" }}>{selectedExpense.category || "â€”"}</strong>
                   </div>
                 </div>
 
@@ -1285,7 +1285,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   <div style={{ background: "rgb(var(--color-card-border) / 0.08)", border: "1px solid rgb(var(--color-card-border) / 0.5)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>BUDGETED</span>
                     {/* The department's real allocation and spend. These were
-                        fixed at ₦1,220,000 / ₦1,211,000 for every request, so
+                        fixed at â‚¦1,220,000 / â‚¦1,211,000 for every request, so
                         the Finance Head was shown a variance that was not the
                         one they were being asked to authorise. */}
                     <strong style={{ fontSize: "0.9rem" }}>
@@ -1295,7 +1295,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   <div style={{ background: "rgb(var(--color-surface-secondary) / 0.4)", border: "1px solid rgb(var(--color-card-border) / 0.4)", padding: "0.6rem 0.85rem", borderRadius: "6px" }}>
                     <span style={{ display: "block", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>AMOUNT SPENT</span>
                     <strong style={{ fontSize: "0.9rem" }}>
-                      {budgetContext?.hasBudget ? formatNaira(budgetContext.utilisedYTD) : "—"}
+                      {budgetContext?.hasBudget ? formatNaira(budgetContext.utilisedYTD) : "â€”"}
                     </strong>
                   </div>
                 </div>
@@ -1388,7 +1388,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           </div>
         )}
 
-        {/* Release, thread and decision dialogs — the profile's action buttons
+        {/* Release, thread and decision dialogs â€” the profile's action buttons
             raise these, so they must render on this branch as well as the list */}
         {workflowDialogs}
 
@@ -1397,7 +1397,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   }
 
   // Calculate total awaiting release for metric card. An empty pipeline is a
-  // real ₦0 — the previous `|| 4850200` fallback reported the design's mock
+  // real â‚¦0 â€” the previous `|| 4850200` fallback reported the design's mock
   // figure whenever there was nothing to release.
   const pendingReleaseTotal = expenses
     .filter(e => BANK_STAGE_STATUSES.includes(e.status) || e.status === "SENT_TO_FINANCE")
@@ -1435,7 +1435,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             to sit here duplicated `handleExportPipeline`; both buttons now go
             through the shared `downloadCsv` helper. */}
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          {/* Today toggle + date picker, as a pair — the design pairs them and
+          {/* Today toggle + date picker, as a pair â€” the design pairs them and
               `approvalDatePicker` was already being applied in `filteredList`,
               but nothing on screen could ever set it. */}
           <div style={{ display: "flex", alignItems: "center", borderRadius: "8px", overflow: "hidden", border: "1px solid rgb(var(--color-card-border))" }}>
@@ -1495,7 +1495,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           <StatCard
             label="Avg. Release Time"
             hint="submission to payment"
-            value={avgReleaseDays === null ? "—" : `${avgReleaseDays.toFixed(1)} Days`}
+            value={avgReleaseDays === null ? "â€”" : `${avgReleaseDays.toFixed(1)} Days`}
             icon={<Icons.FileText size={18} />}
             tone="neutral"
           />
@@ -1554,8 +1554,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       </div>
 
       {/* Sub-tabs. The designs call for three (New Requests / Processing /
-          Completed); only two were reachable, so `newRequests` — which is what
-          a Finance Officer actually picks work off — could never be opened.
+          Completed); only two were reachable, so `newRequests` â€” which is what
+          a Finance Officer actually picks work off â€” could never be opened.
           Rendered from a list so the tabs and their counts cannot drift. */}
       <div style={{ display: "flex", borderBottom: "1px solid rgb(var(--color-card-border))", marginBottom: "1.25rem", gap: "1.5rem" }}>
         {([
@@ -1646,7 +1646,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
               </tr>
             </thead>
             <tbody>
-              {/* Rows are the current page, not the whole list — the footer used
+              {/* Rows are the current page, not the whole list â€” the footer used
                   to advertise pagination the table never applied. */}
               {visibleRows.map((exp) => {
                 // The column is INITIATOR, so it shows the initiator. It used to
@@ -1674,37 +1674,37 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                         style={{ cursor: "pointer", width: "16px", height: "16px" }}
                       />
                     </td>
-                    <td className="cell-wrap" style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
+                    <td className="wrap-anywhere" style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
                       {exp.requestNumber}
                     </td>
 
-                    {/* Free text the initiator typed — wraps to as many lines as
+                    {/* Free text the initiator typed â€” wraps to as many lines as
                         it needs so the row grows down, never across. */}
-                    <td className="cell-wrap" style={{ padding: "1rem" }}>
+                    <td className="wrap-anywhere" style={{ padding: "1rem" }}>
                       <strong style={{ fontSize: "0.9rem", display: "block", color: "rgb(var(--color-text))" }}>{exp.description}</strong>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                        {[exp.departmentId?.name, exp.category].filter(Boolean).join(" • ") || "—"}
+                        {[exp.departmentId?.name, exp.category].filter(Boolean).join(" â€¢ ") || "â€”"}
                       </span>
                     </td>
 
-                    <td className="cell-wrap" style={{ padding: "1rem" }}>
+                    <td className="wrap-anywhere" style={{ padding: "1rem" }}>
                       <strong style={{ fontSize: "1rem", color: "rgb(var(--color-text))" }}>
                         {formatNaira(exp.amount)}
                       </strong>
                     </td>
 
-                    <td className="cell-wrap" style={{ padding: "1rem" }}>
+                    <td className="wrap-anywhere" style={{ padding: "1rem" }}>
                       <strong style={{ fontSize: "0.85rem", display: "block", color: "rgb(var(--color-text))" }}>
-                        {exp.vendorBankDetails?.bankName || "—"}
+                        {exp.vendorBankDetails?.bankName || "â€”"}
                       </strong>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                        {exp.vendorBankDetails?.accountNumber || "—"}
+                        {exp.vendorBankDetails?.accountNumber || "â€”"}
                       </span>
                     </td>
 
-                    <td className="cell-wrap" style={{ padding: "1rem" }}>
+                    <td className="wrap-anywhere" style={{ padding: "1rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        {/* The avatar keeps its 28px however long the name is —
+                        {/* The avatar keeps its 28px however long the name is â€”
                             without this the flex row squashes it into an oval. */}
                         <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: "50%", background: "rgba(37, 99, 235, 0.15)", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: "bold" }}>
                           {initials}
@@ -1773,22 +1773,22 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   a request that was never paid still showed a bank reference. */}
               {visibleRows.map((exp) => (
                 <tr key={exp._id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
-                  <td className="cell-wrap" style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
+                  <td className="wrap-anywhere" style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
                     {exp.requestNumber}
                   </td>
-                  <td className="cell-wrap" style={{ padding: "1rem", fontWeight: "600" }}>{exp.description}</td>
-                  <td className="cell-wrap" style={{ padding: "1rem", fontWeight: "700" }}>{formatNaira(exp.amount)}</td>
-                  <td className="cell-wrap" style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    {exp.departmentId?.name || "—"}
+                  <td className="wrap-anywhere" style={{ padding: "1rem", fontWeight: "600" }}>{exp.description}</td>
+                  <td className="wrap-anywhere" style={{ padding: "1rem", fontWeight: "700" }}>{formatNaira(exp.amount)}</td>
+                  <td className="wrap-anywhere" style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                    {exp.departmentId?.name || "â€”"}
                   </td>
                   <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    {exp.paymentReference ? resolvePaymentMethod(exp) : "—"}
+                    {exp.paymentReference ? resolvePaymentMethod(exp) : "â€”"}
                   </td>
-                  <td className="cell-wrap" style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    {exp.paymentReference || "—"}
+                  <td className="wrap-anywhere" style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                    {exp.paymentReference || "â€”"}
                   </td>
                   <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    {exp.paymentDate ? formatDate(exp.paymentDate) : "—"}
+                    {exp.paymentDate ? formatDate(exp.paymentDate) : "â€”"}
                   </td>
                   <td style={{ padding: "1rem", textAlign: "center" }}>
                     <button
@@ -1821,7 +1821,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         )}
       </div>
 
-      {/* Pagination footer — the shared primitive, so the summary line and the
+      {/* Pagination footer â€” the shared primitive, so the summary line and the
           rows actually shown can no longer disagree. */}
       {filteredList.length > 0 && (
         <Pagination
@@ -1833,7 +1833,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         />
       )}
 
-      {/* Bulk decision confirmation — one signature authorises the batch. */}
+      {/* Bulk decision confirmation â€” one signature authorises the batch. */}
       <ModalShell
         isOpen={bulkDecision !== null}
         onClose={() => { setBulkDecision(null); setBulkSignature(""); }}
@@ -1865,7 +1865,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         />
       </ModalShell>
 
-      {/* Release, thread and decision dialogs — shared by both views */}
+      {/* Release, thread and decision dialogs â€” shared by both views */}
       {workflowDialogs}
 
       {/* Floating Sticky Bulk Action Bar */}

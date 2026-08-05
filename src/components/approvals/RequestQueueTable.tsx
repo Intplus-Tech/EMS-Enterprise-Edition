@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * RequestQueueTable — the request-centric pipeline table from
+ * RequestQueueTable â€” the request-centric pipeline table from
  * `designs/finance-officer/Processing Pipeline Dashboard.png` and
  * `designs/approval/Approval Req..png`.
  *
  * The Finance Officer and the departmental Approver read a queue: what the
  * request is, who raised it, who signed it off, and whether it breaches budget.
  * The Finance Manager reads a payment run instead, so that role keeps the
- * BANK ACCOUNT / INITIATOR table in `ApprovalsTab` — one component per layout
+ * BANK ACCOUNT / INITIATOR table in `ApprovalsTab` â€” one component per layout
  * rather than one table with a role branch buried inside each cell.
  *
  * Presentational: the parent owns the list, its filters and the row action.
@@ -70,7 +70,7 @@ export const RequestQueueTable: React.FC<RequestQueueTableProps> = ({
     <thead>
       {/* REQUEST is the only unsized column, so it takes the slack and its
           free-text contents wrap instead of stretching the table past the
-          panel — the description and the reviewer note are arbitrary length. */}
+          panel â€” the description and the reviewer note are arbitrary length. */}
       <tr>
         <th style={{ width: "150px" }}>ID</th>
         <th>REQUEST</th>
@@ -89,11 +89,11 @@ export const RequestQueueTable: React.FC<RequestQueueTableProps> = ({
 
         return (
           <tr key={exp._id}>
-            <td className="cell-wrap" style={{ fontWeight: 700, color: accent ?? "rgb(var(--color-text-muted))" }}>
+            <td className="wrap-anywhere" style={{ fontWeight: 700, color: accent ?? "rgb(var(--color-text-muted))" }}>
               {exp.requestNumber}
             </td>
 
-            <td className="cell-wrap">
+            <td className="wrap-anywhere">
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <strong style={{ fontSize: "0.95rem", color: accent ?? "rgb(var(--color-text))" }}>
                   {exp.description}
@@ -109,7 +109,7 @@ export const RequestQueueTable: React.FC<RequestQueueTableProps> = ({
                     exp.budgetItemName ? `Budget item: ${exp.budgetItemName}` : null,
                   ]
                     .filter(Boolean)
-                    .join("  •  ") || "—"}
+                    .join("  â€¢  ") || "â€”"}
                 </span>
                 {note && (
                   <span style={{ fontSize: "0.8rem", fontStyle: "italic", color: accent ?? "rgb(var(--color-text-muted))" }}>

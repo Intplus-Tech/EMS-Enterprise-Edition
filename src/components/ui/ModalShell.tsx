@@ -102,8 +102,10 @@ export const ModalShell: React.FC<ModalShellProps> = ({
           </button>
         </div>
 
-        {/* Scrollable body */}
-        <div style={{ padding: "1.5rem 1.75rem", overflowY: "auto", flex: 1 }}>{children}</div>
+        {/* Scrollable body. `wrap-anywhere` is inherited by everything a caller
+            renders here, so an unbroken request description or vendor name
+            wraps instead of widening the dialog past its own maxWidth. */}
+        <div className="wrap-anywhere" style={{ padding: "1.5rem 1.75rem", overflowY: "auto", flex: 1 }}>{children}</div>
 
         {/* Sticky footer — omitted when the caller renders its own actions inline */}
         {footer && (

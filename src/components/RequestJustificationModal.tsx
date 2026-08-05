@@ -85,8 +85,10 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
         padding: "1rem"
       }}
     >
+      {/* Owns its chrome rather than using ModalShell, so it opts into the same
+          wrapping: the thread it renders is entirely user-written text. */}
       <div
-        className="glass-panel"
+        className="glass-panel wrap-anywhere"
         style={{
           width: "100%",
           maxWidth: "680px",

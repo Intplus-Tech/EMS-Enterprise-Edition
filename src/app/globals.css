@@ -322,14 +322,29 @@ body {
 }
 
 /*
- * Free-text cells (request titles, vendor names, bank references). `anywhere`
- * rather than `break-word` because a user-entered value can be one unbroken
- * token with no space to wrap at, which would otherwise spill across the
- * neighbouring column; `anywhere` also lets it shrink the auto-layout tables.
+ * Anywhere a user-entered value is rendered — request titles, vendor names,
+ * bank references, comments. A description can be one unbroken 80-character
+ * token with no space to wrap at, which otherwise sets the min-content width of
+ * its column or grid track and stretches the whole layout past its container.
+ *
+ * `anywhere` rather than `break-word` specifically: only `anywhere` shrinks the
+ * min-content size, which is what stops the stretching rather than merely
+ * clipping it. The property is inherited, so applying it to a container (a
+ * modal body, a table cell) covers every text node beneath it.
  */
-.cell-wrap {
+.wrap-anywhere {
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+/*
+ * Controls opt back out. Their labels are ours, not the user's, and are short
+ * enough to wrap at a space if they ever need to — breaking "Authorize Budget
+ * Expansion" mid-word to save a few pixels reads as a rendering fault.
+ */
+.wrap-anywhere .btn,
+.wrap-anywhere .badge {
+  overflow-wrap: normal;
 }
 
 /* Light Theme Variables and Overrides */

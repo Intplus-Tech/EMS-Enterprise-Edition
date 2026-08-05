@@ -35,7 +35,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
    * Real budget position per open exception, keyed by request id.
    *
    * The DEFICIT and BUDGET columns used to be `amount * 0.4` and `amount * 0.6`
-   * — invented ratios with no relationship to any department's allocation — and
+   * â€” invented ratios with no relationship to any department's allocation â€” and
    * the "Total Deficit Exposed" KPI was their sum. They are now the server's
    * own figures, the same ones the review screen shows.
    */
@@ -81,7 +81,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
     return {
       id: String(e._id),
       // `criticalGap` is the shortfall this request would create. Null until the
-      // figure has loaded, so the cell says "—" instead of guessing.
+      // figure has loaded, so the cell says "â€”" instead of guessing.
       deficit: context?.hasBudget ? context.criticalGap : null,
       reqId: e.requestNumber ? `#${e.requestNumber.replace(/^REQ-/, "")}` : `#${String(e._id).slice(-4)}`,
       title: e.description || e.category,
@@ -223,7 +223,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
             {/* Measured from the queue. This tile showed a fixed "1.4 Days". */}
             <span style={{ fontSize: "2rem", fontWeight: "800", color: "#2563EB", letterSpacing: "-0.02em" }}>
               {records.length === 0
-                ? "—"
+                ? "â€”"
                 : `${Math.max(...records.map(r => r.waitDays))} days`}
             </span>
           </div>
@@ -425,7 +425,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                             fontSize: "0.8rem"
                           }}
                         >
-                          {r.deficit === null ? "—" : `-${formatNaira(Math.abs(r.deficit))}`}
+                          {r.deficit === null ? "â€”" : `-${formatNaira(Math.abs(r.deficit))}`}
                         </span>
                       </td>
 
@@ -434,8 +434,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                         {r.reqId}
                       </td>
 
-                      {/* REQUEST TITLE + Subtitle — free text, so it wraps */}
-                      <td className="cell-wrap" style={{ padding: "1.1rem 1.25rem" }}>
+                      {/* REQUEST TITLE + Subtitle â€” free text, so it wraps */}
+                      <td className="wrap-anywhere" style={{ padding: "1.1rem 1.25rem" }}>
                         <div style={{ display: "flex", flexDirection: "column" }}>
                           <span style={{ fontSize: "0.9rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
                             {r.title}
@@ -447,7 +447,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                       </td>
 
                       {/* DEPT Pill Badge */}
-                      <td className="cell-wrap" style={{ padding: "1.1rem 1.25rem" }}>
+                      <td className="wrap-anywhere" style={{ padding: "1.1rem 1.25rem" }}>
                         <span
                           style={{
                             display: "inline-block",
@@ -561,7 +561,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
             }}
           >
             <Icons.RefreshCw size={15} className={isReloading ? "spin" : ""} />
-            {isReloading ? "Reloading…" : "Reload Data"}
+            {isReloading ? "Reloadingâ€¦" : "Reload Data"}
           </button>
         </div>
       </div>

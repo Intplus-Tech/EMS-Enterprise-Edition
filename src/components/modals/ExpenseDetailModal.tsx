@@ -69,7 +69,10 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
-      <div className="glass-panel" style={{ width: "100%", maxWidth: "750px", maxHeight: "88vh", overflowY: "auto", padding: "2rem", margin: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* This dialog predates ModalShell and owns its own chrome, so it carries
+          `wrap-anywhere` itself: every value below is user-entered, and one
+          unbroken description used to widen the card past its own maxWidth. */}
+      <div className="glass-panel wrap-anywhere" style={{ width: "100%", maxWidth: "750px", maxHeight: "88vh", overflowY: "auto", padding: "2rem", margin: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h3 style={{ fontWeight: "bold", fontSize: "1.25rem" }}>Request Details: {selectedExpense.requestNumber}</h3>
@@ -119,7 +122,10 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+            {/* minmax(0, …) rather than a bare 1fr: a grid track's default floor
+                is its min-content width, which long free text pushes past the
+                card. Matches AuthorizeReleaseModal and CompletedReleaseModal. */}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "1.5rem" }}>
               {/* Left Column: Request Information */}
               <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)" }}>
                 <h4 style={{ fontSize: "0.85rem", fontWeight: "bold", textTransform: "uppercase", color: "rgb(var(--color-text-dim))", marginBottom: "1rem" }}>Request Information</h4>
@@ -181,7 +187,9 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
           </>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+            {/* Same floor as the initiator grid above — Purpose and the payee
+                fields are both free text. */}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "1.5rem" }}>
               <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)" }}>
                 <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Request Parameters</p>
                 <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
