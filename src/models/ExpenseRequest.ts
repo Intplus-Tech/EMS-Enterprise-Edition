@@ -86,6 +86,19 @@ const ExpenseRequestSchema = new Schema(
      */
     budgetShortfall: { type: Number, default: 0 },
 
+    /**
+     * Held because no budget period covered the required payment date.
+     *
+     * Distinct from an ordinary overrun: there is no period to reserve against,
+     * so the request cannot travel the approval chain and no amount is locked.
+     * It parks here until an administrator creates a period covering the date,
+     * at which point `releaseRequestsAwaitingBudget` re-runs the check and
+     * routes it. Submission used to abort with an error in this case, leaving
+     * the request at INSUFFICIENT_BUDGET with no way back — `submitRequest`
+     * accepts only DRAFT and RETURNED, so the initiator could not retry.
+     */
+    awaitingBudgetPeriod: { type: Boolean, default: false },
+
     // Exceptional Approval parameters
     exceptionalBudgetApproved: { type: Boolean, default: false },
     exceptionalApprovedBy: { type: Schema.Types.ObjectId, ref: "User" },

@@ -2,7 +2,7 @@
 import { BANK_STAGE_STATUSES, OVER_BUDGET_STATUSES, RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
 import { NotificationType, collapsesInto, notificationTypeFor } from "./notifiable-events";
-import { humanizeRequestStatus } from "./status-labels";
+import { requestStateLabel } from "./status-labels";
 import { idOf } from "../identity/reference";
 
 export type { NotificationType };
@@ -96,9 +96,15 @@ function messageFor(type: NotificationType, expense: any, entry: any): string {
     // Progress the initiator can watch but not act on. Each of these used to be
     // emailed and shown nowhere in the app.
     case "IN_PROGRESS":
-      return `Your ${category} request for ${amount} is now ${humanizeRequestStatus(
-        entry?.statusAfter
-      ).toLowerCase()}.${reason}`;
+      // "Flagged as over budget" would be untrue of a request merely held for a
+      // missing period, so the flag qualifies the label. Pairing it with the
+      // entry's own status keeps an unrelated transition from picking it up.
+      return `Your ${category} request for ${amount} is now ${requestStateLabel({
+        status: entry?.statusAfter,
+        awaitingBudgetPeriod:
+          entry?.statusAfter === RequestStatus.INSUFFICIENT_BUDGET &&
+          Boolean(expense.awaitingBudgetPeriod),
+      }).toLowerCase()}.${reason}`;
     default:
       return "";
   }
@@ -190,7 +196,15 @@ function buildReviewQueueNotifications(
   if (pendingStatuses.length === 0) return [];
 
   return expenses
-    .filter((expense) => pendingStatuses.includes(expense.status) && idOf(expense.initiatorId) !== userId)
+    .filter(
+      (expense) =>
+        pendingStatuses.includes(expense.status) &&
+        idOf(expense.initiatorId) !== userId &&
+        // Nothing for the Finance Head to act on while a request is held for a
+        // missing budget period — telling them it "is waiting on your action"
+        // would send them to a decision they cannot make.
+        !expense.awaitingBudgetPeriod
+    )
     .map((expense) => {
       const requestNumber = expense.requestNumber || "Request";
       const initiatorName = expense.initiatorId?.name || "an initiator";

@@ -58,9 +58,17 @@ export function humanizeStatus(status?: string | null): string {
  * which desk a request is sitting on. The server resolves the active step's
  * name against the configured chain and sends it as `currentStageName`; this
  * prefers it and falls back to the status for every other state.
+ *
+ * A request held for a missing budget period shares the INSUFFICIENT_BUDGET
+ * status with a genuine overrun but is not one — nobody has ruled it over
+ * budget, its department simply has no allocation yet — so it is named for what
+ * it is actually waiting on.
  */
-export function stageLabel(expense?: { status?: string; currentStageName?: string } | null): string {
+export function stageLabel(
+  expense?: { status?: string; currentStageName?: string; awaitingBudgetPeriod?: boolean } | null
+): string {
   if (!expense) return "";
+  if (expense.awaitingBudgetPeriod) return "AWAITING BUDGET SETUP";
   return expense.currentStageName
     ? expense.currentStageName.toUpperCase()
     : humanizeStatus(expense.status);

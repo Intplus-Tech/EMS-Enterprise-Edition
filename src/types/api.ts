@@ -87,6 +87,12 @@ export interface ExpenseRequestDto {
   /** Deficit left on that item; 0 when it fits. Drives the exception routing. */
   budgetShortfall?: number;
   /**
+   * Held because the department had no budget period covering the payment date.
+   * Shares INSUFFICIENT_BUDGET with a real overrun, so screens must read this to
+   * tell "nothing to reserve against yet" from "over the ceiling".
+   */
+  awaitingBudgetPeriod?: boolean;
+  /**
    * Name of the approval step a PENDING_APPROVAL request is waiting on, so the
    * UI can tell the approver's queue from the Finance Officer's. Resolved
    * server-side against the configured chain; absent for every other status.

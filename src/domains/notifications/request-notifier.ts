@@ -3,7 +3,7 @@ import { EmailService } from "../email/email.service";
 import { LoggerService } from "../logs/logger.service";
 import { RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
-import { humanizeRequestStatus } from "./status-labels";
+import { requestStateLabel } from "./status-labels";
 import { isNotifiableStatus } from "./notifiable-events";
 
 /**
@@ -30,6 +30,8 @@ export class RequestNotifier {
       requestNumber: string;
       initiatorId: unknown;
       status: RequestStatus;
+      /** Qualifies INSUFFICIENT_BUDGET — see `requestStateLabel`. */
+      awaitingBudgetPeriod?: boolean;
     },
     origin?: string
   ): Promise<void> {
@@ -49,7 +51,7 @@ export class RequestNotifier {
         initiator.email,
         initiator.name,
         request.requestNumber,
-        humanizeRequestStatus(request.status),
+        requestStateLabel(request),
         actionUrl,
         origin
       );

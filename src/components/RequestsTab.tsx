@@ -2,7 +2,7 @@ import React from "react";
 import * as Icons from "lucide-react";
 import { isOwnRequest } from "../domains/identity/reference";
 import { StatCard } from "./ui/StatCard";
-import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, statusBadgeClass } from "./ui/format";
+import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import { Pagination } from "./ui/Pagination";
 import { ExpenseRequestDto } from "../types/api";
@@ -416,7 +416,11 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                           <td>{exp.description}</td>
                           <td style={{ textAlign: "right", fontWeight: 700 }}>{formatNairaPrecise(exp.amount)}</td>
                           <td>
-                            <span className={`badge ${statusBadgeClass(exp.status)}`}>{humanizeStatus(exp.status)}</span>
+                            {/* `stageLabel`, not the bare status: it names the desk
+                                a request is sitting on, and reads a request held
+                                for a missing budget period as exactly that
+                                rather than as an overrun. */}
+                            <span className={`badge ${statusBadgeClass(exp.status)}`}>{stageLabel(exp)}</span>
                           </td>
                           <td style={{ textAlign: "right" }}>
                             {/* Stop propagation so the icon does not double-fire the row handler */}

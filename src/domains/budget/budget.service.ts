@@ -39,6 +39,23 @@ export const LOCKED_STATUSES: RequestStatus[] = [
 const NAIRA = "₦";
 const money = (amount: number) => `${NAIRA}${Number(amount || 0).toLocaleString()}`;
 
+/**
+ * Outcome of the submission-time budget gate.
+ *
+ * Typed explicitly so `reason` is readable on every branch — the success case
+ * carries none, and callers switch on it rather than parsing `message`.
+ */
+export interface BudgetCheckResult {
+  isValid: boolean;
+  /** How the check failed. Absent when it passed. */
+  reason?: "NO_PERIOD" | "INSUFFICIENT";
+  remaining: number;
+  periodName?: string;
+  /** The shortfall, on an INSUFFICIENT result. */
+  variance?: number;
+  message?: string;
+}
+
 /** Minimal shape the ceiling helpers need, so they work on lean docs too. */
 type ItemLike = {
   amount?: number;
@@ -178,13 +195,24 @@ export class BudgetService {
    * Returns:
    *   - { isValid: true, remaining: number } if valid
    *   - { isValid: false, remaining: number, message: string } if insufficient
+   *
+   * `reason` separates the two ways the check fails. They are not the same
+   * event: NO_PERIOD means there is nothing to reserve against and the request
+   * has to be held, while INSUFFICIENT means the department is genuinely over
+   * its ceiling and the request travels on carrying the overrun. The caller
+   * used to have to tell them apart by reading the message text.
    */
-  public static async validateRequestBudget(departmentId: string, amount: number, date: Date) {
+  public static async validateRequestBudget(
+    departmentId: string,
+    amount: number,
+    date: Date
+  ): Promise<BudgetCheckResult> {
     const period = await this.getBudgetPeriodForDate(departmentId, date);
-    
+
     if (!period) {
       return {
         isValid: false,
+        reason: "NO_PERIOD" as const,
         remaining: 0,
         message: "No active budget period configured for the requested payment date."
       };
@@ -204,6 +232,7 @@ export class BudgetService {
     // available (N), and the gap between them that needs justifying.
     return {
       isValid: false,
+      reason: "INSUFFICIENT" as const,
       remaining: available,
       periodName: period.periodName,
       variance: amount - available,

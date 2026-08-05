@@ -149,8 +149,12 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
         totalBudget?: number;
         lineItems?: { name: string; description?: string; amount: number }[];
       }
-    ) =>
-      run(async () => {
+    ) => {
+      // Setting the allocation from here can release held requests just as the
+      // Set Budget modal does, so the same outcome is reported.
+      let summary = "Department updated.";
+
+      return run(async () => {
         await AdminClient.updateDepartment(id, {
           name: input.name,
           description: input.description,
@@ -159,16 +163,21 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
         });
 
         if (input.totalBudget !== undefined) {
-          await AdminClient.saveBudgetPeriod({
+          const { released } = await AdminClient.saveBudgetPeriod({
             departmentId: id,
             ...currentFiscalPeriod(),
             totalBudget: input.totalBudget,
             lineItems: input.lineItems ?? [],
           });
+
+          if (released > 0) {
+            summary += ` ${released} held request(s) released into the approval chain.`;
+          }
         }
 
         await Promise.all([loadDepartments(), loadBudgets()]);
-      }, "Department updated."),
+      }, () => summary);
+    },
     [run, loadDepartments, loadBudgets]
   );
 
@@ -294,16 +303,30 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
 
   const saveBudgetPeriod = useCallback(
     (input: Omit<BudgetPeriodInput, "periodName" | "startDate" | "endDate"> &
-      Partial<Pick<BudgetPeriodInput, "periodName" | "startDate" | "endDate">>) =>
-      run(async () => {
-        const { budgets: summaries, periods } = await AdminClient.saveBudgetPeriod({
-          ...currentFiscalPeriod(),
-          ...input,
-        });
+      Partial<Pick<BudgetPeriodInput, "periodName" | "startDate" | "endDate">>) => {
+      // Reported back to the admin: funding a department can move requests that
+      // were waiting on it, and that is not something to leave them to discover.
+      let summary = "Departmental budget updated.";
+
+      return run(async () => {
+        const { budgets: summaries, periods, released, failed } =
+          await AdminClient.saveBudgetPeriod({
+            ...currentFiscalPeriod(),
+            ...input,
+          });
         setBudgets(summaries);
         setBudgetPeriods(periods);
+
+        if (released > 0) {
+          summary += ` ${released} held request(s) released into the approval chain.`;
+        }
+        if (failed?.length > 0) {
+          summary += ` ${failed.length} could not be released (${failed.join(", ")}) — see the audit log.`;
+        }
+
         await loadDepartments();
-      }, "Departmental budget updated."),
+      }, () => summary);
+    },
     [run, loadDepartments]
   );
 

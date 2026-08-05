@@ -150,11 +150,19 @@ export const AdminClient = {
   listBudgets: () =>
     http.get<{ budgets: DepartmentSpendDto[]; periods: BudgetPeriodDto[] }>("/api/admin/budgets"),
 
+  /**
+   * `released` counts the requests this save unblocked: any that were submitted
+   * before the department had a period covering their payment date and were
+   * held rather than routed.
+   */
   saveBudgetPeriod: (input: BudgetPeriodInput) =>
-    http.post<{ budgets: DepartmentSpendDto[]; periods: BudgetPeriodDto[] }>(
-      "/api/admin/budgets",
-      { ...input }
-    ),
+    http.post<{
+      budgets: DepartmentSpendDto[];
+      periods: BudgetPeriodDto[];
+      released: number;
+      requestNumbers: string[];
+      failed: string[];
+    }>("/api/admin/budgets", { ...input }),
 
   /* ----- Roles & permissions ----- */
 

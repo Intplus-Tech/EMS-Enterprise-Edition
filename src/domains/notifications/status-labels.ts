@@ -28,3 +28,21 @@ const LABELS: Record<RequestStatus, string> = {
 export function humanizeRequestStatus(status: RequestStatus | string): string {
   return LABELS[status as RequestStatus] ?? String(status).replace(/_/g, " ");
 }
+
+/**
+ * What to tell the initiator their request is doing.
+ *
+ * A request held for a missing budget period carries INSUFFICIENT_BUDGET, but
+ * telling its owner it was "flagged as over budget" would be false — nothing
+ * has been ruled over budget, the department simply has no allocation yet, and
+ * there is nothing for the initiator to fix.
+ */
+export function requestStateLabel(request: {
+  status: RequestStatus | string;
+  awaitingBudgetPeriod?: boolean;
+}): string {
+  if (request.awaitingBudgetPeriod) {
+    return "Held until an administrator sets the department's budget";
+  }
+  return humanizeRequestStatus(request.status);
+}

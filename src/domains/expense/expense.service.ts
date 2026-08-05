@@ -4,7 +4,7 @@ import { User } from "../../models/User";
 import { Department } from "../../models/Department";
 import { BudgetService } from "../budget/budget.service";
 import { WorkflowService } from "../workflow/workflow.service";
-import { LoggerService } from "../logs/logger.service";
+import { ILogActor, LoggerService } from "../logs/logger.service";
 import { RequestNotifier } from "../notifications/request-notifier";
 import { BANK_STAGE_STATUSES, OVER_BUDGET_STATUSES, RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
@@ -19,8 +19,11 @@ import { IAttachment, IUser } from "../../types";
  */
 type WorkflowActor = IUser & { id?: string; ipAddress?: string };
 
-const getActorId = (actor: WorkflowActor): string => {
-  return (actor?._id || actor?.id)?.toString() || "";
+// Structural: the session state from `authenticate()` carries `id` while a User
+// document carries `_id`, and both reach this service.
+const getActorId = (actor?: { _id?: unknown; id?: string } | null): string => {
+  const raw = actor?._id ?? actor?.id;
+  return raw ? String(raw) : "";
 };
 
 /** Naira amounts in log lines, matching how the UI renders them. */
@@ -46,6 +49,22 @@ type WorkflowRequestDoc = {
     }): unknown;
   };
   save(): Promise<unknown>;
+};
+
+/**
+ * What the budget-gate helpers below read and write on a request: the workflow
+ * fields plus the budget state. Structural rather than the Mongoose document
+ * type, so the helpers stay callable from both this service and a test double.
+ */
+type BudgetGateRequestDoc = WorkflowRequestDoc & {
+  _id: { toString(): string };
+  departmentId: { toString(): string };
+  initiatorId: unknown;
+  amount: number;
+  requiredPaymentDate: Date;
+  awaitingBudgetPeriod?: boolean;
+  budgetShortfall?: number;
+  currentStepIndex?: number;
 };
 
 /**
@@ -247,6 +266,13 @@ export class ExpenseService {
     // reject on its merits.
     request.budgetShortfall = budgetCheck.isValid ? 0 : Math.max(0, budgetCheck.variance ?? 0);
 
+    // No period at all is not an overrun — there is nothing to reserve against
+    // and nothing for an approver to rule on, so the request is held here and
+    // released automatically once an administrator creates the period.
+    if (budgetCheck.reason === "NO_PERIOD") {
+      return this.holdForBudgetPeriod(request, actorId, logActor);
+    }
+
     if (!budgetCheck.isValid) {
       // Flagged, not rerouted. The status still passes through
       // INSUFFICIENT_BUDGET so the overrun is on the record and the
@@ -272,6 +298,75 @@ export class ExpenseService {
       );
     }
 
+    return this.reserveAndRoute(request, budgetCheck, actorId, logActor);
+  }
+
+  /**
+   * Parks a request whose department has no budget period covering its payment
+   * date, instead of failing the submission outright.
+   *
+   * The amount is deliberately not reserved: there is no period to reserve it
+   * in. `awaitingBudgetPeriod` is what `releaseRequestsAwaitingBudget` looks
+   * for, and it is the only thing separating this state from an ordinary
+   * overrun parked at the same status.
+   */
+  private static async holdForBudgetPeriod(
+    request: BudgetGateRequestDoc,
+    actorId: string,
+    logActor: ILogActor
+  ) {
+    const department = await Department.findById(request.departmentId).select("name").lean();
+    const departmentName = department?.name ?? "the department";
+    const paymentDate = new Date(request.requiredPaymentDate).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+    const statusBefore = request.status;
+    request.status = RequestStatus.INSUFFICIENT_BUDGET;
+    request.awaitingBudgetPeriod = true;
+    request.history.push({
+      statusBefore,
+      statusAfter: RequestStatus.INSUFFICIENT_BUDGET,
+      actorId,
+      actorName: "System Engine",
+      actorRole: SystemRole.ADMIN,
+      action: "Held — awaiting budget period",
+      comment:
+        `${departmentName} has no budget period covering ${paymentDate}. ` +
+        `The request will continue automatically once an administrator sets one.`,
+      timestamp: new Date(),
+    });
+    await request.save();
+
+    await LoggerService.logAudit(
+      AuditAction.BUDGET_PERIOD_MISSING,
+      `Request ${request.requestNumber} is held: ${departmentName} has no budget period covering ${paymentDate}.`,
+      { requestId: request._id.toString(), departmentId: request.departmentId?.toString() },
+      logActor
+    );
+
+    await RequestNotifier.notifyInitiator(request);
+
+    return request;
+  }
+
+  /**
+   * Reserves the amount and routes the request into the approval chain.
+   *
+   * Shared by submission and by the release that follows a late budget period,
+   * so a released request reserves, routes, logs and notifies exactly as one
+   * submitted against a funded department does.
+   */
+  private static async reserveAndRoute(
+    request: BudgetGateRequestDoc,
+    budgetCheck: { isValid: boolean },
+    actorId: string,
+    logActor: ILogActor,
+    /** Appended to the routing history entry when a late period unblocked it. */
+    releaseNote?: string
+  ) {
     // Reserve the amount either way. An over-budget request still commits the
     // department to the spend while it is in flight — leaving it unreserved
     // would let a second request be measured against funds this one is already
@@ -284,15 +379,17 @@ export class ExpenseService {
       request.status = RequestStatus.PENDING_APPROVAL;
       request.currentStepIndex = nextRouting.index;
 
+      const routed = budgetCheck.isValid
+        ? `Budget Validated. Routed to: ${nextRouting.step.stepName}`
+        : `Routed to ${nextRouting.step.stepName} carrying a budget overrun`;
+
       request.history.push({
         statusBefore,
         statusAfter: RequestStatus.PENDING_APPROVAL,
         actorId: actorId,
         actorName: "System Engine",
         actorRole: SystemRole.ADMIN,
-        action: budgetCheck.isValid
-          ? `Budget Validated. Routed to: ${nextRouting.step.stepName}`
-          : `Routed to ${nextRouting.step.stepName} carrying a budget overrun`,
+        action: releaseNote ? `${releaseNote} ${routed}` : routed,
         timestamp: new Date()
       });
 
@@ -323,6 +420,90 @@ export class ExpenseService {
   }
 
   /**
+   * Releases the requests a newly-created budget period unblocks.
+   *
+   * Called after an administrator sets a department's budget: every request
+   * held by `holdForBudgetPeriod` whose required payment date falls inside the
+   * new window is re-checked, reserved and routed, exactly as if it had been
+   * submitted against a funded department. Without this the held requests sat
+   * at INSUFFICIENT_BUDGET permanently — `submitRequest` accepts only DRAFT and
+   * RETURNED, so nobody, initiator or admin, could move them on.
+   *
+   * A request that is still over budget after the allocation is released all
+   * the same, carrying its overrun to the approval chain: that is the normal
+   * path for an overrun and the Finance Head decides it at the end.
+   */
+  public static async releaseRequestsAwaitingBudget(
+    period: { departmentId: unknown; startDate: Date; endDate: Date; periodName: string },
+    // The administrator who set the budget, as the route holds them — only the
+    // audit fields are needed, so the full user document is not required.
+    actor: { id?: string; _id?: unknown; name?: string; role?: SystemRole; ipAddress?: string }
+  ): Promise<{ released: number; requestNumbers: string[]; failed: string[] }> {
+    await connectToDatabase();
+
+    const held = await ExpenseRequest.find({
+      departmentId: period.departmentId,
+      awaitingBudgetPeriod: true,
+      requiredPaymentDate: { $gte: period.startDate, $lte: period.endDate },
+    });
+
+    const actorId = getActorId(actor);
+    const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
+    const requestNumbers: string[] = [];
+    const failed: string[] = [];
+
+    for (const request of held) {
+      // Each release is independent: one request that cannot be routed must not
+      // strand the rest, and the budget save itself has already succeeded.
+      try {
+        const budgetCheck = await BudgetService.validateRequestBudget(
+          request.departmentId.toString(),
+          request.amount,
+          request.requiredPaymentDate
+        );
+
+        // The period exists now, so this can only be a genuine shortfall.
+        request.budgetShortfall = budgetCheck.isValid ? 0 : Math.max(0, budgetCheck.variance ?? 0);
+
+        // Cleared in memory only: `reserveAndRoute` persists it as part of the
+        // save that routes the request, so a failure before that point leaves
+        // the flag set in the database and the request eligible for a retry
+        // rather than silently unheld and unrouted.
+        request.awaitingBudgetPeriod = false;
+
+        await this.reserveAndRoute(
+          request,
+          budgetCheck,
+          actorId,
+          logActor,
+          `Released by budget period '${period.periodName}'.`
+        );
+
+        requestNumbers.push(request.requestNumber);
+      } catch (error) {
+        failed.push(request.requestNumber);
+        await LoggerService.logException(
+          AuditAction.BUDGET_PERIOD_MISSING,
+          `Request ${request.requestNumber} could not be released against period '${period.periodName}'.`,
+          error,
+          logActor
+        );
+      }
+    }
+
+    if (requestNumbers.length > 0) {
+      await LoggerService.logAudit(
+        AuditAction.BUDGET_PERIOD_CREATED,
+        `Period '${period.periodName}' released ${requestNumbers.length} held request(s): ${requestNumbers.join(", ")}.`,
+        { periodName: period.periodName, requestNumbers },
+        logActor
+      );
+    }
+
+    return { released: requestNumbers.length, requestNumbers, failed };
+  }
+
+  /**
    * Processes exceptional budget approval from Finance Head
    */
   public static async processExceptionalBudget(requestId: string, actor: WorkflowActor, action: WorkflowActionType, comment?: string, adjustedAmount?: number) {
@@ -338,6 +519,14 @@ export class ExpenseService {
     // parked at INSUFFICIENT_BUDGET: they were reviewable but never decidable.
     if (!OVER_BUDGET_STATUSES.includes(request.status)) {
       throw new Error("Request is not awaiting exceptional budget approval.");
+    }
+    // Held, not over budget: there is no period to expand and no item to expand
+    // it on, so an approval here would fail deep inside `grantOneTimeExpansion`
+    // with a message about attachments rather than the real blocker.
+    if (request.awaitingBudgetPeriod) {
+      throw new Error(
+        `Invalid request: ${request.requestNumber} is held because its department has no budget period covering the required payment date. An administrator must set one; the request then rejoins the approval chain on its own.`
+      );
     }
 
     const previousStatus = request.status;
@@ -473,7 +662,7 @@ export class ExpenseService {
   private static async advanceToBankStage(
     request: WorkflowRequestDoc,
     actor: WorkflowActor,
-    logActor: { id: string; name: string; role: SystemRole; ipAddress?: string }
+    logActor: ILogActor
   ) {
     const actorId = getActorId(actor);
     // The officer is the one who confirms payee and documents. When the Finance

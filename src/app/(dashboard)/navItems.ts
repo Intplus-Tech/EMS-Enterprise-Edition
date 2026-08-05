@@ -9,14 +9,19 @@
 
 import {
   BANK_STAGE_STATUSES,
-  OVER_BUDGET_STATUSES,
+  isDecidableException,
   isStatusIn,
   type RequestStatus,
 } from "../../enums/statuses";
 
 /** Shape of the dashboard data a badge count is derived from. */
 export interface NavBadgeContext {
-  expenses: { status: RequestStatus | string; currentStepIndex?: number }[];
+  expenses: {
+    status: RequestStatus | string;
+    currentStepIndex?: number;
+    /** Held for a missing budget period — see `isDecidableException`. */
+    awaitingBudgetPeriod?: boolean;
+  }[];
   role?: string;
 }
 
@@ -38,7 +43,7 @@ const draftOrReturnedCount = ({ expenses }: NavBadgeContext) =>
 
 /** Over-budget requests sitting with the Finance Head. */
 const openExceptionCount = ({ expenses }: NavBadgeContext) =>
-  expenses.filter((e) => isStatusIn(OVER_BUDGET_STATUSES, e.status)).length;
+  expenses.filter((e) => isDecidableException(e)).length;
 
 /**
  * Requests waiting on *this* approver. Each role owns a different stage, so the
@@ -47,7 +52,7 @@ const openExceptionCount = ({ expenses }: NavBadgeContext) =>
 const awaitingMyDecisionCount = ({ expenses, role }: NavBadgeContext) =>
   expenses.filter((e) => {
     const status = String(e.status);
-    if (role === "FINANCE_HEAD") return isStatusIn(OVER_BUDGET_STATUSES, status);
+    if (role === "FINANCE_HEAD") return isDecidableException(e);
     if (role === "APPROVER") return status === "PENDING_APPROVAL" && e.currentStepIndex === 0;
     if (role === "FINANCE_OFFICER") return status === "SENT_TO_FINANCE";
     if (role === "FINANCE_MANAGER") return isStatusIn(BANK_STAGE_STATUSES, status);

@@ -73,3 +73,21 @@ export const BANK_STAGE_STATUSES: RequestStatus[] = [
 export function isStatusIn(statuses: RequestStatus[], status?: string | null): boolean {
   return statuses.includes(String(status) as RequestStatus);
 }
+
+/**
+ * An over-budget request the Finance Head can actually rule on.
+ *
+ * A request held because its department has no budget period carries
+ * INSUFFICIENT_BUDGET as well, but there is no period to expand and no item to
+ * expand it against — it waits on an administrator setting a budget, not on a
+ * decision. Every Finance Head queue, badge and notification filters on this
+ * rather than the status alone, so held requests do not pad a queue nobody can
+ * clear.
+ */
+export function isDecidableException(request?: {
+  status?: string | null;
+  awaitingBudgetPeriod?: boolean;
+} | null): boolean {
+  if (!request) return false;
+  return isStatusIn(OVER_BUDGET_STATUSES, request.status) && !request.awaitingBudgetPeriod;
+}

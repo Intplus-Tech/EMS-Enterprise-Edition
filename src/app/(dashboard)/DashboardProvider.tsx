@@ -16,6 +16,15 @@ import { AttachmentInput, InviteResultDto } from "../../types/api";
 import type { AttachmentTarget } from "../../components/modals/AttachmentViewModal";
 import { WorkflowActionType } from "../../enums/workflowActions";
 
+/**
+ * Told to the initiator when a submission is accepted but held: the department
+ * has no budget period covering the payment date, so there is nothing to
+ * reserve against and no approver to route to yet.
+ */
+const HELD_FOR_BUDGET_MESSAGE =
+  "Request submitted, and on hold: your department has no budget set for that payment date. " +
+  "It continues to the approver automatically once an administrator sets one.";
+
 const DISMISSED_NOTIFICATIONS_KEY = "ems.notifications.dismissed";
 const READ_NOTIFICATIONS_KEY = "ems.notifications.read";
 
@@ -559,7 +568,13 @@ function useDashboardState() {
 
       if (shouldSubmit) {
         try {
-          await ExpenseClient.submit(created._id);
+          const { request: submitted } = await ExpenseClient.submit(created._id);
+          // A request whose department has no budget period for that payment
+          // date is accepted but held, not routed. Saying nothing would leave
+          // the initiator watching a request that never reaches an approver.
+          if (submitted?.awaitingBudgetPeriod) {
+            notifySuccess(HELD_FOR_BUDGET_MESSAGE);
+          }
         } catch (submitError) {
           // The draft did save, so say so rather than implying nothing happened.
           setFormError(`Draft saved, but failed to submit: ${toErrorMessage(submitError)}`);
@@ -606,13 +621,17 @@ function useDashboardState() {
         vendorBankDetails: selectedResubmitExpense.vendorBankDetails,
         requiredPaymentDate: selectedResubmitExpense.requiredPaymentDate,
       });
-      await ExpenseClient.submit(selectedResubmitExpense._id);
+      const { request: resubmitted } = await ExpenseClient.submit(selectedResubmitExpense._id);
 
       setShowResubmitModal(false);
       setSelectedResubmitExpense(null);
       setResubmitForm({ justification: "", supportingDocuments: [] });
       loadDashboardData(currentUser);
-      notifySuccess("Request updated and resubmitted.");
+      notifySuccess(
+        resubmitted?.awaitingBudgetPeriod
+          ? HELD_FOR_BUDGET_MESSAGE
+          : "Request updated and resubmitted."
+      );
     } catch (err) {
       setFormError(toErrorMessage(err, "Failed to resubmit request."));
     }
