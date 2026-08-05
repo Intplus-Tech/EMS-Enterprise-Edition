@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { useResetOnOpen } from "../../ui/useResetOnOpen";
 
 interface AdminAddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   departments: any[];
-  onSaveUser: (userData: any) => void;
+  /** Resolves false when the invite was refused, so the modal can stay open. */
+  onSaveUser: (userData: any) => void | Promise<boolean | void>;
 }
 
 export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
@@ -17,21 +19,31 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [contactNumber, setContactNumber] = useState("");
-  const [departmentId, setDepartmentId] = useState(departments[0]?._id || departments[0]?.id || "");
+  const [departmentId, setDepartmentId] = useState("");
   const [role, setRole] = useState("INITIATOR");
+
+  // Departments load after first mount, so the initial useState never saw them;
+  // seeding the default here also clears the previous entry on reopen.
+  useResetOnOpen(isOpen, () => {
+    setFullName("");
+    setEmail("");
+    setContactNumber("");
+    setDepartmentId(departments[0]?._id || departments[0]?.id || "");
+    setRole("INITIATOR");
+  });
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveUser({
+    const saved = await onSaveUser({
       fullName,
       email,
       contactNumber,
       departmentId,
       role
     });
-    onClose();
+    if (saved !== false) onClose();
   };
 
   return (

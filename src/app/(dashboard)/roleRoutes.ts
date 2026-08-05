@@ -19,8 +19,11 @@ export function getAllowedRoutesForRole(role?: string): string[] {
         "/audit-trail",
         "/settings",
         "/workflow",
-        "/logs",
-        "/users",
+        // "/logs" (System Audits) and "/users" (Users & Invites) are withheld
+        // alongside their sidebar entries in DashboardShell.tsx, so a direct
+        // URL cannot reach a screen the navigation no longer offers.
+        // "/logs",
+        // "/users",
       ];
     default:
       // APPROVER and any other authenticated role

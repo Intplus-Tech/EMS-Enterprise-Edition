@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+import { useResetOnOpen } from "../../ui/useResetOnOpen";
 
 interface LineItem {
   id: string;
@@ -11,18 +12,28 @@ interface LineItem {
 interface AdminCreateDepartmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreateDepartment: (deptData: any) => void;
+  /** Resolves false when the create was refused, so the modal can stay open. */
+  onCreateDepartment: (deptData: any) => void | Promise<boolean | void>;
+  busy?: boolean;
 }
 
 export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProps> = ({
   isOpen,
   onClose,
-  onCreateDepartment
+  onCreateDepartment,
+  busy = false
 }) => {
   const [deptName, setDeptName] = useState("");
   // Starts empty: the modal used to pre-fill three invented allocation lines
   // totalling ₦9,000,000, which would have been saved verbatim on submit.
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
+
+  // This modal renders null rather than unmounting, so without an explicit
+  // reset the next open still showed the previous department's entry.
+  useResetOnOpen(isOpen, () => {
+    setDeptName("");
+    setLineItems([]);
+  });
 
   if (!isOpen) return null;
 
@@ -51,14 +62,16 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
     setLineItems(lineItems.filter(item => item.id !== id));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Closes only on a confirmed create, so a rejected name (duplicate, too short)
+  // leaves the entry on screen to correct rather than silently discarding it.
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onCreateDepartment({
+    const created = await onCreateDepartment({
       name: deptName,
       totalBudget: totalAllocation,
       lineItems
     });
-    onClose();
+    if (created !== false) onClose();
   };
 
   return (
@@ -268,6 +281,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             </button>
             <button
               type="submit"
+              disabled={busy}
               style={{
                 padding: "0.65rem 1.25rem",
                 borderRadius: "0.5rem",
@@ -276,11 +290,12 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                 color: "#ffffff",
                 fontWeight: "600",
                 fontSize: "0.85rem",
-                cursor: "pointer",
+                cursor: busy ? "not-allowed" : "pointer",
+                opacity: busy ? 0.6 : 1,
                 boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
               }}
             >
-              Create Department
+              {busy ? "Creating…" : "Create Department"}
             </button>
           </div>
         </form>

@@ -441,6 +441,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <Icons.GitFork size={18} /> Workflow Rules
               </button>
 
+              {/* System Audits (/logs) and Users & Invites (/users) are withheld
+                  from the sidebar for now. Audit Trail already covers the log
+                  view and Users & Roles already covers user administration, so
+                  both entries duplicated an existing screen. The routes are
+                  also withheld in roleRoutes.ts — restore both together. */}
+              {/*
               <button
                 onClick={() => navTo("/logs")}
                 className="btn"
@@ -466,6 +472,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               >
                 <Icons.Users size={18} /> Users & Invites
               </button>
+              */}
             </>
           ) : (
             <>
@@ -870,6 +877,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <AdminCreateDepartmentModal
         isOpen={showAdminCreateDeptModal}
         onClose={() => setShowAdminCreateDeptModal(false)}
+        busy={adminBusy}
         onCreateDepartment={(deptData: any) =>
           createDepartment({
             name: deptData.name,
@@ -944,6 +952,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         isOpen={showAdminSetBudgetModal}
         onClose={() => setShowAdminSetBudgetModal(false)}
         departments={departments}
+        busy={adminBusy}
         onSetBudget={(departmentId: string, totalAmount: number, lineItems: any[]) =>
           saveBudgetPeriod({
             departmentId,

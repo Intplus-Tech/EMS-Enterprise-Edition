@@ -9,7 +9,11 @@ const ROWS_PER_PAGE = 5;
 import * as Icons from "lucide-react";
 
 /** A department row joined with its budget figures for this screen. */
-export type AdminDepartmentRow = DepartmentDto & Omit<DepartmentSpendDto, "id" | "name" | "description" | "isActive">;
+export type AdminDepartmentRow = DepartmentDto &
+  Omit<DepartmentSpendDto, "id" | "name" | "description" | "isActive"> & {
+    /** Allocation lines for the period, consumed by the Edit Department modal. */
+    budgetItems?: { category: string; amount: number; description?: string; utilization: number }[];
+  };
 
 interface AdminDepartmentalSpendTabProps {
   departments: AdminDepartmentRow[];
@@ -70,6 +74,26 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
     .filter((d) => d.hasBudget)
     .sort((a, b) => b.pctUsed - a.pctUsed)
     .slice(0, 6);
+
+  /**
+   * In-flight requests and live department count for the two right-hand tiles.
+   * Both read "14" and "6" as literals before, so adding a department or raising
+   * a request left them unchanged and made the screen look like it had not saved.
+   */
+  const pendingRequestCount = expenses.filter((e) =>
+    [
+      "SUBMITTED",
+      "BUDGET_CHECK",
+      "INSUFFICIENT_BUDGET",
+      "PENDING_EXCEPTIONAL",
+      "PENDING_APPROVAL",
+      "APPROVED",
+      "SENT_TO_FINANCE",
+      "UPLOADED_TO_BANK",
+      "AWAITING_RELEASE",
+    ].includes(e.status)
+  ).length;
+  const activeDeptCount = departments.filter((d) => d.isActive !== false).length;
 
   /**
    * Share of the enterprise allocation actually committed. Replaces the fixed
@@ -442,7 +466,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase" }}>PENDING REQUESTS</div>
-              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>14</div>
+              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>{pendingRequestCount}</div>
             </div>
           </div>
         </div>
@@ -455,7 +479,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
             <div>
               <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase" }}>ACTIVE DEPTS.</div>
-              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>6</div>
+              <div style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))", marginTop: "0.15rem" }}>{activeDeptCount}</div>
             </div>
           </div>
         </div>

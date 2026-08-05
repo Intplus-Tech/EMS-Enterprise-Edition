@@ -19,6 +19,7 @@ export default function DepartmentalSpendPage() {
     expenses,
     departments,
     budgets,
+    budgetPeriods,
     setSelectedExpense,
     loadDashboardData,
     setSelectedAdminDept,
@@ -31,6 +32,19 @@ export default function DepartmentalSpendPage() {
   // separate endpoints; the table needs them joined into one row per department.
   const departmentRows = useMemo<AdminDepartmentRow[]>(() => {
     const spendById = new Map(budgets.map((b) => [b.id, b]));
+
+    // Allocation lines, carried on the row so the Edit Department modal can
+    // show them. Without this it opened with an empty list and its save wrote
+    // that empty list back, erasing the department's budget breakdown.
+    const linesByDept = new Map<string, { category: string; amount: number; description?: string; utilization: number }[]>();
+    budgetPeriods.forEach((period) => {
+      const existing = linesByDept.get(period.departmentId) ?? [];
+      period.lineItems.forEach((item) =>
+        existing.push({ category: item.name, amount: item.amount, description: item.description, utilization: 0 })
+      );
+      linesByDept.set(period.departmentId, existing);
+    });
+
     return departments.map((dept) => {
       const spend = spendById.get(dept.id);
       return {
@@ -43,9 +57,10 @@ export default function DepartmentalSpendPage() {
         topRequester: spend?.topRequester ?? "N/A",
         overBudgetCount: spend?.overBudgetCount ?? 0,
         hasBudget: spend?.hasBudget ?? false,
+        budgetItems: linesByDept.get(dept.id) ?? [],
       };
     });
-  }, [departments, budgets]);
+  }, [departments, budgets, budgetPeriods]);
 
   if (currentUser?.role === SystemRole.ADMIN) {
     return (

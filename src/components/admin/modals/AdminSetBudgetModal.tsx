@@ -9,24 +9,39 @@ import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
 import { formatNairaPrecise } from "../../ui/format";
+import { useResetOnOpen } from "../../ui/useResetOnOpen";
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
 
 interface AdminSetBudgetModalProps {
   isOpen: boolean;
   onClose: () => void;
   departments: any[];
-  onSetBudget: (departmentId: string, totalAmount: number, lineItems: any[]) => void;
+  /** Resolves false when the save was refused, so the modal can stay open. */
+  onSetBudget: (departmentId: string, totalAmount: number, lineItems: any[]) => void | Promise<boolean | void>;
+  busy?: boolean;
 }
 
 export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   isOpen,
   onClose,
   departments,
-  onSetBudget
+  onSetBudget,
+  busy = false
 }) => {
-  const [selectedDeptId, setSelectedDeptId] = useState(departments[0]?._id || departments[0]?.id || "");
+  const [selectedDeptId, setSelectedDeptId] = useState("");
   const [lineItems, setLineItems] = useState<any[]>([]);
   const [showAddItem, setShowAddItem] = useState(false);
+  const [error, setError] = useState("");
+
+  // The department list arrives after this modal first mounts, so the initial
+  // useState could never see it — the select stayed on "" and every save was
+  // rejected by the API for a missing departmentId.
+  useResetOnOpen(isOpen, () => {
+    setSelectedDeptId(departments[0]?._id || departments[0]?.id || "");
+    setLineItems([]);
+    setShowAddItem(false);
+    setError("");
+  });
 
   if (!isOpen) return null;
 
@@ -50,9 +65,22 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
     setLineItems(lineItems.filter(item => item.id !== id));
   };
 
-  const handleSubmit = () => {
-    onSetBudget(selectedDeptId, totalAllocation, lineItems);
-    onClose();
+  /**
+   * Closes only once the save is known to have succeeded. Dismissing
+   * unconditionally is what made a rejected budget look like a saved one.
+   */
+  const handleSubmit = async () => {
+    if (!selectedDeptId) {
+      setError("Select a department before setting its budget.");
+      return;
+    }
+    if (lineItems.length === 0) {
+      setError("Add at least one budget line item.");
+      return;
+    }
+    setError("");
+    const saved = await onSetBudget(selectedDeptId, totalAllocation, lineItems);
+    if (saved !== false) onClose();
   };
 
   return (
@@ -68,16 +96,33 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
             <button type="button" onClick={onClose} className="btn btn-secondary" style={{ background: "none", border: "none" }}>
               Cancel
             </button>
-            <button type="button" onClick={handleSubmit} className="btn btn-primary" style={{ background: "#2563EB", border: "none" }}>
-              Finish
+            <button type="button" onClick={handleSubmit} disabled={busy} className="btn btn-primary" style={{ background: "#2563EB", border: "none", opacity: busy ? 0.6 : 1 }}>
+              {busy ? "Saving…" : "Finish"}
             </button>
           </div>
         }
       >
+        {/* Validation banner — the API's rejection reason used to surface only
+            as a toast after the modal had already closed. */}
+        {error && (
+          <div style={{
+            marginBottom: "1rem",
+            padding: "0.65rem 0.85rem",
+            borderRadius: "0.5rem",
+            border: "1px solid rgba(220, 38, 38, 0.35)",
+            background: "rgba(220, 38, 38, 0.1)",
+            color: "#DC2626",
+            fontSize: "0.82rem",
+            fontWeight: 600
+          }}>
+            {error}
+          </div>
+        )}
+
         {/* Department Selection */}
         <div style={{ marginBottom: "1.5rem" }}>
           <label className="form-label">Department Name</label>
-          <select className="form-select" value={selectedDeptId} onChange={(e) => setSelectedDeptId(e.target.value)}>
+          <select className="form-select" value={selectedDeptId} onChange={(e) => { setSelectedDeptId(e.target.value); setError(""); }}>
             <option value="">Select Department</option>
             {departments.map((d: any) => (
               <option key={d._id || d.id} value={d._id || d.id}>{d.name}</option>
