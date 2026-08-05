@@ -1,13 +1,13 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
 import { ApproveRequestModal, ApproveRequestPayload } from "./modals/ApproveRequestModal";
 import { RejectDecision, RejectOrClarifyModal, RejectOrClarifyPayload } from "./modals/RejectOrClarifyModal";
+import { AuthorizeReleaseModal, PaymentReleasePayload } from "./modals/AuthorizeReleaseModal";
 import { CompletedReleaseModal } from "./modals/CompletedReleaseModal";
 import { Notice } from "./ui/NoticeBanner";
 import {
-  AttachmentDto,
   AttachmentInput,
   BudgetContextDto,
   BudgetItemOptionDto,
@@ -23,7 +23,6 @@ import { SubmitButton } from "./ui/SubmitButton";
 import { Pagination } from "./ui/Pagination";
 import { StatCard } from "./ui/StatCard";
 import { EmptyState } from "./ui/EmptyState";
-import { formatFileSize } from "../domains/attachments/attachment.rules";
 import { formatNaira, formatDate, formatDateTime, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import { ExpenseClient } from "../services/expense.client";
@@ -168,13 +167,27 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     setActiveReleaseItem(expense);
     onFocusThreadRequest?.(expense ? String(expense._id) : null);
   };
-  const [bankRefNumber, setBankRefNumber] = useState("");
+
   // The uploaded transfer evidence — a real stored document, not a filename.
+  // The reference, debit confirmation and signature are collected by the dialog.
   const [receipt, setReceipt] = useState<AttachmentInput | null>(null);
   const [receiptUploading, setReceiptUploading] = useState(false);
-  const [confirmDebited, setConfirmDebited] = useState(false);
-  const [releaseSignature, setReleaseSignature] = useState("");
-  const receiptInputRef = useRef<HTMLInputElement>(null);
+
+  /** Opens the release dialog on a request, from either the list or its profile. */
+  const openReleaseDialog = (expense: any) => {
+    focusReleaseItem(expense);
+    setReceipt(null);
+    setShowAuthorizeReleaseModal(true);
+  };
+
+  // Evidence uploaded for one release must never be carried into the next, so it
+  // is cleared on the way out as well as on the way in.
+  const closeReleaseDialog = () => {
+    setShowAuthorizeReleaseModal(false);
+    focusReleaseItem(null);
+    setReceipt(null);
+  };
+
   const [methodFilter, setMethodFilter] = useState("ALL");
   const [dateRangeFilter, setDateRangeFilter] = useState("30DAYS");
 
@@ -211,9 +224,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           tone: "error",
           message: "Open the release dialog to record the bank reference and transfer evidence.",
         });
-        focusReleaseItem(selectedExpense);
-        setBankRefNumber(selectedExpense.paymentReference || "");
-        setShowAuthorizeReleaseModal(true);
+        openReleaseDialog(selectedExpense);
         return;
       } else {
         ok = await actions.approve(id, decisionComment || "Approved.", signature, budgetItemId);
@@ -355,14 +366,13 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   };
 
   // Finance Manager Payment Release Action
-  const handleReleasePayment = async (expToRelease: any) => {
+  const handleReleasePayment = async (expToRelease: any, payload: PaymentReleasePayload) => {
     if (!expToRelease || actions.submitting) return;
 
-    // Each guard is a control requirement, not UI polish: a release without a
-    // bank reference cannot be reconciled, the receipt is the audit evidence the
-    // label promises, and the debit confirmation is the manager's attestation
-    // that funds actually left the corporate account.
-    if (!bankRefNumber.trim()) {
+    // The dialog gates its own button on these, but the guards stay here too:
+    // a release without a bank reference cannot be reconciled, and the receipt
+    // is the audit evidence the label promises.
+    if (!payload.reference) {
       onNotify?.({ tone: "error", message: "Please enter a Bank Reference Number." });
       return;
     }
@@ -370,29 +380,17 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       onNotify?.({ tone: "error", message: "Attach the payment receipt or evidence of transfer." });
       return;
     }
-    if (!confirmDebited) {
-      onNotify?.({
-        tone: "error",
-        message: "Please confirm the funds have been debited from the corporate account.",
-      });
-      return;
-    }
 
     const ok = await actions.releasePayment(
       expToRelease._id,
-      bankRefNumber,
-      releaseSignature,
+      payload.reference,
+      payload.signature,
       receipt.url
     );
 
     if (ok) {
-      setShowAuthorizeReleaseModal(false);
-      focusReleaseItem(null);
+      closeReleaseDialog();
       setSelectedExpense(null);
-      setBankRefNumber("");
-      setReceipt(null);
-      setConfirmDebited(false);
-      setReleaseSignature("");
     }
   };
 
@@ -508,13 +506,6 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   const safePage = Math.min(listPage, totalPages);
   const visibleRows = filteredList.slice((safePage - 1) * ROWS_PER_PAGE, safePage * ROWS_PER_PAGE);
 
-  // Documents and approver justifications for the request open in the release
-  // dialog. Both used to read `selectedExpense`, which is null in the list view.
-  const releaseAttachments: AttachmentDto[] = activeReleaseItem?.attachments ?? [];
-  const releaseJustifications: any[] = (activeReleaseItem?.history ?? []).filter(
-    (h: any) => h.comment && h.actorRole && h.actorRole !== "INITIATOR"
-  );
-
   // Department spend calculation helper
   const deptExpenses = expenses.filter(e => {
     const dId = selectedExpense?.departmentId?._id || selectedExpense?.departmentId;
@@ -617,6 +608,113 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         },
       ]
     : [];
+
+  /**
+   * Every dialog raised by a decision button, defined once and rendered by both
+   * views below.
+   *
+   * They used to live only at the end of the list-view branch, past the early
+   * return for the request profile — so a reviewer who opened a request and
+   * pressed Approve, Reject or Authorize Expansion flipped the dialog's state
+   * flag and nothing appeared. That is what left the approver with no way to
+   * pick a budget item, and therefore no way to approve at all: the server
+   * refuses an approval that books the spend nowhere.
+   */
+  const workflowDialogs = (
+    <>
+      {/* Finance Manager release — designs/finance-manager/Finance Manager Release Review Modal.png.
+          Mounted only while open so each release starts from an empty form. */}
+      {showAuthorizeReleaseModal && activeReleaseItem && (
+        <AuthorizeReleaseModal
+          isOpen
+          onClose={closeReleaseDialog}
+          expense={activeReleaseItem}
+          receipt={receipt}
+          receiptUploading={receiptUploading}
+          onUploadReceipt={handleReceiptUpload}
+          submitting={actions.submitting}
+          onConfirm={(payload) => handleReleasePayment(activeReleaseItem, payload)}
+          onViewAttachment={onViewAttachment}
+          onViewThread={() => setShowThreadModal(true)}
+        />
+      )}
+
+      {/* Completed release — the read-only receipt view for a disbursed request */}
+      <CompletedReleaseModal
+        isOpen={showCompletedReleaseModal}
+        onClose={() => { setShowCompletedReleaseModal(false); focusReleaseItem(null); }}
+        expense={activeReleaseItem}
+        onViewThread={() => setShowThreadModal(true)}
+      />
+
+      {/* Full communication thread for whichever request is in focus */}
+      <CommunicationThreadModal
+        isOpen={showThreadModal}
+        onClose={() => setShowThreadModal(false)}
+        expense={activeReleaseItem ?? selectedExpense}
+        entries={thread}
+        loading={threadLoading}
+        onExport={handleExportThread}
+      />
+
+      {/* Approver decision dialogs — every approve/reject is signed off in a modal */}
+      <ApproveRequestModal
+        isOpen={showApproveRequestModal}
+        onClose={() => setShowApproveRequestModal(false)}
+        expense={selectedExpense}
+        budgetItems={budgetItems}
+        budgetItemsLoading={budgetItemsLoading}
+        // Only the departmental approver books the spend against an item; the
+        // Finance Officer reviews the choice they already made.
+        requiresBudgetItem={currentUser?.role === "APPROVER"}
+        submitting={actions.submitting}
+        onConfirm={handleApproveConfirm}
+      />
+
+      <RejectOrClarifyModal
+        isOpen={showRejectClarifyModal}
+        onClose={() => setShowRejectClarifyModal(false)}
+        expense={selectedExpense}
+        initialDecision={rejectClarifyIntent}
+        submitting={actions.submitting}
+        onConfirm={handleRejectOrClarifyConfirm}
+      />
+
+      {/* Finance Head Approve One-Time Budget Expansion Modal */}
+      <ApproveExpansionModal
+        isOpen={showApproveExpansionModal}
+        onClose={() => setShowApproveExpansionModal(false)}
+        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : ""}
+        requestAmount={selectedExpense?.amount ?? 0}
+        remainingBudget={budgetContext?.remaining ?? 0}
+        deficitAmount={budgetContext?.criticalGap ?? 0}
+        onConfirm={async (notes, signature) => {
+          if (!selectedExpense) return;
+          if (await actions.approveExpansion(selectedExpense._id, notes, signature)) {
+            setShowApproveExpansionModal(false);
+            setSelectedExpense(null);
+          }
+        }}
+      />
+
+      {/* Finance Head Reject One-Time Budget Expansion Modal */}
+      <RejectExpansionModal
+        isOpen={showRejectExpansionModal}
+        onClose={() => setShowRejectExpansionModal(false)}
+        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : ""}
+        requestAmount={selectedExpense?.amount ?? 0}
+        remainingBudget={budgetContext?.remaining ?? 0}
+        deficitAmount={budgetContext?.criticalGap ?? 0}
+        onConfirm={async (reason, signature) => {
+          if (!selectedExpense) return;
+          if (await actions.rejectExpansion(selectedExpense._id, reason, signature)) {
+            setShowRejectExpansionModal(false);
+            setSelectedExpense(null);
+          }
+        }}
+      />
+    </>
+  );
 
   // RENDER DETAILED REQUEST PROFILE PAGE
   if (selectedExpense) {
@@ -1290,6 +1388,10 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           </div>
         )}
 
+        {/* Release, thread and decision dialogs — the profile's action buttons
+            raise these, so they must render on this branch as well as the list */}
+        {workflowDialogs}
+
       </div>
     );
   }
@@ -1611,9 +1713,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                         <button
                           onClick={() => {
                             if (isFinanceManager && BANK_STAGE_STATUSES.includes(exp.status)) {
-                              focusReleaseItem(exp);
-                              setBankRefNumber(exp.paymentReference || "");
-                              setShowAuthorizeReleaseModal(true);
+                              openReleaseDialog(exp);
                             } else {
                               setSelectedExpense(exp);
                             }
@@ -1755,304 +1855,8 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         />
       </ModalShell>
 
-      {/* MODAL 1: REVIEW & AUTHORIZE RELEASE MODAL (Screenshot 4) */}
-      {showAuthorizeReleaseModal && activeReleaseItem && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, width: "100%", height: "100%",
-          background: "rgb(var(--color-overlay) / 0.65)", zIndex: 120,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          backdropFilter: "blur(6px)"
-        }}>
-          <div className="glass-panel" style={{
-            width: "95%", maxWidth: "980px", maxHeight: "90vh", overflowY: "auto",
-            background: "rgb(var(--color-surface))", color: "rgb(var(--color-text))", borderRadius: "16px",
-            padding: "2rem", boxShadow: "var(--shadow-lg)"
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem" }}>
-              <div>
-                <h2 style={{ fontSize: "1.35rem", fontWeight: "700", margin: 0 }}>Review &amp; Authorize Release</h2>
-                <span style={{ fontSize: "0.85rem", color: "#2563EB", fontWeight: "700" }}>{activeReleaseItem.requestNumber}</span>
-              </div>
-              <button onClick={() => setShowAuthorizeReleaseModal(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "rgb(var(--color-text-muted))" }}>
-                <Icons.X size={22} />
-              </button>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "1.75rem" }}>
-
-              {/* Left Column (Review Details) */}
-              <div style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "12px", padding: "1.25rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                <div>
-                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
-                    PAYEE ACCOUNT DETAILS
-                  </span>
-                  {/* Bank details come from the request. There is no sensible
-                      placeholder for an account number, so a request missing
-                      them says so rather than showing a plausible-looking one. */}
-                  <div style={{ background: "rgb(var(--color-card))", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "8px", padding: "0.85rem 1rem", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.5rem" }}>
-                    <div>
-                      <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block" }}>Payee Name</span>
-                      <strong style={{ fontSize: "0.85rem" }}>{activeReleaseItem.vendorName || "—"}</strong>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block" }}>Bank</span>
-                      <strong style={{ fontSize: "0.85rem" }}>{activeReleaseItem.vendorBankDetails?.bankName || "—"}</strong>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))", display: "block" }}>Account Number</span>
-                      <strong style={{ fontSize: "0.85rem" }}>{activeReleaseItem.vendorBankDetails?.accountNumber || "—"}</strong>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "#2563EB", marginBottom: "0.6rem" }}>
-                    <Icons.Paperclip size={16} />
-                    <strong style={{ fontSize: "0.85rem" }}>Documentation</strong>
-                  </div>
-                  {/* Documents belong to the request being released. This read
-                      `selectedExpense`, which is null when the dialog is opened
-                      from the list, so it always reported "no documents". */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                    {releaseAttachments.map((doc, idx) => (
-                      <button
-                        key={doc._id || `${doc.url}-${idx}`}
-                        type="button"
-                        onClick={() => onViewAttachment({ ...doc, requestNumber: activeReleaseItem.requestNumber })}
-                        style={{ display: "flex", alignItems: "center", gap: "0.6rem", background: "rgb(var(--color-card))", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "8px", padding: "0.65rem 0.85rem", cursor: "pointer", textAlign: "left", width: "100%", color: "inherit" }}
-                      >
-                        <Icons.FileText size={18} style={{ color: "#2563EB", flexShrink: 0 }} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: "0.8rem", fontWeight: "600", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{doc.name}</div>
-                          <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>
-                            {[formatFileSize(doc.size), doc.uploadedByName].filter(Boolean).join(" • ") || "Supporting document"}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-                    {releaseAttachments.length === 0 && (
-                      <span style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))" }}>No documents attached.</span>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", letterSpacing: "0.05em", display: "block", marginBottom: "0.6rem" }}>
-                    JUSTIFICATION SUMMARY
-                  </span>
-                  {/* Real approver comments off the request's own history. This
-                      block previously showed two invented quotations with fixed
-                      timestamps — the very evidence the release is judged on. */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                    {releaseJustifications.map((entry, idx) => (
-                      <div key={idx} style={{ background: "rgb(var(--color-card))", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "8px", padding: "0.75rem 0.85rem" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", gap: "0.5rem" }}>
-                          <strong style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                            {entry.actorName} ({humanizeStatus(entry.actorRole)})
-                          </strong>
-                          <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))", whiteSpace: "nowrap" }}>
-                            {formatDateTime(entry.timestamp)}
-                          </span>
-                        </div>
-                        <p style={{ margin: 0, fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontStyle: "italic" }}>
-                          &lsquo;{entry.comment}&rsquo;
-                        </p>
-                      </div>
-                    ))}
-                    {releaseJustifications.length === 0 && (
-                      <span style={{ fontSize: "0.78rem", color: "rgb(var(--color-text-muted))" }}>
-                        No approver justifications were recorded on this request.
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setShowThreadModal(true)}
-                  style={{ background: "none", border: "none", color: "#2563EB", cursor: "pointer", fontSize: "0.8rem", fontWeight: "700", display: "flex", alignItems: "center", gap: "0.35rem", padding: 0 }}
-                >
-                  <Icons.MessageSquare size={16} /> View Full Communication Thread &rarr;
-                </button>
-              </div>
-
-              {/* Right Column (Confirm Payment Release Form) */}
-              <div style={{ background: "rgb(var(--color-card))", border: "1px solid rgb(var(--color-card-border) / 0.6)", borderRadius: "12px", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                <h3 style={{ fontSize: "1.1rem", fontWeight: "700", margin: 0 }}>Confirm Payment Release</h3>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: "600", marginBottom: "0.35rem" }}>
-                    Bank Reference Number <span style={{ color: "#EF4444" }}>*</span>
-                  </label>
-                  <div style={{ position: "relative" }}>
-                    <Icons.Building size={16} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))" }} />
-                    <input
-                      type="text"
-                      placeholder="Enter transaction reference ID"
-                      value={bankRefNumber}
-                      onChange={(e) => setBankRefNumber(e.target.value)}
-                      className="form-input"
-                      style={{ paddingLeft: "2.25rem", fontSize: "0.85rem" }}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: "600", marginBottom: "0.35rem" }}>
-                    Payment Receipt / Evidence of Transfer <span style={{ color: "#EF4444" }}>*</span>
-                  </label>
-
-                  {/* A real upload. Clicking here used to set a fixed filename,
-                      so every released payment recorded the same "receipt". */}
-                  <input
-                    type="file"
-                    ref={receiptInputRef}
-                    style={{ display: "none" }}
-                    accept="image/*,.pdf"
-                    onChange={(e) => {
-                      handleReceiptUpload(e.target.files);
-                      if (receiptInputRef.current) receiptInputRef.current.value = "";
-                    }}
-                  />
-                  <div
-                    onClick={() => receiptInputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleReceiptUpload(e.dataTransfer.files);
-                    }}
-                    style={{
-                      border: "2px dashed rgb(var(--color-card-border) / 0.9)", borderRadius: "8px", padding: "1.5rem 1rem",
-                      textAlign: "center", background: "rgb(var(--color-surface-secondary) / 0.4)", cursor: "pointer"
-                    }}
-                  >
-                    <Icons.UploadCloud size={32} style={{ color: "rgb(var(--color-text-muted))", margin: "0 auto 0.5rem" }} />
-                    <div style={{ fontSize: "0.85rem", fontWeight: "700" }}>
-                      {receiptUploading
-                        ? "Uploading receipt…"
-                        : receipt
-                          ? `${receipt.name}${receipt.size ? ` • ${formatFileSize(receipt.size)}` : ""}`
-                          : "Drop your file here or click to browse"}
-                    </div>
-                    <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>Supports PDF, PNG, JPG (Max 5MB)</span>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: "0.6rem", alignItems: "flex-start", background: "rgba(37, 99, 235, 0.08)", border: "1px solid rgba(37, 99, 235, 0.2)", padding: "0.75rem", borderRadius: "8px" }}>
-                  <input
-                    type="checkbox"
-                    id="confirmDebited"
-                    checked={confirmDebited}
-                    onChange={(e) => setConfirmDebited(e.target.checked)}
-                    style={{ width: "1.1rem", height: "1.1rem", marginTop: "0.1rem", cursor: "pointer" }}
-                  />
-                  <label htmlFor="confirmDebited" style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", lineHeight: "1.4", cursor: "pointer" }}>
-                    I confirm that the funds have been successfully debited from the corporate account and the transaction is complete.
-                  </label>
-                </div>
-
-                <ElectronicSignatureField value={releaseSignature} onChange={setReleaseSignature} />
-
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem", marginTop: "auto" }}>
-                  <button onClick={() => setShowAuthorizeReleaseModal(false)} className="btn btn-secondary">
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => handleReleasePayment(activeReleaseItem)}
-                    className="btn btn-primary"
-                    style={{ background: "#2563EB", border: "none", padding: "0.6rem 1.75rem", fontWeight: "700" }}
-                    disabled={!bankRefNumber || !receipt || !confirmDebited || !releaseSignature.trim() || actions.submitting}
-                  >
-                    {actions.submitting ? "Processing..." : "Paid"}
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Completed release — the shared dialog, which reads the request's own
-          payee, reference, date and approver justifications. The copy that used
-          to be inlined here carried fabricated fallbacks ("Blessing Okafor",
-          account 0012933746, TXN-2026-0789-1234, two invented justification
-          quotes) and hardcoded light-mode colours. */}
-      <CompletedReleaseModal
-        isOpen={showCompletedReleaseModal}
-        onClose={() => { setShowCompletedReleaseModal(false); focusReleaseItem(null); }}
-        expense={activeReleaseItem}
-        onViewThread={() => setShowThreadModal(true)}
-      />
-
-      {/* Full communication thread for the request open in the release dialog.
-          Its own component now, rendering the real merged thread — the copy that
-          lived here was 125 lines of fabricated conversation. */}
-      <CommunicationThreadModal
-        isOpen={showThreadModal}
-        onClose={() => setShowThreadModal(false)}
-        expense={activeReleaseItem}
-        entries={thread}
-        loading={threadLoading}
-        onExport={handleExportThread}
-      />
-
-      {/* Approver decision dialogs — every approve/reject is signed off in a modal */}
-      <ApproveRequestModal
-        isOpen={showApproveRequestModal}
-        onClose={() => setShowApproveRequestModal(false)}
-        expense={selectedExpense}
-        budgetItems={budgetItems}
-        budgetItemsLoading={budgetItemsLoading}
-        // Only the departmental approver books the spend against an item; the
-        // Finance Officer reviews the choice they already made.
-        requiresBudgetItem={currentUser?.role === "APPROVER"}
-        submitting={actions.submitting}
-        onConfirm={handleApproveConfirm}
-      />
-
-      <RejectOrClarifyModal
-        isOpen={showRejectClarifyModal}
-        onClose={() => setShowRejectClarifyModal(false)}
-        expense={selectedExpense}
-        initialDecision={rejectClarifyIntent}
-        submitting={actions.submitting}
-        onConfirm={handleRejectOrClarifyConfirm}
-      />
-
-      {/* Finance Head Approve One-Time Budget Expansion Modal */}
-      <ApproveExpansionModal
-        isOpen={showApproveExpansionModal}
-        onClose={() => setShowApproveExpansionModal(false)}
-        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : ""}
-        requestAmount={selectedExpense?.amount ?? 0}
-        remainingBudget={budgetContext?.remaining ?? 0}
-        deficitAmount={budgetContext?.criticalGap ?? 0}
-        onConfirm={async (notes, signature) => {
-          if (!selectedExpense) return;
-          if (await actions.approveExpansion(selectedExpense._id, notes, signature)) {
-            setShowApproveExpansionModal(false);
-            setSelectedExpense(null);
-          }
-        }}
-      />
-
-      {/* Finance Head Reject One-Time Budget Expansion Modal */}
-      <RejectExpansionModal
-        isOpen={showRejectExpansionModal}
-        onClose={() => setShowRejectExpansionModal(false)}
-        requestNumber={selectedExpense?.requestNumber ? `#${selectedExpense.requestNumber.replace(/^REQ-/, '')}` : ""}
-        requestAmount={selectedExpense?.amount ?? 0}
-        remainingBudget={budgetContext?.remaining ?? 0}
-        deficitAmount={budgetContext?.criticalGap ?? 0}
-        onConfirm={async (reason, signature) => {
-          if (!selectedExpense) return;
-          if (await actions.rejectExpansion(selectedExpense._id, reason, signature)) {
-            setShowRejectExpansionModal(false);
-            setSelectedExpense(null);
-          }
-        }}
-      />
+      {/* Release, thread and decision dialogs — shared by both views */}
+      {workflowDialogs}
 
       {/* Floating Sticky Bulk Action Bar */}
       {selectedIds.length > 0 && (

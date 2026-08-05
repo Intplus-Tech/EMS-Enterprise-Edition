@@ -7,7 +7,7 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../ui/ModalShell";
-import { formatNairaPrecise, formatDateTime } from "../ui/format";
+import { formatNairaPrecise, formatDateTime, justificationLabel } from "../ui/format";
 
 interface CompletedReleaseModalProps {
   isOpen: boolean;
@@ -15,14 +15,6 @@ interface CompletedReleaseModalProps {
   expense: any;
   onViewThread?: (expense: any) => void;
 }
-
-// Roles whose comments make up the justification summary, in narrative order.
-const JUSTIFICATION_ROLES: Record<string, string> = {
-  APPROVER: "Approver's Justification (Dept. Head)",
-  FINANCE_HEAD: "Finance Head's Justification",
-  FINANCE_OFFICER: "Finance Officer's Justification",
-  FINANCE_MANAGER: "Finance Manager's Justification",
-};
 
 export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
   isOpen,
@@ -33,8 +25,9 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
   if (!isOpen || !expense) return null;
 
   const bank = expense.vendorBankDetails || {};
+  // Roles whose comments make up the justification summary, in narrative order.
   const justifications = (expense.history || []).filter(
-    (h: any) => h.comment && JUSTIFICATION_ROLES[h.actorRole]
+    (h: any) => h.comment && justificationLabel(h.actorRole)
   );
 
   const attachments: any[] = expense.attachments?.length
@@ -219,7 +212,7 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
                 }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", marginBottom: "0.35rem" }}>
-                  <span style={{ fontSize: "0.85rem", fontWeight: 700 }}>{JUSTIFICATION_ROLES[entry.actorRole]}</span>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 700 }}>{justificationLabel(entry.actorRole)}</span>
                   <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", flexShrink: 0 }}>
                     {formatDateTime(entry.timestamp)}
                   </span>

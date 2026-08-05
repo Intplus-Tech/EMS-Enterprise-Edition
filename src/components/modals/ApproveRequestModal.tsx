@@ -115,76 +115,111 @@ export const ApproveRequestModal: React.FC<ApproveRequestModalProps> = ({
       />
 
       {/* Budget item the disbursement is charged against — the item's ledger is
-          what the department's spend and any expansion are measured on */}
+          what the department's spend and any expansion are measured on.
+
+          Only the departmental approver picks it: the attach endpoint is closed
+          to finance roles, so offering them a select would have collected a
+          choice the server discards — and, since they cannot read the item list
+          either, warned them that a department with a perfectly good budget had
+          none. They see the approver's choice instead. */}
       <div style={{ marginTop: "1.25rem" }}>
         <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: 600 }}>
           Budget Item{" "}
           {requiresBudgetItem && <span style={{ color: "rgb(var(--color-danger))" }}>*</span>}
         </label>
-        <select
-          value={budgetItem}
-          onChange={(e) => setBudgetItem(e.target.value)}
-          className="form-select"
-          disabled={budgetItemsLoading}
-        >
-          <option value="">
-            {budgetItemsLoading ? "Loading budget items…" : "Select a Budget Item"}
-          </option>
-          {budgetItems.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name} — {formatNaira(item.available)} available
-            </option>
-          ))}
-        </select>
 
-        {/* Three states, as every list in this app carries: loading, empty, populated */}
-        {!budgetItemsLoading && budgetItems.length === 0 && (
-          <p style={{ fontSize: "0.78rem", color: "rgb(var(--color-danger))", marginTop: "0.4rem" }}>
-            This department has no budget items for the requested payment date. An administrator
-            must add them under Departmental Spend → Set Budget before this request can be approved.
-          </p>
-        )}
-
-        {/* What attaching here does to the item, shown before the signature */}
-        {selected && (
+        {!requiresBudgetItem ? (
           <div
             style={{
-              marginTop: "0.65rem",
-              padding: "0.7rem 0.85rem",
+              padding: "0.65rem 0.85rem",
               borderRadius: "0.5rem",
-              border: `1px solid ${willOverrun ? "rgb(var(--color-danger) / 0.35)" : "rgb(var(--color-card-border))"}`,
-              background: willOverrun
-                ? "rgb(var(--color-danger) / 0.08)"
-                : "rgb(var(--color-surface-secondary) / 0.45)",
-              fontSize: "0.78rem",
-              color: "rgb(var(--color-text-muted))",
-              display: "flex",
-              gap: "0.55rem",
+              border: "1px solid rgb(var(--color-card-border))",
+              background: "rgb(var(--color-surface-secondary) / 0.45)",
+              fontSize: "0.85rem",
             }}
           >
-            {willOverrun ? (
-              <Icons.AlertTriangle size={15} style={{ color: "rgb(var(--color-danger))", flexShrink: 0, marginTop: "1px" }} />
+            {expense.budgetItemName ? (
+              <>
+                <strong>{expense.budgetItemName}</strong>
+                <span style={{ color: "rgb(var(--color-text-muted))" }}>
+                  {" "}
+                  — booked by the departmental approver
+                </span>
+              </>
             ) : (
-              <Icons.CheckCircle2 size={15} style={{ color: "rgb(var(--color-secondary))", flexShrink: 0, marginTop: "1px" }} />
+              <span style={{ color: "rgb(var(--color-text-muted))" }}>
+                No budget item recorded on this request.
+              </span>
             )}
-            <span>
-              {willOverrun ? (
-                <>
-                  <strong style={{ color: "rgb(var(--color-danger))" }}>
-                    Overruns this item by {formatNaira(shortfall)}.
-                  </strong>{" "}
-                  Approving still sends the request forward, but it will need a one-time expansion
-                  from the Finance Head before payment.
-                </>
-              ) : (
-                <>
-                  Leaves {formatNaira(selected.available - expense.amount)} on{" "}
-                  <strong style={{ color: "rgb(var(--color-text))" }}>{selected.name}</strong> after
-                  this request.
-                </>
-              )}
-            </span>
           </div>
+        ) : (
+          <>
+            <select
+              value={budgetItem}
+              onChange={(e) => setBudgetItem(e.target.value)}
+              className="form-select"
+              disabled={budgetItemsLoading}
+            >
+              <option value="">
+                {budgetItemsLoading ? "Loading budget items…" : "Select a Budget Item"}
+              </option>
+              {budgetItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name} — {formatNaira(item.available)} available
+                </option>
+              ))}
+            </select>
+
+            {/* Three states, as every list in this app carries: loading, empty, populated */}
+            {!budgetItemsLoading && budgetItems.length === 0 && (
+              <p style={{ fontSize: "0.78rem", color: "rgb(var(--color-danger))", marginTop: "0.4rem" }}>
+                This department has no budget items for the requested payment date. An administrator
+                must add them under Departmental Spend → Set Budget before this request can be approved.
+              </p>
+            )}
+
+            {/* What attaching here does to the item, shown before the signature */}
+            {selected && (
+              <div
+                style={{
+                  marginTop: "0.65rem",
+                  padding: "0.7rem 0.85rem",
+                  borderRadius: "0.5rem",
+                  border: `1px solid ${willOverrun ? "rgb(var(--color-danger) / 0.35)" : "rgb(var(--color-card-border))"}`,
+                  background: willOverrun
+                    ? "rgb(var(--color-danger) / 0.08)"
+                    : "rgb(var(--color-surface-secondary) / 0.45)",
+                  fontSize: "0.78rem",
+                  color: "rgb(var(--color-text-muted))",
+                  display: "flex",
+                  gap: "0.55rem",
+                }}
+              >
+                {willOverrun ? (
+                  <Icons.AlertTriangle size={15} style={{ color: "rgb(var(--color-danger))", flexShrink: 0, marginTop: "1px" }} />
+                ) : (
+                  <Icons.CheckCircle2 size={15} style={{ color: "rgb(var(--color-secondary))", flexShrink: 0, marginTop: "1px" }} />
+                )}
+                <span>
+                  {willOverrun ? (
+                    <>
+                      <strong style={{ color: "rgb(var(--color-danger))" }}>
+                        Overruns this item by {formatNaira(shortfall)}.
+                      </strong>{" "}
+                      Approving still sends the request forward, but it will need a one-time expansion
+                      from the Finance Head before payment.
+                    </>
+                  ) : (
+                    <>
+                      Leaves {formatNaira(selected.available - expense.amount)} on{" "}
+                      <strong style={{ color: "rgb(var(--color-text))" }}>{selected.name}</strong> after
+                      this request.
+                    </>
+                  )}
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

@@ -75,6 +75,23 @@ export function stageLabel(
 }
 
 /**
+ * How a decision comment is attributed in the release designs — by the role's
+ * job in the flow rather than the raw enum. Shared by the release review and
+ * completed release dialogs, which show the same trail either side of payment.
+ */
+const JUSTIFICATION_LABELS: Record<string, string> = {
+  APPROVER: "Approver's Justification (Dept. Head)",
+  FINANCE_HEAD: "Finance Head's Justification",
+  FINANCE_OFFICER: "Finance Officer's Justification",
+  FINANCE_MANAGER: "Finance Manager's Justification",
+};
+
+/** `null` for roles that contribute no justification (the initiator's own notes). */
+export function justificationLabel(actorRole?: string | null): string | null {
+  return JUSTIFICATION_LABELS[actorRole ?? ""] ?? null;
+}
+
+/**
  * Maps a workflow status onto one of the `badge-*` classes in globals.css.
  * Centralised so a status never renders with a different colour on another screen.
  */
