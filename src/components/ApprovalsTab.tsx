@@ -1619,8 +1619,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           />
         ) : activeSubTab !== "completed" ? (
           /* Pending Release Table View (Screenshot 5) */
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
+          <table className="table-fixed" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
             <thead>
+              {/* Every column but REQUEST is sized, so REQUEST absorbs the slack
+                  and a long description wraps inside it instead of widening the
+                  table. Widths fit their longest realistic value: a full request
+                  number, a nine-figure amount, a two-line status badge. */}
               <tr style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
                 <th style={{ padding: "0.85rem 0.5rem 0.85rem 1rem", width: "40px" }}>
                   <input
@@ -1633,12 +1637,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     style={{ cursor: "pointer", width: "16px", height: "16px" }}
                   />
                 </th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "90px" }}>ID</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "150px" }}>ID</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>REQUEST</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "140px" }}>AMOUNT</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "150px" }}>AMOUNT</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "180px" }}>BANK ACCOUNT</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "180px" }}>INITIATOR</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "140px", textAlign: "center" }}>STATUS</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "170px", textAlign: "center" }}>STATUS</th>
               </tr>
             </thead>
             <tbody>
@@ -1670,24 +1674,26 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                         style={{ cursor: "pointer", width: "16px", height: "16px" }}
                       />
                     </td>
-                    <td style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
+                    <td className="cell-wrap" style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
                       {exp.requestNumber}
                     </td>
 
-                    <td style={{ padding: "1rem" }}>
+                    {/* Free text the initiator typed — wraps to as many lines as
+                        it needs so the row grows down, never across. */}
+                    <td className="cell-wrap" style={{ padding: "1rem" }}>
                       <strong style={{ fontSize: "0.9rem", display: "block", color: "rgb(var(--color-text))" }}>{exp.description}</strong>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
                         {[exp.departmentId?.name, exp.category].filter(Boolean).join(" • ") || "—"}
                       </span>
                     </td>
 
-                    <td style={{ padding: "1rem" }}>
+                    <td className="cell-wrap" style={{ padding: "1rem" }}>
                       <strong style={{ fontSize: "1rem", color: "rgb(var(--color-text))" }}>
                         {formatNaira(exp.amount)}
                       </strong>
                     </td>
 
-                    <td style={{ padding: "1rem" }}>
+                    <td className="cell-wrap" style={{ padding: "1rem" }}>
                       <strong style={{ fontSize: "0.85rem", display: "block", color: "rgb(var(--color-text))" }}>
                         {exp.vendorBankDetails?.bankName || "—"}
                       </strong>
@@ -1696,12 +1702,14 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                       </span>
                     </td>
 
-                    <td style={{ padding: "1rem" }}>
+                    <td className="cell-wrap" style={{ padding: "1rem" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(37, 99, 235, 0.15)", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: "bold" }}>
+                        {/* The avatar keeps its 28px however long the name is —
+                            without this the flex row squashes it into an oval. */}
+                        <div style={{ width: 28, height: 28, flexShrink: 0, borderRadius: "50%", background: "rgba(37, 99, 235, 0.15)", color: "#2563EB", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: "bold" }}>
                           {initials}
                         </div>
-                        <span style={{ fontSize: "0.85rem", fontWeight: "600" }}>{initiatorName}</span>
+                        <span style={{ fontSize: "0.85rem", fontWeight: "600", minWidth: 0 }}>{initiatorName}</span>
                       </div>
                     </td>
 
@@ -1744,13 +1752,15 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           </table>
         ) : (
           /* Completed Release / History Table View (Screenshot 1) */
-          <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
+          <table className="data-table table-fixed" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", fontSize: "0.85rem" }}>
             <thead>
+              {/* Sized like the pending table above: REQUEST is the only elastic
+                  column, so a long title wraps rather than widening the table. */}
               <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)", textTransform: "uppercase", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "90px" }}>ID</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "150px" }}>ID</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700" }}>REQUEST</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "120px" }}>AMOUNT</th>
-                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "120px" }}>DEPT.</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "150px" }}>AMOUNT</th>
+                <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "130px" }}>DEPT.</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "110px" }}>METHOD.</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "150px" }}>REFERENCE</th>
                 <th style={{ padding: "0.85rem 1rem", fontWeight: "700", width: "130px" }}>RELEASED DATE</th>
@@ -1763,18 +1773,18 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   a request that was never paid still showed a bank reference. */}
               {visibleRows.map((exp) => (
                 <tr key={exp._id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
-                  <td style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
+                  <td className="cell-wrap" style={{ padding: "1rem", fontWeight: "700", color: "rgb(var(--color-text-muted))" }}>
                     {exp.requestNumber}
                   </td>
-                  <td style={{ padding: "1rem", fontWeight: "600" }}>{exp.description}</td>
-                  <td style={{ padding: "1rem", fontWeight: "700" }}>{formatNaira(exp.amount)}</td>
-                  <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                  <td className="cell-wrap" style={{ padding: "1rem", fontWeight: "600" }}>{exp.description}</td>
+                  <td className="cell-wrap" style={{ padding: "1rem", fontWeight: "700" }}>{formatNaira(exp.amount)}</td>
+                  <td className="cell-wrap" style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
                     {exp.departmentId?.name || "—"}
                   </td>
                   <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
                     {exp.paymentReference ? resolvePaymentMethod(exp) : "—"}
                   </td>
-                  <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
+                  <td className="cell-wrap" style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
                     {exp.paymentReference || "—"}
                   </td>
                   <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>

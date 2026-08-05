@@ -66,10 +66,13 @@ export const RequestQueueTable: React.FC<RequestQueueTableProps> = ({
   emptyDescription,
   onOpenRequest,
 }) => (
-  <table className="data-table" style={{ width: "100%", fontSize: "0.85rem" }}>
+  <table className="data-table table-fixed" style={{ width: "100%", fontSize: "0.85rem" }}>
     <thead>
+      {/* REQUEST is the only unsized column, so it takes the slack and its
+          free-text contents wrap instead of stretching the table past the
+          panel — the description and the reviewer note are arbitrary length. */}
       <tr>
-        <th style={{ width: "110px" }}>ID</th>
+        <th style={{ width: "150px" }}>ID</th>
         <th>REQUEST</th>
         <th style={{ width: "160px", textAlign: "right" }}>AMOUNT</th>
         <th style={{ width: "220px", textAlign: "right" }}>STATUS</th>
@@ -86,11 +89,11 @@ export const RequestQueueTable: React.FC<RequestQueueTableProps> = ({
 
         return (
           <tr key={exp._id}>
-            <td style={{ fontWeight: 700, color: accent ?? "rgb(var(--color-text-muted))" }}>
+            <td className="cell-wrap" style={{ fontWeight: 700, color: accent ?? "rgb(var(--color-text-muted))" }}>
               {exp.requestNumber}
             </td>
 
-            <td>
+            <td className="cell-wrap">
               <div style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
                 <strong style={{ fontSize: "0.95rem", color: accent ?? "rgb(var(--color-text))" }}>
                   {exp.description}

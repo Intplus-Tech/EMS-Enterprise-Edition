@@ -308,6 +308,30 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 
+/*
+ * Fixed column layout for request tables.
+ *
+ * Under the default `auto` layout one long description or vendor name sets its
+ * column's min-content width and stretches the whole table past its panel, so
+ * the page scrolls sideways. `fixed` makes the `width` declared on each <th>
+ * authoritative and hands the remainder to the single unsized column: the table
+ * can no longer outgrow its container, and rows grow taller instead.
+ */
+.table-fixed {
+  table-layout: fixed;
+}
+
+/*
+ * Free-text cells (request titles, vendor names, bank references). `anywhere`
+ * rather than `break-word` because a user-entered value can be one unbroken
+ * token with no space to wrap at, which would otherwise spill across the
+ * neighbouring column; `anywhere` also lets it shrink the auto-layout tables.
+ */
+.cell-wrap {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 /* Light Theme Variables and Overrides */
 html[data-theme="light"], :root[data-theme="light"] {
   --color-background: 248 250 252;

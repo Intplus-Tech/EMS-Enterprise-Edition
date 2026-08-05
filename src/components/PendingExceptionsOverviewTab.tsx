@@ -385,17 +385,20 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         }}
       >
         <div className="table-container" style={{ overflowX: "auto" }}>
-          <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <table className="data-table table-fixed" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
+              {/* Every column but REQUEST TITLE is sized to its longest realistic
+                  value, so the title absorbs the slack and wraps rather than
+                  stretching the table past the panel. */}
               <tr style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)" }}>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEFICIT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQ ID</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "160px" }}>DEFICIT</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "120px" }}>REQ ID</th>
                 <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQUEST TITLE</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEPT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>AMOUNT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>BUDGET</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>WAIT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "right" }}>ACTION</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "150px" }}>DEPT</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "150px" }}>AMOUNT</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "140px" }}>BUDGET</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", width: "100px" }}>WAIT</th>
+                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "right", width: "150px" }}>ACTION</th>
               </tr>
             </thead>
             <tbody>
@@ -431,8 +434,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                         {r.reqId}
                       </td>
 
-                      {/* REQUEST TITLE + Subtitle */}
-                      <td style={{ padding: "1.1rem 1.25rem" }}>
+                      {/* REQUEST TITLE + Subtitle — free text, so it wraps */}
+                      <td className="cell-wrap" style={{ padding: "1.1rem 1.25rem" }}>
                         <div style={{ display: "flex", flexDirection: "column" }}>
                           <span style={{ fontSize: "0.9rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
                             {r.title}
@@ -444,9 +447,10 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                       </td>
 
                       {/* DEPT Pill Badge */}
-                      <td style={{ padding: "1.1rem 1.25rem" }}>
+                      <td className="cell-wrap" style={{ padding: "1.1rem 1.25rem" }}>
                         <span
                           style={{
+                            display: "inline-block",
                             padding: "0.25rem 0.75rem",
                             borderRadius: "8px",
                             background: "rgba(37, 99, 235, 0.12)",
