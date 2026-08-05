@@ -37,9 +37,16 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
     // and weight alone do not.
     className={`btn sidebar-nav-item${isActive ? " active" : ""}`}
     aria-current={isActive ? "page" : undefined}
+    // Recovers the full label if the rail ever truncates it (long custom labels).
+    title={label}
   >
     <DynamicIcon name={icon} size={18} />
-    {label}
+
+    {/* `data-label` feeds the bold ghost in globals.css that reserves the active
+        weight's width, so selecting an item cannot re-wrap or clip its label. */}
+    <span className="sidebar-nav-label" data-label={label}>
+      {label}
+    </span>
 
     {badgeCount ? <span className="sidebar-nav-badge">{badgeCount}</span> : null}
   </button>

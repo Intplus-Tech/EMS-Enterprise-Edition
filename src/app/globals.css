@@ -51,6 +51,12 @@
   
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
+
+  /* Wide enough for the longest nav label a role can see ("Departmental
+     Spend" / "Pending Exceptions") at the *bold* active weight, plus its badge.
+     At the previous 260px those labels wrapped to a second line the moment they
+     went active, which resized the row on every click. */
+  --sidebar-width: 280px;
 }
 
 body {
@@ -109,7 +115,7 @@ body {
 }
 
 .sidebar {
-  width: 260px;
+  width: var(--sidebar-width);
   flex-shrink: 0;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(15, 23, 42, 0.85);
@@ -204,6 +210,46 @@ body {
   background: transparent;
   color: rgb(var(--color-text-muted));
   font-weight: 500;
+  /* `.btn` pads 1.25rem for standalone buttons; inside a fixed-width rail that
+     is 40px the label cannot use. */
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+  gap: 0.625rem;
+  text-align: left;
+}
+
+/* The icon and badge are fixed furniture — only the label may absorb or give up
+   space, otherwise a long label squashes the icon instead of ellipsising. */
+.sidebar-nav-item > svg,
+.sidebar-nav-badge {
+  flex-shrink: 0;
+}
+
+/* Label sizing is what keeps the row one line tall in every state:
+   - `nowrap` makes wrapping impossible, so activating an item can never turn a
+     one-line row into a two-line one;
+   - `min-width: 0` lets it shrink inside the flex row so an over-long label
+     ellipsises (with a `title` tooltip from SidebarNavItem) rather than
+     overflowing the rail. */
+.sidebar-nav-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ghost copy of the label at the active weight (700), collapsed to zero height.
+   It reserves the bold width while the item is inactive, so going active never
+   changes the label's measured width — no reflow, no late ellipsis. */
+.sidebar-nav-label::after {
+  content: attr(data-label);
+  display: block;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 700;
+  pointer-events: none;
 }
 
 .sidebar-nav-item:hover {
