@@ -25,6 +25,13 @@ const HELD_FOR_BUDGET_MESSAGE =
   "Request submitted, and on hold: your department has no budget set for that payment date. " +
   "It continues to the approver automatically once an administrator sets one.";
 
+/**
+ * Which initiator write is currently in flight. The dialogs spin the button
+ * that started it and refuse a second click; `null` means idle. One flag covers
+ * all three because the New Request and Reply dialogs are never open together.
+ */
+export type RequestSubmitPhase = "draft" | "submit" | "resubmit" | null;
+
 const DISMISSED_NOTIFICATIONS_KEY = "ems.notifications.dismissed";
 const READ_NOTIFICATIONS_KEY = "ems.notifications.read";
 
@@ -153,6 +160,8 @@ function useDashboardState() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newRequest, setNewRequest] = useState(emptyRequestForm);
   const [formError, setFormError] = useState("");
+  // Drives the in-flight state of Save Draft / Submit Request / Submit Reply.
+  const [requestSubmitting, setRequestSubmitting] = useState<RequestSubmitPhase>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resubmitFileInputRef = useRef<HTMLInputElement>(null);
@@ -529,6 +538,11 @@ function useDashboardState() {
   // Submit new request (Save Draft or Submit directly)
   const handleCreateRequest = async (e: React.FormEvent, shouldSubmit: boolean = false) => {
     if (e) e.preventDefault();
+    // Submitting takes two round-trips (create, then submit) with nothing on
+    // screen to say so, and both footer buttons stayed live throughout — a
+    // second click raised a second request. The guard is the real fix; the
+    // spinner the dialog now shows is what makes waiting make sense.
+    if (requestSubmitting) return;
     setFormError("");
 
     if (!newRequest.description || !newRequest.amount || !newRequest.vendorName) {
@@ -549,6 +563,7 @@ function useDashboardState() {
       return;
     }
 
+    setRequestSubmitting(shouldSubmit ? "submit" : "draft");
     try {
       // No `category`: the initiator does not classify their own spend, so the
       // server applies the default. Resubmission (below) still sends the stored
@@ -566,38 +581,56 @@ function useDashboardState() {
         requiredPaymentDate: newRequest.requiredPaymentDate,
       });
 
+      let heldForBudget = false;
       if (shouldSubmit) {
         try {
           const { request: submitted } = await ExpenseClient.submit(created._id);
           // A request whose department has no budget period for that payment
           // date is accepted but held, not routed. Saying nothing would leave
           // the initiator watching a request that never reaches an approver.
-          if (submitted?.awaitingBudgetPeriod) {
-            notifySuccess(HELD_FOR_BUDGET_MESSAGE);
-          }
+          heldForBudget = Boolean(submitted?.awaitingBudgetPeriod);
         } catch (submitError) {
           // The draft did save, so say so rather than implying nothing happened.
           setFormError(`Draft saved, but failed to submit: ${toErrorMessage(submitError)}`);
-          loadDashboardData(currentUser);
+          await loadDashboardData(currentUser);
           return;
         }
       }
 
+      // Refetch *before* closing. The reload used to be fire-and-forget, so the
+      // dialog closed onto a stale Active Requests list and the new row only
+      // appeared a round-trip later — reading as "it didn't update".
+      await loadDashboardData(currentUser);
+
       setShowCreateModal(false);
       setNewRequest(emptyRequestForm());
-      loadDashboardData(currentUser);
+      // A silent close left the initiator unsure the request had gone anywhere;
+      // only the held-for-budget case ever confirmed anything.
+      notifySuccess(
+        heldForBudget
+          ? HELD_FOR_BUDGET_MESSAGE
+          : shouldSubmit
+            ? "Request submitted for approval."
+            : "Draft saved. You can submit it from My Drafts."
+      );
     } catch (err) {
       setFormError(toErrorMessage(err, "Failed to create request"));
+    } finally {
+      setRequestSubmitting(null);
     }
   };
 
   // Initiator updates and resubmits a returned request
   const handleResubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Same two-call shape as a first submission (update, then submit), so it
+    // needs the same re-entry guard.
+    if (requestSubmitting) return;
     setFormError("");
 
     if (!selectedResubmitExpense) return;
 
+    setRequestSubmitting("resubmit");
     try {
       // Update the details, then re-enter the workflow. Both must succeed for
       // the resubmission to count, so they share one try block.
@@ -623,10 +656,13 @@ function useDashboardState() {
       });
       const { request: resubmitted } = await ExpenseClient.submit(selectedResubmitExpense._id);
 
+      // Refetched before the dialog closes, so the request has already moved out
+      // of "Awaiting Your Response" by the time the initiator sees the screen.
+      await loadDashboardData(currentUser);
+
       setShowResubmitModal(false);
       setSelectedResubmitExpense(null);
       setResubmitForm({ justification: "", supportingDocuments: [] });
-      loadDashboardData(currentUser);
       notifySuccess(
         resubmitted?.awaitingBudgetPeriod
           ? HELD_FOR_BUDGET_MESSAGE
@@ -634,6 +670,8 @@ function useDashboardState() {
       );
     } catch (err) {
       setFormError(toErrorMessage(err, "Failed to resubmit request."));
+    } finally {
+      setRequestSubmitting(null);
     }
   };
 
@@ -883,6 +921,7 @@ function useDashboardState() {
     showCreateModal, setShowCreateModal,
     newRequest, setNewRequest,
     formError, setFormError,
+    requestSubmitting,
     fileInputRef,
     resubmitFileInputRef,
     isUploadingDoc, setIsUploadingDoc,

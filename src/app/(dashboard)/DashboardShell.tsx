@@ -69,6 +69,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     isUploadingDoc,
     uploadDocError,
     handleCreateRequest,
+    requestSubmitting,
     selectedExpense, setSelectedExpense,
     actionComment, setActionComment,
     adjustedAmount, setAdjustedAmount,
@@ -418,6 +419,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         uploadDocError={uploadDocError}
         removeDraftAttachment={removeDraftAttachment}
         handleCreateRequest={handleCreateRequest}
+        // The Reply dialog owns "resubmit"; this one only reflects its own two.
+        submitting={requestSubmitting === "resubmit" ? null : requestSubmitting}
       />
 
       <ExpenseDetailModal
@@ -456,6 +459,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onViewAttachment={setViewedAttachment}
         isUploadingDoc={isUploadingDoc}
         handleResubmitRequest={handleResubmitRequest}
+        isResubmitting={requestSubmitting === "resubmit"}
         onWithdraw={(id: string) => { setShowResubmitModal(false); handleCancelRequest(id); }}
       />
 

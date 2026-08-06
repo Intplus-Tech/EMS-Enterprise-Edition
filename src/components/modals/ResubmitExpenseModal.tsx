@@ -14,6 +14,7 @@ import * as Icons from "lucide-react";
 import { AttachmentList } from "../ui/AttachmentList";
 import { AttachmentDto, AttachmentInput } from "../../types/api";
 import { formatNaira, formatDateTime, humanizeStatus } from "../ui/format";
+import { SubmitButton } from "../ui/SubmitButton";
 
 interface ResubmitExpenseModalProps {
   isOpen: boolean;
@@ -29,6 +30,8 @@ interface ResubmitExpenseModalProps {
   onViewAttachment: (attachment: AttachmentDto) => void;
   isUploadingDoc: boolean;
   handleResubmitRequest: (e: React.FormEvent) => Promise<void>;
+  /** True while the reply's update + submit pair is still in flight. */
+  isResubmitting?: boolean;
   /** Withdraws the request instead of replying (design: "Withdraw Request"). */
   onWithdraw: (id: string) => void;
 }
@@ -46,6 +49,7 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
   onViewAttachment,
   isUploadingDoc,
   handleResubmitRequest,
+  isResubmitting = false,
   onWithdraw,
 }) => {
   if (!isOpen || !selectedResubmitExpense) return null;
@@ -73,7 +77,12 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
               </span>
             </div>
           </div>
-          <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer", flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            disabled={isResubmitting}
+            aria-label="Close"
+            style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: isResubmitting ? "not-allowed" : "pointer", opacity: isResubmitting ? 0.5 : 1, flexShrink: 0 }}
+          >
             <Icons.X size={22} />
           </button>
         </div>
@@ -214,6 +223,7 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
           <button
             type="button"
             onClick={() => onWithdraw(selectedResubmitExpense._id)}
+            disabled={isResubmitting}
             className="btn"
             style={{ background: "rgba(239, 68, 68, 0.1)", color: "#EF4444", border: "1px solid rgba(239, 68, 68, 0.25)" }}
           >
@@ -221,11 +231,15 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
           </button>
 
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button
+            {/* Replying is an update *then* a submit; the plain button here gave
+                no sign either was running and could be pressed again mid-flight. */}
+            <SubmitButton
               type="button"
               onClick={handleResubmitRequest as unknown as React.MouseEventHandler}
+              loading={isResubmitting}
+              loadingLabel="Sending…"
+              icon={<Icons.Send size={16} />}
               disabled={!resubmitForm.justification?.trim()}
-              className="btn btn-primary"
               style={{
                 background: "#2563EB",
                 border: "none",
@@ -235,9 +249,9 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
                 opacity: resubmitForm.justification?.trim() ? 1 : 0.55,
               }}
             >
-              <Icons.Send size={16} /> Submit Reply
-            </button>
-            <button type="button" onClick={onClose} className="btn btn-secondary">
+              Submit Reply
+            </SubmitButton>
+            <button type="button" onClick={onClose} disabled={isResubmitting} className="btn btn-secondary">
               Cancel
             </button>
           </div>

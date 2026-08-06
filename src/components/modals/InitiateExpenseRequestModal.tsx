@@ -18,6 +18,7 @@ import * as Icons from "lucide-react";
 import { AttachmentInput } from "../../types/api";
 import { formatFileSize, MAX_ATTACHMENTS_PER_REQUEST } from "../../domains/attachments/attachment.rules";
 import { CURRENCY_SYMBOL } from "../ui/format";
+import { SubmitButton } from "../ui/SubmitButton";
 
 interface InitiateExpenseRequestModalProps {
   isOpen: boolean;
@@ -34,6 +35,12 @@ interface InitiateExpenseRequestModalProps {
   /** Drops a not-yet-submitted upload from the form. */
   removeDraftAttachment: (url: string, isResubmit?: boolean) => void;
   handleCreateRequest: (e: React.FormEvent, shouldSubmit?: boolean) => Promise<void>;
+  /**
+   * Which write is in flight, so the button the initiator pressed is the one
+   * that spins. Narrowed to the two this dialog can start (rule 1-I) — the
+   * provider's wider phase type also covers the Reply dialog.
+   */
+  submitting?: "draft" | "submit" | null;
 }
 
 export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalProps> = ({
@@ -49,10 +56,15 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
   uploadDocError,
   removeDraftAttachment,
   handleCreateRequest,
+  submitting = null,
 }) => {
   if (!isOpen) return null;
 
   const set = (patch: Record<string, unknown>) => setNewRequest({ ...newRequest, ...patch });
+
+  // Either write locks the whole dialog: a request must not be dismissed or
+  // edited while the create/submit pair is still in flight against the server.
+  const isBusy = submitting !== null;
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
@@ -66,7 +78,12 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
               Submit your financial request for departmental approval and budget verification.
             </p>
           </div>
-          <button onClick={onClose} aria-label="Close" style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer", flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            disabled={isBusy}
+            aria-label="Close"
+            style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: isBusy ? "not-allowed" : "pointer", opacity: isBusy ? 0.5 : 1, flexShrink: 0 }}
+          >
             <Icons.X size={22} />
           </button>
         </div>
@@ -209,12 +226,15 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
               <span style={{ color: "#EF4444" }}>*</span>
             </label>
 
+            {/* Locked mid-submit: the payload has already left, so a file added
+                now would never reach the request that is being created. */}
             <div
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => { if (!isBusy) fileInputRef.current?.click(); }}
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                if (isBusy) return;
                 if (e.dataTransfer.files?.length) handleFileUpload(e.dataTransfer.files, false);
               }}
               style={{
@@ -222,7 +242,8 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
                 borderRadius: "10px",
                 padding: "2rem 1rem",
                 textAlign: "center",
-                cursor: "pointer",
+                cursor: isBusy ? "not-allowed" : "pointer",
+                opacity: isBusy ? 0.6 : 1,
                 background: "rgba(37, 99, 235, 0.04)",
               }}
             >
@@ -276,14 +297,31 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
           </div>
         </form>
 
-        {/* Footer band — Save Draft and Submit Request, as in the design */}
+        {/* Footer band — Save Draft and Submit Request, as in the design.
+            Both are SubmitButtons: submitting runs create *then* submit, and
+            the plain buttons here stayed pressable for the whole of it. */}
         <div style={{ padding: "1.25rem 2rem", background: "rgba(37, 99, 235, 0.05)", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", display: "flex", justifyContent: "flex-end", gap: "1rem" }}>
-          <button type="button" onClick={(e) => handleCreateRequest(e, false)} className="btn btn-secondary">
+          <SubmitButton
+            type="button"
+            variant="secondary"
+            onClick={(e) => handleCreateRequest(e, false)}
+            loading={submitting === "draft"}
+            loadingLabel="Saving…"
+            // Disabled, not spinning, while the other button owns the request.
+            disabled={isBusy}
+          >
             Save Draft
-          </button>
-          <button type="button" onClick={(e) => handleCreateRequest(e, true)} className="btn btn-primary" style={{ background: "#2563EB", border: "none" }}>
+          </SubmitButton>
+          <SubmitButton
+            type="button"
+            onClick={(e) => handleCreateRequest(e, true)}
+            loading={submitting === "submit"}
+            loadingLabel="Submitting…"
+            disabled={isBusy}
+            style={{ background: "#2563EB", border: "none" }}
+          >
             Submit Request
-          </button>
+          </SubmitButton>
         </div>
       </div>
     </div>
