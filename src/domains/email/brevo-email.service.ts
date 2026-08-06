@@ -1,5 +1,12 @@
 import { EmailDispatchResult, IEmailService } from "./email-service.interface";
-import { getInviteEmailHtml, getResetCodeEmailHtml, compileTemplate } from "./templates";
+import {
+  getInviteEmailHtml,
+  getInviteEmailText,
+  getResetCodeEmailHtml,
+  getResetCodeEmailText,
+  getExpenseNotificationText,
+  compileTemplate,
+} from "./templates";
 import { ENV } from "../../config/env";
 import { BRANDING } from "../../config/branding";
 
@@ -36,7 +43,8 @@ export class BrevoEmailService implements IEmailService {
     toEmail: string,
     toName: string,
     subject: string,
-    htmlContent: string
+    htmlContent: string,
+    textContent?: string
   ): Promise<EmailDispatchResult> {
     try {
       const response = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -57,8 +65,13 @@ export class BrevoEmailService implements IEmailService {
               name: toName,
             },
           ],
+          replyTo: {
+            email: this.senderEmail,
+            name: this.senderName,
+          },
           subject,
           htmlContent,
+          ...(textContent ? { textContent } : {}),
         }),
       });
 
@@ -89,8 +102,9 @@ export class BrevoEmailService implements IEmailService {
     origin?: string
   ): Promise<EmailDispatchResult> {
     const htmlContent = getInviteEmailHtml(inviteUrl, roleName, recipientName, origin);
+    const textContent = getInviteEmailText(inviteUrl, roleName, recipientName);
     const subject = `Invitation to join ${BRANDING.appName} as ${roleName}`;
-    return this.sendSmtpEmail(to, recipientName, subject, htmlContent);
+    return this.sendSmtpEmail(to, recipientName, subject, htmlContent, textContent);
   }
 
   public async sendPasswordResetEmail(
@@ -100,8 +114,9 @@ export class BrevoEmailService implements IEmailService {
     origin?: string
   ): Promise<EmailDispatchResult> {
     const htmlContent = getResetCodeEmailHtml(code, recipientName, origin);
+    const textContent = getResetCodeEmailText(code, recipientName);
     const subject = `Your Password Reset Code - ${BRANDING.appName}`;
-    return this.sendSmtpEmail(to, recipientName, subject, htmlContent);
+    return this.sendSmtpEmail(to, recipientName, subject, htmlContent, textContent);
   }
 
   public async sendExpenseNotification(
@@ -129,7 +144,8 @@ export class BrevoEmailService implements IEmailService {
       title: `Expense #${requestNumber} Update`,
       origin,
     });
+    const textContent = getExpenseNotificationText(requestNumber, status, recipientName, actionUrl);
     const subject = `Expense Request #${requestNumber} Status: ${status}`;
-    return this.sendSmtpEmail(to, recipientName, subject, htmlContent);
+    return this.sendSmtpEmail(to, recipientName, subject, htmlContent, textContent);
   }
 }
