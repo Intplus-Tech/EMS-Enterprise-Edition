@@ -232,7 +232,7 @@ export const AdminBudgetsTab: React.FC<AdminBudgetsTabProps> = ({
         <StatCard
           label="TOTAL ENTERPRISE BUDGET"
           value={formatNairaCompact(metrics.totalAllocated)}
-          description={`${metrics.activeCount} funded departments`}
+          hint={`${metrics.activeCount} funded departments`}
           icon={<Icons.Wallet size={20} />}
           tone="primary"
         />
@@ -240,7 +240,7 @@ export const AdminBudgetsTab: React.FC<AdminBudgetsTabProps> = ({
         <StatCard
           label="UTILISED SPEND"
           value={formatNairaCompact(metrics.totalUtilised)}
-          description={`${metrics.overallPct}% of total allocation spent`}
+          hint={`${metrics.overallPct}% of total allocation spent`}
           icon={<Icons.CheckCircle2 size={20} />}
           tone="neutral"
         />
@@ -248,7 +248,7 @@ export const AdminBudgetsTab: React.FC<AdminBudgetsTabProps> = ({
         <StatCard
           label="RESERVED / PENDING"
           value={formatNairaCompact(metrics.totalPending)}
-          description="In-flight approvals reserved"
+          hint="In-flight approvals reserved"
           icon={<Icons.Clock size={20} />}
           tone="warning"
         />
@@ -256,7 +256,7 @@ export const AdminBudgetsTab: React.FC<AdminBudgetsTabProps> = ({
         <StatCard
           label="AVAILABLE HEADROOM"
           value={formatNairaCompact(metrics.totalRemaining)}
-          description={metrics.atRiskCount > 0 ? `${metrics.atRiskCount} depts at risk (>85%)` : "Healthy headroom"}
+          hint={metrics.atRiskCount > 0 ? `${metrics.atRiskCount} depts at risk (>85%)` : "Healthy headroom"}
           icon={<Icons.PieChart size={20} />}
           tone={metrics.atRiskCount > 0 ? "danger" : "neutral"}
         />
