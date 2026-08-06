@@ -24,7 +24,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   }
 
   if (user.inviteExpires && new Date(user.inviteExpires) < new Date()) {
-    throw new Error("This invitation has expired (limit 48 hours). Please contact your administrator.");
+    throw new Error("This invitation has expired (limit 7 days). Please contact your administrator.");
   }
 
   return NextResponse.json({

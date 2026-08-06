@@ -54,7 +54,7 @@ function describeDelivery(result: InviteResultDto) {
     tone: "#10B981",
     icon: <Icons.CheckCircle size={20} />,
     title: "Invitation sent",
-    detail: `The activation link is on its way to ${result.user?.email ?? "the recipient"}. It expires in 48 hours.`,
+    detail: `The activation link is on its way to ${result.user?.email ?? "the recipient"}. It expires in 7 days.`,
     canRetry: false,
   };
 }

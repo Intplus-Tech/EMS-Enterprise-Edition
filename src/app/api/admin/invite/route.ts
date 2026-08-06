@@ -56,7 +56,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       existingUser.role = role;
       existingUser.departmentId = resolvedDepartmentId;
       existingUser.inviteToken = inviteToken;
-      existingUser.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+      existingUser.inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
       await existingUser.save();
 
       const inviteUrl = `${req.nextUrl.origin}/setup?token=${inviteToken}`;
@@ -97,7 +97,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   // 4. Generate invitation token and expires time
   const inviteToken = crypto.randomUUID();
-  const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+  const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
   // 5. Create new user with inactive status and placeholder password hash
   const newUser = new User({

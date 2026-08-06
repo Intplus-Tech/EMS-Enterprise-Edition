@@ -190,7 +190,7 @@ export function getInviteEmailHtml(inviteUrl: string, roleName: string, recipien
     </table>
     
     <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #64748B; text-align: center; margin: 16px 0 0 0;">
-      This link will expire in 48 hours.
+      This link will expire in 7 days.
     </p>
 
     <!-- Fallback Plain Text URL for Security Scanners & Corporate Mail Gateways -->
@@ -248,7 +248,7 @@ You have been invited to join ${BRANDING.appName} as a ${roleName}.
 To accept your invitation and set up your account, copy and paste the following link into your web browser:
 ${inviteUrl}
 
-Note: This link will expire in 48 hours.
+Note: This link will expire in 7 days.
 
 If you did not expect this invitation, please contact your administrator.
 
