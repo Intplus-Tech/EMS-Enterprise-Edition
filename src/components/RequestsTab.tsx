@@ -2,7 +2,7 @@ import React from "react";
 import * as Icons from "lucide-react";
 import { isOwnRequest } from "../domains/identity/reference";
 import { StatCard } from "./ui/StatCard";
-import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
+import { CURRENCY_SYMBOL, formatNaira, formatNairaPrecise, formatDate, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import { Pagination } from "./ui/Pagination";
 import { ExpenseRequestDto } from "../types/api";
@@ -635,7 +635,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                             <th>Initiator</th>
                             <th>Request ID</th>
                             <th>Category</th>
-                            <th>Amount (₦)</th>
+                            <th>Amount ({CURRENCY_SYMBOL})</th>
                             <th>Date</th>
                             <th>Status</th>
                             <th>Actions</th>

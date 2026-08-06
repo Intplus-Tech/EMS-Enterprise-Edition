@@ -141,10 +141,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const navTo = (route: string) => startNavigation(() => router.push(route));
   const isActive = (route: string) => pathname === route;
 
-  // Only these roles may raise a request — `POST /api/expenses` accepts nobody
-  // else. The button used to render for every role and 403 on submit; the
-  // finance and admin designs show it greyed out for exactly this reason.
-  const canRaiseRequest = ["INITIATOR", "APPROVER", "ADMIN"].includes(currentUser?.role);
+  // Raising a request is the initiator's job and nobody else's, so the control
+  // is absent rather than disabled for every other role — a greyed-out button
+  // still advertises an action they will never be given. The list also used to
+  // include APPROVER, who `POST /api/expenses` has never accepted: that button
+  // was enabled and 403'd on submit.
+  const canRaiseRequest = currentUser?.role === "INITIATOR";
 
   // Notification actions resolve back to the live expense record they were derived from.
   const handleNotificationAction = (notification: any) => {
@@ -370,27 +372,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-            <button
-              onClick={() => setShowCreateModal(true)}
-              disabled={!canRaiseRequest}
-              title={canRaiseRequest ? undefined : "Your role does not raise expense requests"}
-              className="btn btn-primary"
-              style={{
-                // `btn-primary` already paints the brand blue; no override needed.
-                padding: "0.55rem 1.15rem",
-                borderRadius: "8px",
-                fontWeight: "600",
-                fontSize: "0.85rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)",
-                opacity: canRaiseRequest ? 1 : 0.45,
-                cursor: canRaiseRequest ? "pointer" : "not-allowed"
-              }}
-            >
-              <Icons.Plus size={16} /> New Request
-            </button>
+            {/* Initiators only — see `canRaiseRequest`. */}
+            {canRaiseRequest && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="btn btn-primary"
+                style={{
+                  // `btn-primary` already paints the brand blue; no override needed.
+                  padding: "0.55rem 1.15rem",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  fontSize: "0.85rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)",
+                }}
+              >
+                <Icons.Plus size={16} /> New Request
+              </button>
+            )}
           </div>
         </div>
 

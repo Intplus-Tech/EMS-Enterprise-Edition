@@ -12,6 +12,7 @@ import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
 import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
 import { IAttachment, IUser } from "../../types";
+import { formatNaira } from "../../components/ui/format";
 
 /**
  * The authenticated caller as the API routes hand it over: a User document or
@@ -26,8 +27,8 @@ const getActorId = (actor?: { _id?: unknown; id?: string } | null): string => {
   return raw ? String(raw) : "";
 };
 
-/** Naira amounts in log lines, matching how the UI renders them. */
-const money = (amount: number) => `₦${Number(amount || 0).toLocaleString()}`;
+/** Naira amounts in log lines, through the same helper the UI renders with. */
+const money = formatNaira;
 
 /**
  * The part of a request document the workflow helpers touch — enough to push
@@ -209,7 +210,7 @@ export class ExpenseService {
     const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
     await LoggerService.logAudit(
       AuditAction.EXPENSE_CREATED,
-      `Draft request ${requestNumber} created for ₦${request.amount.toLocaleString()}`,
+      `Draft request ${requestNumber} created for ${money(request.amount)}`,
       { requestId: request._id },
       logActor
     );

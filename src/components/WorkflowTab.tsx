@@ -1,5 +1,6 @@
 import React from "react";
 import * as Icons from "lucide-react";
+import { CURRENCY_SYMBOL } from "./ui/format";
 
 interface WorkflowTabProps {
   currentUser: any;
@@ -57,7 +58,8 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({
 
               <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
                 <div className="form-group" style={{ margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Min Amount Rule: $</span>
+                  {/* The threshold is compared against request amounts, which are Naira. */}
+                  <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Min Amount Rule: {CURRENCY_SYMBOL}</span>
                   <input
                     type="number"
                     value={step.minAmount}

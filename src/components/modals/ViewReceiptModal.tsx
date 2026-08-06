@@ -2,6 +2,7 @@
 
 import React from "react";
 import * as Icons from "lucide-react";
+import { formatNaira } from "../ui/format";
 
 interface ViewReceiptModalProps {
   isOpen: boolean;
@@ -31,7 +32,9 @@ export const ViewReceiptModal: React.FC<ViewReceiptModalProps> = ({
             <Icons.CheckCircle size={28} />
           </div>
           <div>
-            <h4 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: "0" }}>₦{(selectedReceiptData.amount || 12000).toLocaleString()}</h4>
+            {/* Shared helper; the `|| 12000` that used to sit here invented a
+                design sample amount whenever the receipt carried none. */}
+            <h4 style={{ fontSize: "1.5rem", fontWeight: "bold", margin: "0" }}>{formatNaira(selectedReceiptData.amount)}</h4>
             <p style={{ color: "#10B981", fontSize: "0.85rem", margin: "0.25rem 0 0" }}><span className="badge badge-paid">PAID</span></p>
           </div>
 

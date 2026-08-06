@@ -195,7 +195,9 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                 <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <span>Department: <strong>{selectedExpense.departmentId?.name}</strong></span>
                   <span>Category: <strong>{selectedExpense.category}</strong></span>
-                  <span>Amount: <strong style={{ color: "rgb(var(--color-primary))" }}>${selectedExpense.amount?.toLocaleString()}</strong></span>
+                  {/* Naira via the shared helper — this read `$` while the
+                      queue tables behind it read `₦` for the same figure. */}
+                  <span>Amount: <strong style={{ color: "rgb(var(--color-primary))" }}>{formatNaira(selectedExpense.amount)}</strong></span>
                   <span>Required By: <strong>{selectedExpense.requiredPaymentDate ? new Date(selectedExpense.requiredPaymentDate).toLocaleDateString() : 'N/A'}</strong></span>
                   <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>Purpose: <em>"{selectedExpense.description}"</em></span>
                 </div>

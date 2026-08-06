@@ -31,10 +31,10 @@ export const GET = withErrorHandling(async (req: NextRequest, { params }: { para
   if (user.role === SystemRole.APPROVER && expense.departmentId._id.toString() !== user.departmentId) {
     throw new Error("Forbidden: You do not have permission to view this request.");
   }
-  // A Finance Officer's remit starts after approval. Without this the list
-  // filter could be stepped around by requesting an id directly.
+  // Both finance processing roles pick the pipeline up after approval. Without
+  // this the list filter could be stepped around by requesting an id directly.
   if (
-    user.role === SystemRole.FINANCE_OFFICER &&
+    (user.role === SystemRole.FINANCE_OFFICER || user.role === SystemRole.FINANCE_MANAGER) &&
     !POST_APPROVAL_STATUSES.includes(expense.status)
   ) {
     throw new Error("Forbidden: You do not have permission to view this request.");

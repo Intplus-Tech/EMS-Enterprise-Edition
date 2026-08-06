@@ -5,14 +5,33 @@
  * every tab/modal shows identical strings. Pure functions only — no React, no I/O.
  */
 
+/**
+ * The application's only currency. Every amount stored, entered, logged or
+ * rendered is Naira — there is no multi-currency support and no conversion
+ * anywhere in the stack, so a `$` on screen is always a bug, not another
+ * currency. The three helpers below are the only places this symbol is written.
+ */
+export const CURRENCY_SYMBOL = "₦";
+
+/**
+ * Grouping is pinned rather than left to the reader's locale.
+ *
+ * `toLocaleString()` with no locale follows whatever the runtime is set to, so
+ * the same amount rendered on the server and re-rendered in a de-DE browser
+ * disagreed (`1,450,000` vs `1.450.000`) — a hydration mismatch as well as an
+ * inconsistency. en-NG is the locale that goes with the currency and formats
+ * `1,450,000.00`.
+ */
+const MONEY_LOCALE = "en-NG";
+
 /** Naira amount with thousands separators, e.g. `₦1,450,000`. */
 export function formatNaira(amount?: number | null): string {
-  return `₦${Number(amount ?? 0).toLocaleString()}`;
+  return `${CURRENCY_SYMBOL}${Number(amount ?? 0).toLocaleString(MONEY_LOCALE)}`;
 }
 
 /** Naira amount with kobo, matching the design's `₦ 1,450,000.00` treatment. */
 export function formatNairaPrecise(amount?: number | null): string {
-  return `₦${Number(amount ?? 0).toLocaleString(undefined, {
+  return `${CURRENCY_SYMBOL}${Number(amount ?? 0).toLocaleString(MONEY_LOCALE, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -21,9 +40,9 @@ export function formatNairaPrecise(amount?: number | null): string {
 /** Compact money used on KPI cards, e.g. `₦28.4M` / `₦800k`. */
 export function formatNairaCompact(amount?: number | null): string {
   const value = Number(amount ?? 0);
-  if (Math.abs(value) >= 1_000_000) return `₦${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `₦${Math.round(value / 1_000)}k`;
-  return `₦${value}`;
+  if (Math.abs(value) >= 1_000_000) return `${CURRENCY_SYMBOL}${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${CURRENCY_SYMBOL}${Math.round(value / 1_000)}k`;
+  return `${CURRENCY_SYMBOL}${value}`;
 }
 
 /** `Oct 24, 2023` — the date format used across every table in the designs. */

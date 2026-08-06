@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import * as Icons from "lucide-react";
 import { EmptyState } from "../ui/EmptyState";
-import { formatNaira, formatNairaCompact } from "../ui/format";
+import { CURRENCY_SYMBOL, formatNaira, formatNairaCompact } from "../ui/format";
 import { DepartmentDto, DepartmentSpendDto, PopulatedExpenseDto } from "../../types/api";
 import { datedFilename, downloadCsv } from "../ui/exportCsv";
 import { BANK_STAGE_STATUSES } from "../../enums/statuses";
@@ -426,7 +426,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
               <thead>
                 <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)", textTransform: "uppercase" }}>
                   <th style={{ textAlign: "left", paddingBottom: "0.5rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>DEPT</th>
-                  <th style={{ textAlign: "right", paddingBottom: "0.5rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>REMAINING (₦)</th>
+                  <th style={{ textAlign: "right", paddingBottom: "0.5rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>REMAINING ({CURRENCY_SYMBOL})</th>
                 </tr>
               </thead>
               <tbody>

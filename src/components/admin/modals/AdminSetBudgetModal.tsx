@@ -8,7 +8,7 @@
 import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
-import { formatNaira, formatNairaPrecise, formatDate } from "../../ui/format";
+import { CURRENCY_SYMBOL, formatNaira, formatNairaPrecise, formatDate } from "../../ui/format";
 import { BudgetPeriodDto } from "../../../types/api";
 import {
   FiscalPeriod,
@@ -299,7 +299,7 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
                           style={{ background: "none", border: "none", color: "rgb(var(--color-text))", fontWeight: 600, fontSize: "0.85rem", flexGrow: 1, outline: "none" }}
                         />
                         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                          <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>₦</span>
+                          <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>{CURRENCY_SYMBOL}</span>
                           <input
                             type="number"
                             value={item.amount}

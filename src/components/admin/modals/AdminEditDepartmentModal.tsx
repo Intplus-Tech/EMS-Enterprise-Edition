@@ -8,7 +8,7 @@ import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
 import { DEPARTMENT_SCOPED_ROLES } from "../../../enums/roles";
-import { formatNairaPrecise, formatNairaCompact } from "../../ui/format";
+import { CURRENCY_SYMBOL, formatNairaPrecise, formatNairaCompact } from "../../ui/format";
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
 
 interface BudgetLine {
@@ -207,7 +207,7 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
             </select>
           </div>
           <div>
-            <label className="form-label">Fiscal Year Budget (₦)</label>
+            <label className="form-label">Fiscal Year Budget ({CURRENCY_SYMBOL})</label>
             <input
               type="number"
               min={0}

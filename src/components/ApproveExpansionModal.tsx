@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
+import { formatNairaPrecise } from "./ui/format";
 
 interface ApproveExpansionModalProps {
   isOpen: boolean;
@@ -151,7 +152,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
               REQUEST AMOUNT
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
-              ₦{requestAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatNairaPrecise(requestAmount)}
             </span>
           </div>
 
@@ -160,7 +161,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
               {budgetItemName ? "ITEM REMAINING" : "REMAINING BUDGET"}
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
-              ₦{remainingBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatNairaPrecise(remainingBudget)}
             </span>
           </div>
 
@@ -169,7 +170,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
               DEFICIT
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#DC2626" }}>
-              -₦{deficitAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              -{formatNairaPrecise(deficitAmount)}
             </span>
           </div>
         </div>
@@ -190,7 +191,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", color: "#2563EB" }}>
             <Icons.Info size={20} />
             <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#1E3A8A" }}>
-              Expansion Amount: ₦{deficitAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Expansion Amount: {formatNairaPrecise(deficitAmount)}
             </span>
           </div>
 

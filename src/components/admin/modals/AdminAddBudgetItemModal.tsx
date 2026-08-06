@@ -6,6 +6,7 @@
  */
 import React, { useEffect, useState } from "react";
 import { ModalShell } from "../../ui/ModalShell";
+import { CURRENCY_SYMBOL } from "../../ui/format";
 
 // Default catalogue keeps the picker useful before a category API exists.
 const DEFAULT_CATEGORIES = [
@@ -123,7 +124,7 @@ export const AdminAddBudgetItemModal: React.FC<AdminAddBudgetItemModalProps> = (
               pointerEvents: "none",
             }}
           >
-            ₦
+            {CURRENCY_SYMBOL}
           </span>
           <input
             type="number"

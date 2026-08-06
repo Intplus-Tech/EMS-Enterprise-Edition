@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { SubmitButton } from "../../ui/SubmitButton";
+import { CURRENCY_SYMBOL, formatNairaPrecise } from "../../ui/format";
 
 interface LineItem {
   id: string;
@@ -150,7 +151,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             <div style={{ marginBottom: "1rem" }}>
               <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>TOTAL ALLOCATION</div>
               <div style={{ fontSize: "1.35rem", fontWeight: "800", color: "#38bdf8", marginTop: "0.15rem" }}>
-                ₦{totalAllocation.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {formatNairaPrecise(totalAllocation)}
               </div>
             </div>
 
@@ -197,7 +198,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                     />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>₦</span>
+                    <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>{CURRENCY_SYMBOL}</span>
                     <input
                       type="number"
                       value={item.amount}

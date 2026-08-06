@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
+import { formatNairaPrecise } from "./ui/format";
 
 interface RejectExpansionModalProps {
   isOpen: boolean;
@@ -146,7 +147,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
               REQUEST AMOUNT
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
-              ₦{requestAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatNairaPrecise(requestAmount)}
             </span>
           </div>
 
@@ -155,7 +156,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
               {budgetItemName ? "ITEM REMAINING" : "REMAINING BUDGET"}
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
-              ₦{remainingBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatNairaPrecise(remainingBudget)}
             </span>
           </div>
 
@@ -164,7 +165,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
               DEFICIT
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#DC2626" }}>
-              -₦{deficitAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              -{formatNairaPrecise(deficitAmount)}
             </span>
           </div>
         </div>

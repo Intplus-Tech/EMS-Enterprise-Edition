@@ -20,16 +20,23 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   // Role-based visibility controls:
   // - Initiator: Only see requests raised by themselves
   // - Approver: Only see requests matching their own department
-  // - Finance Officer: Only requests that have cleared approval — they audit
-  //   payment payloads, so anything still in (or refused by) the approval chain
-  //   is outside their remit. Enforced here rather than in the screen's tab
-  //   filters, which are cosmetic and cannot stop a direct call to this route.
-  // - Finance Head / Finance Manager / Admin: all requests across the org
+  // - Finance Officer / Finance Manager: Only requests that have cleared
+  //   approval and are in (or through) the payment pipeline. The officer audits
+  //   payment payloads and the manager releases the cash; neither rules on the
+  //   spend, so anything still in — or refused by — the approval chain is
+  //   outside both remits. The manager used to receive every request in the
+  //   organisation, including drafts and rejections they can do nothing with.
+  //   Enforced here rather than in the screen's tab filters, which are cosmetic
+  //   and cannot stop a direct call to this route.
+  // - Finance Head / Admin: all requests across the org
   if (user.role === SystemRole.INITIATOR) {
     query.initiatorId = user.id;
   } else if (user.role === SystemRole.APPROVER) {
     query.departmentId = user.departmentId;
-  } else if (user.role === SystemRole.FINANCE_OFFICER) {
+  } else if (
+    user.role === SystemRole.FINANCE_OFFICER ||
+    user.role === SystemRole.FINANCE_MANAGER
+  ) {
     query.status = { $in: POST_APPROVAL_STATUSES };
   }
 

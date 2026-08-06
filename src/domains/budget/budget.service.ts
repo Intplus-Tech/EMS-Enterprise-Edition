@@ -14,6 +14,7 @@ import {
   BudgetTrendPointDto,
   DepartmentSpendDto,
 } from "../../types/api";
+import { formatNaira } from "../../components/ui/format";
 
 /**
  * Statuses whose amount is already counted inside `pendingBudget`.
@@ -35,9 +36,13 @@ export const LOCKED_STATUSES: RequestStatus[] = [
   RequestStatus.AWAITING_RELEASE,
 ];
 
-/** Amounts in log lines and validation messages are Naira, matching the UI. */
-const NAIRA = "₦";
-const money = (amount: number) => `${NAIRA}${Number(amount || 0).toLocaleString()}`;
+/**
+ * Amounts in log lines and validation messages go through the same helper the
+ * screens use, so a message quoting a figure and the table showing it can never
+ * disagree on symbol or grouping. `format.ts` is pure — no React, no I/O — so
+ * server code may depend on it.
+ */
+const money = formatNaira;
 
 /**
  * Outcome of the submission-time budget gate.

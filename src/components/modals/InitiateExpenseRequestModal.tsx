@@ -17,6 +17,7 @@ import React, { RefObject } from "react";
 import * as Icons from "lucide-react";
 import { AttachmentInput } from "../../types/api";
 import { formatFileSize, MAX_ATTACHMENTS_PER_REQUEST } from "../../domains/attachments/attachment.rules";
+import { CURRENCY_SYMBOL } from "../ui/format";
 
 interface InitiateExpenseRequestModalProps {
   isOpen: boolean;
@@ -161,7 +162,7 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
               <label className="form-label">Amount Requested</label>
               <div style={{ position: "relative" }}>
                 <span style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))", fontWeight: 600 }}>
-                  ₦
+                  {CURRENCY_SYMBOL}
                 </span>
                 <input
                   type="number"

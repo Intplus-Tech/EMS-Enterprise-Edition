@@ -14,7 +14,7 @@ import { StatCard } from "./ui/StatCard";
 import { Pagination } from "./ui/Pagination";
 import { EmptyState } from "./ui/EmptyState";
 import { RequestStatus } from "../enums/statuses";
-import { formatNaira, formatNairaPrecise, formatDate, humanizeStatus, statusBadgeClass } from "./ui/format";
+import { CURRENCY_SYMBOL, formatNaira, formatNairaPrecise, formatDate, humanizeStatus, statusBadgeClass } from "./ui/format";
 
 /** Design shows five rows per page in the history table. */
 const ROWS_PER_PAGE = 5;
@@ -258,7 +258,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
                     <th>REQUEST ID</th>
                     <th>DATE</th>
                     <th>CATEGORY</th>
-                    <th style={{ textAlign: "right" }}>AMOUNT (₦)</th>
+                    <th style={{ textAlign: "right" }}>AMOUNT ({CURRENCY_SYMBOL})</th>
                     <th>STATUS</th>
                     <th style={{ textAlign: "right" }}>ACTIONS</th>
                   </tr>

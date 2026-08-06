@@ -22,12 +22,17 @@ export enum RequestStatus {
 /**
  * Statuses a request can hold once it has cleared the approval chain.
  *
- * This is the Finance Officer's entire world: they audit payment payloads and
- * upload bank instructions, so nothing that is still being approved — or that
- * was refused — is any of their business. Note the final approval lands on
- * SENT_TO_FINANCE, not APPROVED (APPROVED comes off the exceptional-budget
- * path), so "approved requests only" has to mean this set rather than the
- * single APPROVED value, or the officer's own queue would be empty.
+ * This is the entire world of both finance processing roles — the Officer, who
+ * audits payment payloads and uploads bank instructions, and the Manager, who
+ * releases the cash. Neither takes part in the commercial decision, so nothing
+ * that is still being approved — or that was refused — is any of their
+ * business. Note the final approval lands on SENT_TO_FINANCE, not APPROVED
+ * (APPROVED comes off the exceptional-budget path), so "approved requests only"
+ * has to mean this set rather than the single APPROVED value, or their queues
+ * would be empty.
+ *
+ * PAID and CLOSED stay in: the Manager's History screen is a ledger of the
+ * payments they themselves released, which would be blank without them.
  *
  * REJECTED and CANCELLED are absent by design: a refused request never cleared
  * approval, so it is not part of the payment pipeline.

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { DepartmentSpendDto } from "../types/api";
-import { formatNaira } from "./ui/format";
+import { formatNaira, formatNairaCompact } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 
 // Row accent colours, cycled in the order the design shows them.
@@ -142,7 +142,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
       avatarColor: "#FFFFFF",
       name: app.name,
       subtitle: app.dept,
-      amount: `₦${app.totalApproved >= 1000 ? Math.round(app.totalApproved / 1000) + "k" : app.totalApproved}`,
+      amount: formatNairaCompact(app.totalApproved),
       status: "Approved"
     };
   });
@@ -200,7 +200,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
           </div>
           <div style={{ marginTop: "1.25rem" }}>
             <h2 style={{ fontSize: "2.35rem", fontWeight: "800", color: "rgb(var(--color-text))", letterSpacing: "-0.03em", margin: 0 }}>
-              ₦{totalEnterpriseBudget.toLocaleString()}
+              {formatNaira(totalEnterpriseBudget)}
             </h2>
           </div>
         </div>
@@ -240,7 +240,7 @@ export const DepartmentalSpendTab: React.FC<DepartmentalSpendTabProps> = ({
           </div>
           <div style={{ marginTop: "1.25rem" }}>
             <h2 style={{ fontSize: "2.35rem", fontWeight: "800", color: "rgb(var(--color-text))", letterSpacing: "-0.03em", margin: 0 }}>
-              ₦{totalUtilized.toLocaleString()}
+              {formatNaira(totalUtilized)}
             </h2>
           </div>
         </div>

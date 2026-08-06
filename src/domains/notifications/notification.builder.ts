@@ -4,6 +4,7 @@ import { SystemRole } from "../../enums/roles";
 import { NotificationType, collapsesInto, notificationTypeFor } from "./notifiable-events";
 import { requestStateLabel } from "./status-labels";
 import { idOf } from "../identity/reference";
+import { formatNaira } from "../../components/ui/format";
 
 export type { NotificationType };
 
@@ -17,11 +18,8 @@ export interface AppNotification {
   meta: Record<string, any>;
 }
 
-const NAIRA = "\u20A6";
-
-function money(amount: number | undefined): string {
-  return `${NAIRA}${Number(amount || 0).toLocaleString()}`;
-}
+/** Same Naira rendering as the screens the notification links through to. */
+const money = formatNaira;
 
 /**
  * Human readable "time ago" label for a notification timestamp.

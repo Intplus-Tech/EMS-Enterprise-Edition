@@ -578,7 +578,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             Action Required
           </span>
           <span style={{ fontSize: "0.8rem", color: "#64748B" }}>
-            Exceptional Approval for ₦{requestDetails.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({requestDetails.departmentFull})
+            Exceptional Approval for {formatNairaPrecise(requestDetails.amount)} ({requestDetails.departmentFull})
           </span>
         </div>
 
