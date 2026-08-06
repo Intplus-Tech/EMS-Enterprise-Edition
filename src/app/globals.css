@@ -167,6 +167,34 @@ body {
   box-shadow: 0 0 0 2px rgb(var(--color-primary) / 0.2);
 }
 
+/* --- Field-level validation ---------------------------------------------
+   Backs the `FieldError` primitive. Forms previously had one banner at the
+   top of the dialog naming no field at all, so the invalid control had to be
+   found by hand. Colour is carried on the border as well as the message, for
+   readers who cannot distinguish the red text. */
+.form-input.is-invalid,
+.form-select.is-invalid,
+.form-textarea.is-invalid {
+  border-color: rgb(var(--color-danger) / 0.65);
+}
+
+.form-input.is-invalid:focus,
+.form-select.is-invalid:focus,
+.form-textarea.is-invalid:focus {
+  border-color: rgb(var(--color-danger));
+  box-shadow: 0 0 0 2px rgb(var(--color-danger) / 0.18);
+}
+
+.form-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.3rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: rgb(var(--color-danger));
+}
+
 /* Buttons */
 .btn {
   display: inline-flex;

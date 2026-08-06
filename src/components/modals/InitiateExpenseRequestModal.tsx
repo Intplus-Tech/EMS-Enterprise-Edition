@@ -13,19 +13,38 @@
  * ExpenseService.initiateRequest), so reporting still groups these requests.
  */
 
-import React, { RefObject } from "react";
+import React, { RefObject, useState } from "react";
 import * as Icons from "lucide-react";
 import { AttachmentInput } from "../../types/api";
 import { formatFileSize, MAX_ATTACHMENTS_PER_REQUEST } from "../../domains/attachments/attachment.rules";
+import {
+  ACCOUNT_NAME_MAX,
+  ACCOUNT_NUMBER_MAX_DIGITS,
+  ACCOUNT_NUMBER_MIN_DIGITS,
+  BANK_NAME_MAX,
+  DESCRIPTION_MAX,
+  NEW_REQUEST_FIELDS,
+  NewRequestField,
+  NewRequestFormValues,
+  toDigits,
+  todayIsoDate,
+  validateNewRequestForm,
+  VENDOR_NAME_MAX,
+} from "../../domains/expense/request-form.rules";
 import { CURRENCY_SYMBOL } from "../ui/format";
+import { FieldError } from "../ui/FieldError";
 import { SubmitButton } from "../ui/SubmitButton";
 
-interface InitiateExpenseRequestModalProps {
+interface InitiateExpenseRequestModalProps extends InitiateExpenseRequestFormProps {
   isOpen: boolean;
+}
+
+interface InitiateExpenseRequestFormProps {
   onClose: () => void;
   formError: string;
-  newRequest: any;
-  setNewRequest: React.Dispatch<React.SetStateAction<any>>;
+  /** Typed, not `any` (rule 1-I) — the validator and the provider share this shape. */
+  newRequest: NewRequestFormValues;
+  setNewRequest: React.Dispatch<React.SetStateAction<NewRequestFormValues>>;
   /** Read-only department shown at the top of the form, per the design. */
   departmentName?: string;
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -43,8 +62,19 @@ interface InitiateExpenseRequestModalProps {
   submitting?: "draft" | "submit" | null;
 }
 
+/**
+ * Open/closed gate only.
+ *
+ * The form below is mounted rather than hidden, so its "which fields have been
+ * touched" state starts clean on every open — a dialog reopened after a failed
+ * attempt would otherwise come up pre-reddened against a blank form.
+ */
 export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalProps> = ({
   isOpen,
+  ...formProps
+}) => (isOpen ? <InitiateExpenseRequestForm {...formProps} /> : null);
+
+const InitiateExpenseRequestForm: React.FC<InitiateExpenseRequestFormProps> = ({
   onClose,
   formError,
   newRequest,
@@ -58,13 +88,38 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
   handleCreateRequest,
   submitting = null,
 }) => {
-  if (!isOpen) return null;
+  /**
+   * Which fields the initiator has left, so a message appears once they have
+   * had their turn at a field rather than the form turning red on open. A
+   * submit attempt marks every field touched at once.
+   */
+  const [touched, setTouched] = useState<Partial<Record<NewRequestField, boolean>>>({});
 
-  const set = (patch: Record<string, unknown>) => setNewRequest({ ...newRequest, ...patch });
+  const set = (patch: Partial<NewRequestFormValues>) => setNewRequest({ ...newRequest, ...patch });
+  const touch = (field: NewRequestField) => setTouched((prev) => ({ ...prev, [field]: true }));
 
   // Either write locks the whole dialog: a request must not be dismissed or
   // edited while the create/submit pair is still in flight against the server.
   const isBusy = submitting !== null;
+
+  // Derived, not stored: the errors are a pure function of the form, so keeping
+  // them in state would only create a second copy that can fall out of step.
+  const errors = validateNewRequestForm(newRequest);
+  const errorFor = (field: NewRequestField) => (touched[field] ? errors[field] : undefined);
+  const invalidClass = (field: NewRequestField) => (errorFor(field) ? " is-invalid" : "");
+  const describedBy = (field: NewRequestField) => (errorFor(field) ? `${field}-error` : undefined);
+
+  /**
+   * Reveals every outstanding message before delegating.
+   *
+   * The handler re-runs the same rules and refuses an invalid form, so this is
+   * purely about showing the initiator *which* fields it stopped on — the
+   * dialog previously reported one unnamed "required fields" line.
+   */
+  const attemptSubmit = (e: React.FormEvent | React.MouseEvent, shouldSubmit: boolean) => {
+    setTouched(Object.fromEntries(NEW_REQUEST_FIELDS.map((f) => [f, true])));
+    handleCreateRequest(e as React.FormEvent, shouldSubmit);
+  };
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
@@ -88,8 +143,12 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
           </button>
         </div>
 
+        {/* `noValidate`: the footer buttons sit outside this form, so native
+            validation never ran for them and only Enter-to-submit saw it. One
+            rule set for both paths beats two that disagree. */}
         <form
-          onSubmit={(e) => handleCreateRequest(e, true)}
+          noValidate
+          onSubmit={(e) => attemptSubmit(e, true)}
           style={{ display: "flex", flexDirection: "column", gap: "1.15rem", padding: "1.75rem 2rem" }}
         >
           {formError && (
@@ -114,96 +173,155 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
 
           {/* Vendor / payee */}
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Vendor/Payee Details</label>
+            <label className="form-label" htmlFor="vendorName">Vendor/Payee Details</label>
             <input
+              id="vendorName"
               type="text"
               required
+              maxLength={VENDOR_NAME_MAX}
               placeholder="e.g. Acme Corp Int, AWS, Staples"
               value={newRequest.vendorName}
               onChange={(e) => set({ vendorName: e.target.value })}
-              className="form-input"
+              onBlur={() => touch("vendorName")}
+              aria-invalid={Boolean(errorFor("vendorName"))}
+              aria-describedby={describedBy("vendorName")}
+              className={`form-input${invalidClass("vendorName")}`}
             />
+            <FieldError id="vendorName-error" message={errorFor("vendorName")} />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem", alignItems: "start" }}>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Bank Name</label>
+              <label className="form-label" htmlFor="bankName">Bank Name</label>
               <input
+                id="bankName"
                 type="text"
                 required
+                maxLength={BANK_NAME_MAX}
                 placeholder="e.g. Zenith Bank"
                 value={newRequest.bankName}
                 onChange={(e) => set({ bankName: e.target.value })}
-                className="form-input"
+                onBlur={() => touch("bankName")}
+                aria-invalid={Boolean(errorFor("bankName"))}
+                aria-describedby={describedBy("bankName")}
+                className={`form-input${invalidClass("bankName")}`}
               />
+              <FieldError id="bankName-error" message={errorFor("bankName")} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Account Number</label>
+              <label className="form-label" htmlFor="accountNumber">Account Number</label>
+              {/* Stays a text input on purpose: `type="number"` drops the leading
+                  zero most NUBAN numbers carry and offers a spinner on an
+                  identifier that is not a quantity. Non-digits are stripped as
+                  they are typed, so a pasted "0123-4567-89" is accepted. */}
               <input
+                id="accountNumber"
                 type="text"
                 required
                 inputMode="numeric"
-                placeholder="10-digit number"
+                autoComplete="off"
+                maxLength={ACCOUNT_NUMBER_MAX_DIGITS}
+                placeholder={`${ACCOUNT_NUMBER_MIN_DIGITS}-digit number`}
                 value={newRequest.accountNumber}
-                onChange={(e) => set({ accountNumber: e.target.value })}
-                className="form-input"
+                onChange={(e) => set({ accountNumber: toDigits(e.target.value).slice(0, ACCOUNT_NUMBER_MAX_DIGITS) })}
+                onBlur={() => touch("accountNumber")}
+                aria-invalid={Boolean(errorFor("accountNumber"))}
+                aria-describedby={describedBy("accountNumber")}
+                className={`form-input${invalidClass("accountNumber")}`}
               />
+              <FieldError id="accountNumber-error" message={errorFor("accountNumber")} />
             </div>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Account Name</label>
+              <label className="form-label" htmlFor="accountName">Account Name</label>
               <input
+                id="accountName"
                 type="text"
                 required
+                maxLength={ACCOUNT_NAME_MAX}
                 placeholder="Full name on account"
                 value={newRequest.accountName}
                 onChange={(e) => set({ accountName: e.target.value })}
-                className="form-input"
+                onBlur={() => touch("accountName")}
+                aria-invalid={Boolean(errorFor("accountName"))}
+                aria-describedby={describedBy("accountName")}
+                className={`form-input${invalidClass("accountName")}`}
               />
+              <FieldError id="accountName-error" message={errorFor("accountName")} />
             </div>
           </div>
 
           <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Description / Business Purpose</label>
+            <label className="form-label" htmlFor="description">Description / Business Purpose</label>
             <textarea
+              id="description"
               required
               rows={4}
+              maxLength={DESCRIPTION_MAX}
               value={newRequest.description}
               onChange={(e) => set({ description: e.target.value })}
+              onBlur={() => touch("description")}
               placeholder="Please provide a detailed explanation for this expense request..."
-              className="form-textarea"
+              aria-invalid={Boolean(errorFor("description"))}
+              aria-describedby={describedBy("description")}
+              className={`form-textarea${invalidClass("description")}`}
             />
+            <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem" }}>
+              <FieldError id="description-error" message={errorFor("description")} />
+              {/* Counter sits opposite the message so the ceiling is visible
+                  before it is hit, not only once the field stops accepting. */}
+              <span style={{ marginLeft: "auto", flexShrink: 0, fontSize: "0.72rem", color: "rgb(var(--color-text-dim))", marginTop: "0.35rem" }}>
+                {(newRequest.description || "").length}/{DESCRIPTION_MAX}
+              </span>
+            </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", alignItems: "start" }}>
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Amount Requested</label>
+              <label className="form-label" htmlFor="amount">Amount Requested</label>
               <div style={{ position: "relative" }}>
-                <span style={{ position: "absolute", left: "0.85rem", top: "50%", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))", fontWeight: 600 }}>
+                <span style={{ position: "absolute", left: "0.85rem", top: "1.35rem", transform: "translateY(-50%)", color: "rgb(var(--color-text-dim))", fontWeight: 600 }}>
                   {CURRENCY_SYMBOL}
                 </span>
                 <input
+                  id="amount"
                   type="number"
                   required
-                  min="1"
+                  // Smallest amount the 2-decimal rule allows, so the spinner
+                  // and the validator bottom out at the same value.
+                  min="0.01"
                   step="0.01"
                   value={newRequest.amount}
                   onChange={(e) => set({ amount: e.target.value })}
+                  onBlur={() => touch("amount")}
                   placeholder="0.00"
-                  className="form-input"
+                  aria-invalid={Boolean(errorFor("amount"))}
+                  aria-describedby={describedBy("amount")}
+                  className={`form-input${invalidClass("amount")}`}
                   style={{ paddingLeft: "2rem" }}
                 />
               </div>
+              <FieldError id="amount-error" message={errorFor("amount")} />
             </div>
 
             <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Required Payment Date</label>
+              <label className="form-label" htmlFor="requiredPaymentDate">Required Payment Date</label>
+              {/* `min` blocks the past in the native picker; the rule still runs
+                  because a typed date bypasses it in several browsers. The date
+                  decides which budget period the request is checked against, so
+                  a back-dated one has nothing to reserve. */}
               <input
+                id="requiredPaymentDate"
                 type="date"
                 required
+                min={todayIsoDate()}
                 value={newRequest.requiredPaymentDate}
                 onChange={(e) => set({ requiredPaymentDate: e.target.value })}
-                className="form-input"
+                onBlur={() => touch("requiredPaymentDate")}
+                aria-invalid={Boolean(errorFor("requiredPaymentDate"))}
+                aria-describedby={describedBy("requiredPaymentDate")}
+                className={`form-input${invalidClass("requiredPaymentDate")}`}
               />
+              <FieldError id="requiredPaymentDate-error" message={errorFor("requiredPaymentDate")} />
             </div>
           </div>
 
@@ -256,9 +374,13 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
               </span>
             </div>
 
+            {/* The upload's own failure, then the count rule. They are separate
+                problems: a file can fail to upload while the request still has
+                enough documents attached to be valid. */}
             {uploadDocError && (
               <p style={{ color: "#EF4444", fontSize: "0.75rem", margin: "0.5rem 0 0" }}>{uploadDocError}</p>
             )}
+            <FieldError id="supportingDocuments-error" message={errorFor("supportingDocuments")} />
 
             {/* Attached files carry their real size and can be removed before
                 the request is created. */}
@@ -304,7 +426,7 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
           <SubmitButton
             type="button"
             variant="secondary"
-            onClick={(e) => handleCreateRequest(e, false)}
+            onClick={(e) => attemptSubmit(e, false)}
             loading={submitting === "draft"}
             loadingLabel="Saving…"
             // Disabled, not spinning, while the other button owns the request.
@@ -314,7 +436,7 @@ export const InitiateExpenseRequestModal: React.FC<InitiateExpenseRequestModalPr
           </SubmitButton>
           <SubmitButton
             type="button"
-            onClick={(e) => handleCreateRequest(e, true)}
+            onClick={(e) => attemptSubmit(e, true)}
             loading={submitting === "submit"}
             loadingLabel="Submitting…"
             disabled={isBusy}

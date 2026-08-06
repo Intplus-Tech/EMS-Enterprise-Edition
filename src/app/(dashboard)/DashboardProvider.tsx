@@ -12,6 +12,10 @@ import { ExpenseClient } from "../../services/expense.client";
 import { AdminClient, InviteInput } from "../../services/admin.client";
 import { AuthClient } from "../../services/auth.client";
 import { ApiRequestError, toErrorMessage } from "../../services/http";
+import {
+  firstNewRequestError,
+  validateNewRequestForm,
+} from "../../domains/expense/request-form.rules";
 import { AttachmentInput, InviteResultDto } from "../../types/api";
 import type { AttachmentTarget } from "../../components/modals/AttachmentViewModal";
 import { WorkflowActionType } from "../../enums/workflowActions";
@@ -545,21 +549,17 @@ function useDashboardState() {
     if (requestSubmitting) return;
     setFormError("");
 
-    if (!newRequest.description || !newRequest.amount || !newRequest.vendorName) {
-      setFormError("All required text fields must be filled.");
-      return;
-    }
-
-    if (newRequest.supportingDocuments.length === 0) {
-      setFormError("At least one supporting document is mandatory. Please upload a file.");
-      return;
-    }
-
-    // Vendor bank details used to fall back to placeholder values ("1234567890",
-    // "Corporate Bank Plc") when left blank, which would have sent a real payment
-    // instruction to a fabricated account. They are now required.
-    if (!newRequest.accountNumber || !newRequest.bankName) {
-      setFormError("Vendor bank name and account number are required to raise a payment request.");
+    // One rule set, shared with the dialog's per-field messages, so the gate and
+    // the red text can never disagree. This replaced an if-chain that checked
+    // four of the eight fields — account name, the payment date and the *shape*
+    // of the amount and account number were never checked at all, and vendor
+    // bank details once fell back to placeholder values ("1234567890",
+    // "Corporate Bank Plc"), sending a payment instruction to an invented
+    // account. `ExpenseInitiateSchema` remains the real boundary (rule 5).
+    const errors = validateNewRequestForm(newRequest);
+    const firstError = firstNewRequestError(errors);
+    if (firstError) {
+      setFormError(firstError);
       return;
     }
 
@@ -574,9 +574,12 @@ function useDashboardState() {
         supportingDocuments: newRequest.supportingDocuments,
         vendorName: newRequest.vendorName,
         vendorBankDetails: {
+          // No `|| vendorName` fallback any more: account name is validated as
+          // its own field, and quietly paying "Acme Corp Int" into an account
+          // held under a different name is the mismatch a bank rejects.
           accountNumber: newRequest.accountNumber,
           bankName: newRequest.bankName,
-          accountName: newRequest.accountName || newRequest.vendorName,
+          accountName: newRequest.accountName,
         },
         requiredPaymentDate: newRequest.requiredPaymentDate,
       });
