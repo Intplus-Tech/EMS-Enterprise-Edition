@@ -291,7 +291,23 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             </div>
 
             {/* Transition action controllers */}
-            {currentUser?.role === "FINANCE_HEAD" && selectedExpense.status === "PENDING_EXCEPTIONAL" && (
+            {selectedExpense.exceptionalBudgetApproved && (
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.4)", background: "rgb(var(--color-secondary) / 0.08)", padding: "1.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <Icons.CheckCircle2 size={22} style={{ color: "rgb(var(--color-secondary))", flexShrink: 0 }} />
+                  <div>
+                    <h4 style={{ margin: 0, fontWeight: "bold", color: "rgb(var(--color-secondary))", fontSize: "0.95rem" }}>
+                      One-Time Budget Expansion Authorized
+                    </h4>
+                    <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.82rem", color: "rgb(var(--color-text-muted))" }}>
+                      Finance Head authorized the budget overrun for this request. It has been forwarded to Finance for payment release.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentUser?.role === "FINANCE_HEAD" && selectedExpense.status === "PENDING_EXCEPTIONAL" && !selectedExpense.exceptionalBudgetApproved && (
               <div className="glass-card" style={{ border: "1px solid rgb(var(--color-accent) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-accent))", marginBottom: "0.5rem" }}>Finance Head Action Required: Budget Overrun detected</p>
                 <div className="form-group">

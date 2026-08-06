@@ -67,12 +67,10 @@ export function useExpenseActions({ currentUser, reload, onSuccess, onError }: E
     ) =>
       perform(
         () =>
-          isFinanceHead
-            ? ExpenseClient.exceptionalAction(id, action, comment, signature)
-            : ExpenseClient.workflowAction(id, action, comment, signature, budgetItemId),
+          ExpenseClient.workflowAction(id, action, comment, signature, budgetItemId),
         successMessage
       ),
-    [perform, isFinanceHead]
+    [perform]
   );
 
   /**
