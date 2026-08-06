@@ -25,6 +25,7 @@ import { StatCard } from "./ui/StatCard";
 import { EmptyState } from "./ui/EmptyState";
 import { formatNaira, formatDate, formatDateTime, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
+import { sameId } from "../domains/identity/reference";
 import { ExpenseClient } from "../services/expense.client";
 import { toErrorMessage } from "../services/http";
 import {
@@ -437,16 +438,39 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     }
   };
 
-  // Grouping expense items based on Finance views
+  // Helper: has current user already approved this request in workflow history?
+  const hasUserApproved = (e: any) => {
+    if (!Array.isArray(e?.history)) return false;
+    return e.history.some(
+      (h: any) =>
+        h.actorRole === currentUser?.role || (currentUser?.id && sameId(h.actorId, currentUser.id))
+    );
+  };
+
+  const isApprover = currentUser?.role === "APPROVER";
+
+  // Grouping expense items based on Finance views and user role
   const newRequests = expenses.filter(e => e.status === "SENT_TO_FINANCE" || e.status === "APPROVED");
   
-  const processingRequests = expenses.filter(e => [
-    ...BANK_STAGE_STATUSES, ...OVER_BUDGET_STATUSES, "RETURNED", "BUDGET_CHECK", "PENDING_APPROVAL"
-  ].includes(e.status));
+  const processingRequests = expenses.filter(e => {
+    if (![...BANK_STAGE_STATUSES, ...OVER_BUDGET_STATUSES, "RETURNED", "BUDGET_CHECK", "PENDING_APPROVAL"].includes(e.status)) {
+      return false;
+    }
+    // For Departmental Approver, filter out requests already approved by them or moved to subsequent steps
+    if (isApprover) {
+      if (hasUserApproved(e)) return false;
+      if (e.status === "PENDING_APPROVAL" && typeof e.currentStepIndex === "number" && e.currentStepIndex > 0) return false;
+    }
+    return true;
+  });
 
-  const completedRequests = expenses.filter(e => [
-    "PAID", "CLOSED", "REJECTED", "CANCELLED"
-  ].includes(e.status));
+  const completedRequests = expenses.filter(e => {
+    if (["PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(e.status)) return true;
+    if (isApprover && (e.status === "SENT_TO_FINANCE" || e.status === "PENDING_EXCEPTIONAL" || hasUserApproved(e))) {
+      return true;
+    }
+    return false;
+  });
 
   // Determine active list & count labels
   let currentList = processingRequests;

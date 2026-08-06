@@ -9,7 +9,7 @@
 
 import React, { useMemo, useState } from "react";
 import * as Icons from "lucide-react";
-import { isOwnRequest } from "../domains/identity/reference";
+import { isOwnRequest, sameId } from "../domains/identity/reference";
 import { StatCard } from "./ui/StatCard";
 import { Pagination } from "./ui/Pagination";
 import { EmptyState } from "./ui/EmptyState";
@@ -78,8 +78,8 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
     return currentUser?.role === "INITIATOR"
       ? isOwnRequest(e, currentUser)
       : (["ADMIN", "FINANCE_MANAGER", "FINANCE_OFFICER", "FINANCE_HEAD"].includes(currentUser?.role)
-        || e.departmentId === currentUser?.departmentId
-        || e.initiatorId?.departmentId === currentUser?.departmentId
+        || sameId(e.departmentId, currentUser?.departmentId)
+        || sameId(e.initiatorId?.departmentId, currentUser?.departmentId)
         || (e.departmentId as any)?.name === currentUser?.departmentName);
   }), [expenses, currentUser]);
 

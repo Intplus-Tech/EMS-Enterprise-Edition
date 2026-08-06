@@ -9,6 +9,7 @@ import { AttachmentList } from "../ui/AttachmentList";
 import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
 import { BudgetItemOptionDto } from "../../types/api";
+import { sameId } from "../../domains/identity/reference";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
@@ -75,6 +76,26 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   React.useEffect(() => {
     setBudgetItem("");
   }, [selectedExpense?._id]);
+
+  // Check if current user has already signed off on this request in history
+  const hasUserApproved = React.useMemo(() => {
+    if (!Array.isArray(selectedExpense?.history)) return false;
+    return selectedExpense.history.some(
+      (h: any) =>
+        h.actorRole === currentUser?.role || (currentUser?.id && sameId(h.actorId, currentUser.id))
+    );
+  }, [selectedExpense?.history, currentUser]);
+
+  const isStepForCurrentRole = React.useMemo(() => {
+    if (selectedExpense?.status !== "PENDING_APPROVAL") return false;
+    if (currentUser?.role === "APPROVER") {
+      return !hasUserApproved && (!selectedExpense.currentStepIndex || selectedExpense.currentStepIndex === 0);
+    }
+    if (currentUser?.role === "FINANCE_OFFICER") {
+      return selectedExpense.currentStepIndex === 1 || selectedExpense.currentStageName === "Finance Officer Review";
+    }
+    return true;
+  }, [selectedExpense?.status, selectedExpense?.currentStepIndex, selectedExpense?.currentStageName, currentUser?.role, hasUserApproved]);
 
   // Every decision button in this modal commits a financial transition, so all
   // of them are gated on the signature the server will verify.
@@ -316,7 +337,23 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             )}
 
-            {selectedExpense.status === "PENDING_APPROVAL" && (
+            {selectedExpense.status === "PENDING_APPROVAL" && (hasUserApproved || (currentUser?.role === "APPROVER" && selectedExpense.currentStepIndex > 0)) && (
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.4)", background: "rgb(var(--color-secondary) / 0.08)", padding: "1.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <Icons.CheckCircle2 size={22} style={{ color: "rgb(var(--color-secondary))", flexShrink: 0 }} />
+                  <div>
+                    <h4 style={{ margin: 0, fontWeight: "bold", color: "rgb(var(--color-secondary))", fontSize: "0.95rem" }}>
+                      Departmental Approval Signed Off
+                    </h4>
+                    <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.82rem", color: "rgb(var(--color-text-muted))" }}>
+                      You have already approved this request. It is currently progressing through {selectedExpense.currentStageName || "Finance Review"}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedExpense.status === "PENDING_APPROVAL" && isStepForCurrentRole && (
               <div className="glass-card" style={{ border: "1px solid rgb(var(--color-primary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }}>Workflow Approval Step Required</p>
 
