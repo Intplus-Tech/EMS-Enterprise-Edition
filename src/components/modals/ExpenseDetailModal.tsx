@@ -8,11 +8,14 @@ import { AttachmentTarget } from "./AttachmentViewModal";
 import { AttachmentList } from "../ui/AttachmentList";
 import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
+import { BudgetItemOptionDto } from "../../types/api";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
   currentUser: any;
   onClose: () => void;
+  budgetItems?: BudgetItemOptionDto[];
+  budgetItemsLoading?: boolean;
   actionComment: string;
   setActionComment: (comment: string) => void;
   adjustedAmount: number;
@@ -24,7 +27,7 @@ interface ExpenseDetailModalProps {
   setDecisionSignature: (signature: string) => void;
   handleCancelRequest: (id: string) => Promise<void>;
   handleExceptionalBudgetAction: (id: string, action: WorkflowActionType) => Promise<void>;
-  handleWorkflowAction: (id: string, action: WorkflowActionType) => Promise<void>;
+  handleWorkflowAction: (id: string, action: WorkflowActionType, budgetItemId?: string) => Promise<void>;
   /** Opens the supporting document in the shared attachment viewer. */
   onViewAttachment: (attachment: AttachmentTarget) => void;
   onAddAttachments: (requestId: string, files: FileList | File[]) => void;
@@ -38,6 +41,8 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   selectedExpense,
   currentUser,
   onClose,
+  budgetItems = [],
+  budgetItemsLoading = false,
   actionComment,
   setActionComment,
   adjustedAmount,
@@ -63,9 +68,23 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   const canEditDocuments =
     currentUser?.role === "INITIATOR" && ["DRAFT", "RETURNED"].includes(selectedExpense.status);
 
+  // Track selected budget item for departmental approver sign-off
+  const [budgetItem, setBudgetItem] = React.useState("");
+
+  // Reset the budget item selection whenever a new request is brought into focus
+  React.useEffect(() => {
+    setBudgetItem("");
+  }, [selectedExpense?._id]);
+
   // Every decision button in this modal commits a financial transition, so all
   // of them are gated on the signature the server will verify.
   const signed = decisionSignature.trim().length > 0;
+
+  const requiresBudgetItem = currentUser?.role === "APPROVER";
+  const selectedItem = (budgetItems || []).find((item) => item.id === budgetItem);
+  const willOverrun = Boolean(selectedItem && !selectedItem.coversRequest);
+  const shortfall = selectedItem ? Math.max(0, (selectedExpense?.amount || 0) - selectedItem.available) : 0;
+  const canApprove = signed && (!requiresBudgetItem || Boolean(budgetItem));
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
@@ -300,6 +319,76 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             {selectedExpense.status === "PENDING_APPROVAL" && (
               <div className="glass-card" style={{ border: "1px solid rgb(var(--color-primary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }}>Workflow Approval Step Required</p>
+
+                {/* Budget Item Selection — required for Departmental Approvers before signing off */}
+                {requiresBudgetItem && (
+                  <div className="form-group" style={{ marginBottom: "1rem" }}>
+                    <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                      Budget Item <span style={{ color: "rgb(var(--color-danger))" }}>*</span>
+                    </label>
+                    <select
+                      value={budgetItem}
+                      onChange={(e) => setBudgetItem(e.target.value)}
+                      className="form-select"
+                      disabled={budgetItemsLoading}
+                    >
+                      <option value="">
+                        {budgetItemsLoading ? "Loading budget items…" : "Select a Budget Item"}
+                      </option>
+                      {(budgetItems || []).map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} — {formatNaira(item.available)} available
+                        </option>
+                      ))}
+                    </select>
+
+                    {!budgetItemsLoading && (!budgetItems || budgetItems.length === 0) && (
+                      <p style={{ fontSize: "0.78rem", color: "rgb(var(--color-danger))", marginTop: "0.4rem" }}>
+                        This department has no budget items for the requested payment date. An administrator must add them before this request can be approved.
+                      </p>
+                    )}
+
+                    {selectedItem && (
+                      <div
+                        style={{
+                          marginTop: "0.65rem",
+                          padding: "0.7rem 0.85rem",
+                          borderRadius: "0.5rem",
+                          border: `1px solid ${willOverrun ? "rgb(var(--color-danger) / 0.35)" : "rgb(var(--color-card-border))"}`,
+                          background: willOverrun
+                            ? "rgb(var(--color-danger) / 0.08)"
+                            : "rgb(var(--color-surface-secondary) / 0.45)",
+                          fontSize: "0.78rem",
+                          color: "rgb(var(--color-text-muted))",
+                          display: "flex",
+                          gap: "0.55rem",
+                        }}
+                      >
+                        {willOverrun ? (
+                          <Icons.AlertTriangle size={15} style={{ color: "rgb(var(--color-danger))", flexShrink: 0, marginTop: "1px" }} />
+                        ) : (
+                          <Icons.CheckCircle2 size={15} style={{ color: "rgb(var(--color-secondary))", flexShrink: 0, marginTop: "1px" }} />
+                        )}
+                        <span>
+                          {willOverrun ? (
+                            <>
+                              <strong style={{ color: "rgb(var(--color-danger))" }}>
+                                Overruns this item by {formatNaira(shortfall)}.
+                              </strong>{" "}
+                              Approving still sends the request forward, but it will need a one-time expansion from the Finance Head before payment.
+                            </>
+                          ) : (
+                            <>
+                              Leaves {formatNaira(selectedItem.available - selectedExpense.amount)} on{" "}
+                              <strong style={{ color: "rgb(var(--color-text))" }}>{selectedItem.name}</strong> after this request.
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label className="form-label">Approval comments / details</label>
                   <textarea
@@ -326,7 +415,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger" disabled={!signed}>
                     Reject
                   </button>
-                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.APPROVE)} className="btn btn-primary" disabled={!signed}>
+                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.APPROVE, budgetItem || undefined)} className="btn btn-primary" disabled={!canApprove}>
                     Approve Step
                   </button>
                 </div>

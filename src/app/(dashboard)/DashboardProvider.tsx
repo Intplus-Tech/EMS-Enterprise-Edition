@@ -8,6 +8,7 @@ import { buildNotifications, formatRelativeTime } from "../../domains/notificati
 import { useAdminAdministration } from "./hooks/useAdminAdministration";
 import { useExpenseActions } from "./hooks/useExpenseActions";
 import { useAttachments } from "./hooks/useAttachments";
+import { useBudgetItems } from "./hooks/useBudgetItems";
 import { ExpenseClient } from "../../services/expense.client";
 import { AdminClient, InviteInput } from "../../services/admin.client";
 import { AuthClient } from "../../services/auth.client";
@@ -221,6 +222,8 @@ function useDashboardState() {
 
     setIsUploadingDoc(false);
   };
+
+  const { budgetItems, budgetItemsLoading } = useBudgetItems(selectedExpense?._id);
 
   /** Drops a not-yet-submitted upload from the New Request / Resubmit form. */
   const removeDraftAttachment = useCallback((url: string, isResubmit = false) => {
@@ -777,9 +780,9 @@ function useDashboardState() {
   };
 
   // Approver decision (from the request detail modal)
-  const handleWorkflowAction = async (id: string, action: WorkflowActionType) => {
+  const handleWorkflowAction = async (id: string, action: WorkflowActionType, budgetItemId?: string) => {
     try {
-      await ExpenseClient.workflowAction(id, action, actionComment, decisionSignature);
+      await ExpenseClient.workflowAction(id, action, actionComment, decisionSignature, budgetItemId);
       setSelectedExpense(null);
       setActionComment("");
       setDecisionSignature("");
@@ -988,6 +991,8 @@ function useDashboardState() {
     handleWorkflowAction,
     handleFinanceUpload,
     handlePaymentRelease,
+    budgetItems,
+    budgetItemsLoading,
     handleSaveWorkflowConfig,
     moveWorkflowStep,
     handleStepDetailChange,

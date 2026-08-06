@@ -71,6 +71,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     handleCreateRequest,
     requestSubmitting,
     selectedExpense, setSelectedExpense,
+    budgetItems, budgetItemsLoading,
     actionComment, setActionComment,
     adjustedAmount, setAdjustedAmount,
     paymentRef, setPaymentRef,
@@ -426,6 +427,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <ExpenseDetailModal
         selectedExpense={selectedExpense}
         currentUser={currentUser}
+        budgetItems={budgetItems}
+        budgetItemsLoading={budgetItemsLoading}
         onClose={() => { setSelectedExpense(null); setActionComment(""); setDecisionSignature(""); }}
         actionComment={actionComment}
         setActionComment={setActionComment}
