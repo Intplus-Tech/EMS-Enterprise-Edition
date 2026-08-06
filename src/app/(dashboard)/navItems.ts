@@ -105,6 +105,7 @@ const FINANCE_PROCESSING_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { route: "/dashboard", label: "Dashboard", icon: "LayoutDashboard" },
   { route: "/departmental-spend", label: "Departmental Spend", icon: "PieChart" },
+  { route: "/budgets", label: "Budgets", icon: "Wallet" },
   { route: "/reports", label: "Report", icon: "BarChart2" },
   { route: "/users-roles", label: "Users & Roles", icon: "Users" },
   { route: "/audit-trail", label: "Audit Trail", icon: "FileText" },
