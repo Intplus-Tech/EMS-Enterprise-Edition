@@ -4,12 +4,20 @@ import { ExpenseRequest } from "../../../models/ExpenseRequest";
 import { Department } from "../../../models/Department";
 import { ExpenseService } from "../../../domains/expense/expense.service";
 import { scopeForFinanceManager } from "../../../domains/expense/finance-manager.view";
+import {
+  isVisibleToFinanceOfficer,
+  statusScopeForRole,
+} from "../../../domains/expense/visibility";
 import { authenticate } from "../../../middlewares/auth";
 import { withErrorHandling } from "../../../middlewares/errors";
 import { ExpenseInitiateSchema } from "../../../validators/validation";
-import { WorkflowService } from "../../../domains/workflow/workflow.service";
+import {
+  WorkflowService,
+  WorkflowStep,
+  resolveActiveStep,
+} from "../../../domains/workflow/workflow.service";
 import { SystemRole } from "../../../enums/roles";
-import { POST_APPROVAL_STATUSES, RequestStatus } from "../../../enums/statuses";
+import { RequestStatus } from "../../../enums/statuses";
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   await connectToDatabase();
@@ -20,24 +28,23 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   // Role-based visibility controls:
   // - Initiator: Only see requests raised by themselves
   // - Approver: Only see requests matching their own department
-  // - Finance Officer / Finance Manager: Only requests that have cleared
-  //   approval and are in (or through) the payment pipeline. The officer audits
-  //   payment payloads and the manager releases the cash; neither rules on the
-  //   spend, so anything still in — or refused by — the approval chain is
-  //   outside both remits. The manager used to receive every request in the
+  // - Finance Officer: their own approval step plus everything downstream of it
+  // - Finance Manager: only requests that have cleared approval and are in (or
+  //   through) the payment pipeline. They release the cash but do not rule on
+  //   the spend, so anything still in — or refused by — the approval chain is
+  //   outside their remit. They used to receive every request in the
   //   organisation, including drafts and rejections they can do nothing with.
   //   Enforced here rather than in the screen's tab filters, which are cosmetic
   //   and cannot stop a direct call to this route.
   // - Finance Head / Admin: all requests across the org
+  const statusScope = statusScopeForRole(user.role);
+
   if (user.role === SystemRole.INITIATOR) {
     query.initiatorId = user.id;
   } else if (user.role === SystemRole.APPROVER) {
     query.departmentId = user.departmentId;
-  } else if (
-    user.role === SystemRole.FINANCE_OFFICER ||
-    user.role === SystemRole.FINANCE_MANAGER
-  ) {
-    query.status = { $in: POST_APPROVAL_STATUSES };
+  } else if (statusScope) {
+    query.status = { $in: statusScope };
   }
 
   // Requests belonging to a deleted department are cold storage: they stay in
@@ -61,21 +68,33 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
 
   // PENDING_APPROVAL now covers two different queues — the departmental
   // approver at step 0 and the Finance Officer at step 1 — so the raw status
-  // no longer says who a request is actually waiting on. The active step's name
-  // is resolved once here rather than the UI guessing from `currentStepIndex`,
-  // which would be wrong the moment an admin reconfigures the chain.
+  // no longer says who a request is actually waiting on. The active step is
+  // resolved once here rather than the UI guessing from `currentStepIndex`,
+  // which would be wrong the moment an admin reconfigures the chain. The role
+  // travels with the name: the bell used to treat every PENDING_APPROVAL row as
+  // the approver's, so they were told a request sitting with the Finance
+  // Officer was "awaiting your review".
   const workflow = await WorkflowService.getActiveWorkflow();
-  const steps = [...workflow.steps].sort(
-    (a: { stepIndex: number }, b: { stepIndex: number }) => a.stepIndex - b.stepIndex
-  );
+  const steps = workflow.steps as WorkflowStep[];
 
-  const expenses = found.map((expense) => {
+  let expenses = found.map((expense) => {
     const json = expense.toJSON();
     if (json.status === RequestStatus.PENDING_APPROVAL) {
-      json.currentStageName = steps[expense.currentStepIndex]?.stepName;
+      // `resolveActiveStep`, not `steps[currentStepIndex]`: the index is the
+      // next candidate, and a step below its `minAmount` threshold is skipped.
+      const active = resolveActiveStep(steps, expense);
+      json.currentStageName = active?.step.stepName;
+      json.currentStageRole = active?.step.role;
     }
     return json;
   });
+
+  // The officer's status scope admits every PENDING_APPROVAL request; only the
+  // ones resting on their own step are theirs to act on. Applied after the
+  // active step is resolved, since that is what distinguishes them.
+  if (user.role === SystemRole.FINANCE_OFFICER) {
+    expenses = expenses.filter((e) => isVisibleToFinanceOfficer(e.status, e.currentStageRole));
+  }
 
   // The Finance Manager releases cash against an instruction that has already
   // been approved and audited; they do not re-open the commercial decision. So

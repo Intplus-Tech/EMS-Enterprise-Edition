@@ -94,8 +94,13 @@ export const WorkflowActionSchema = z.object({
 
 export const PaymentReleaseSchema = z.object({
   reference: z.string().min(3, "Payment transaction reference is required"),
-  /** Stored document reference for the transfer evidence, never a bare filename. */
-  receipt: z.string().optional(),
+  /**
+   * Stored document reference for the transfer evidence, never a bare filename.
+   * Mandatory: the release dialog gates its own button on an uploaded receipt,
+   * but an optional field here let a second screen release cash with none, and
+   * the service then recorded a placeholder filename pointing at nothing.
+   */
+  receipt: z.string().min(1, "Payment receipt or evidence of transfer is required"),
   signature: SignatureSchema,
 });
 

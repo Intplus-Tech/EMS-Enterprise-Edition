@@ -11,6 +11,7 @@ import { SystemRole } from "../../enums/roles";
 import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
 import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
+import { SYSTEM_ACTOR_NAME } from "../identity/reference";
 import { IAttachment, IUser } from "../../types";
 import { formatNaira } from "../../components/ui/format";
 
@@ -284,7 +285,7 @@ export class ExpenseService {
         statusBefore: RequestStatus.BUDGET_CHECK,
         statusAfter: RequestStatus.INSUFFICIENT_BUDGET,
         actorId: actorId,
-        actorName: "System Engine",
+        actorName: SYSTEM_ACTOR_NAME,
         actorRole: SystemRole.ADMIN,
         action: `Budget Overrun. Flagged: ${budgetCheck.message}`,
         timestamp: new Date()
@@ -331,7 +332,7 @@ export class ExpenseService {
       statusBefore,
       statusAfter: RequestStatus.INSUFFICIENT_BUDGET,
       actorId,
-      actorName: "System Engine",
+      actorName: SYSTEM_ACTOR_NAME,
       actorRole: SystemRole.ADMIN,
       action: "Held — awaiting budget period",
       comment:
@@ -388,7 +389,7 @@ export class ExpenseService {
         statusBefore,
         statusAfter: RequestStatus.PENDING_APPROVAL,
         actorId: actorId,
-        actorName: "System Engine",
+        actorName: SYSTEM_ACTOR_NAME,
         actorRole: SystemRole.ADMIN,
         action: releaseNote ? `${releaseNote} ${routed}` : routed,
         timestamp: new Date()
@@ -677,7 +678,7 @@ export class ExpenseService {
       statusBefore: RequestStatus.SENT_TO_FINANCE,
       statusAfter: RequestStatus.UPLOADED_TO_BANK,
       actorId,
-      actorName: isOfficer ? actor.name : "System Engine",
+      actorName: isOfficer ? actor.name : SYSTEM_ACTOR_NAME,
       actorRole: isOfficer ? actor.role : SystemRole.ADMIN,
       action: isOfficer
         ? "Confirm Documentation & Upload Instruction to Bank Platform"
@@ -700,7 +701,7 @@ export class ExpenseService {
       statusBefore: RequestStatus.UPLOADED_TO_BANK,
       statusAfter: RequestStatus.AWAITING_RELEASE,
       actorId,
-      actorName: "System Engine",
+      actorName: SYSTEM_ACTOR_NAME,
       actorRole: SystemRole.ADMIN,
       action: "Awaiting Finance Manager release on the bank platform",
       timestamp: new Date(),
@@ -951,7 +952,7 @@ export class ExpenseService {
       statusBefore: RequestStatus.UPLOADED_TO_BANK,
       statusAfter: RequestStatus.AWAITING_RELEASE,
       actorId: actorId,
-      actorName: "System Engine",
+      actorName: SYSTEM_ACTOR_NAME,
       actorRole: SystemRole.ADMIN,
       action: "Awaiting Finance Manager release on the bank platform",
       timestamp: new Date()
@@ -972,7 +973,8 @@ export class ExpenseService {
     requestId: string,
     actor: WorkflowActor,
     reference: string,
-    receiptFileName?: string
+    /** Stored document reference for the transfer evidence. Required — see below. */
+    receiptFileName: string
   ) {
     await connectToDatabase();
     if (actor.role !== SystemRole.FINANCE_MANAGER) {
@@ -988,12 +990,19 @@ export class ExpenseService {
       throw new Error("Request has not been uploaded to the bank yet.");
     }
 
+    // The receipt is the evidence the release rests on. It used to fall back to
+    // a hardcoded "bank_receipt.pdf" that pointed at no stored document, so a
+    // release with no evidence was indistinguishable from one with it.
+    if (!receiptFileName?.trim()) {
+      throw new Error("Attach the payment receipt or evidence of transfer before releasing the payment.");
+    }
+
     const actorId = getActorId(actor);
     const previousStatus = request.status;
-    
+
     // Save bank transaction records
     request.paymentReference = reference;
-    request.paymentReceipt = receiptFileName || "bank_receipt.pdf";
+    request.paymentReceipt = receiptFileName.trim();
     request.paymentDate = new Date();
     request.status = RequestStatus.PAID;
     
@@ -1029,20 +1038,30 @@ export class ExpenseService {
       statusBefore: RequestStatus.PAID,
       statusAfter: RequestStatus.CLOSED,
       actorId: actorId as any,
-      actorName: "System Engine",
+      actorName: SYSTEM_ACTOR_NAME,
       actorRole: SystemRole.ADMIN,
       action: "Final Closure & Audit Logs Solidified",
       timestamp: new Date()
     });
     
     await request.save();
-    await LoggerService.logApp(
+    // `logAudit`, not `logApp`: closure is the terminal event of a payment and
+    // belongs in the audit trail with the rest of the chain. As an APP entry it
+    // carried no actor, no details and no IP, so the one row proving a request
+    // was closed out matched neither the Audit Trail's user filter nor its
+    // reference-by-details filter.
+    await LoggerService.logAudit(
       AuditAction.EXPENSE_CLOSED,
-      `Request ${request.requestNumber} transitioned to CLOSED. Ledger and audits locked.`
+      `Request ${request.requestNumber} transitioned to CLOSED. Ledger and audits locked.`,
+      { requestId: request._id.toString(), requestNumber: request.requestNumber, reference },
+      logActor
     );
 
-    // Tell the initiator their request moved. Non-blocking by design.
+    // Tell the initiator their request moved, then everyone who handled it that
+    // it is done. Reviewers see only their own queue, so this completion notice
+    // is the one thing that ever reports the outcome back to them.
     await RequestNotifier.notifyInitiator(request);
+    await RequestNotifier.notifyParticipants(request);
 
     return request;
   }

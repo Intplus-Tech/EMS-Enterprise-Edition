@@ -116,7 +116,7 @@ export function useExpenseActions({ currentUser, reload, onSuccess, onError }: E
 
   /** Finance Manager: release the payment and close the request. */
   const releasePayment = useCallback(
-    (id: string, reference: string, signature: string, receipt?: string) =>
+    (id: string, reference: string, signature: string, receipt: string) =>
       perform(
         () => ExpenseClient.releasePayment(id, reference, signature, receipt),
         `Payment released. Reference: ${reference}`

@@ -448,10 +448,36 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   };
 
   const isApprover = currentUser?.role === "APPROVER";
+  const isFinanceOfficer = currentUser?.role === "FINANCE_OFFICER";
 
-  // Grouping expense items based on Finance views and user role
-  const newRequests = expenses.filter(e => e.status === "SENT_TO_FINANCE" || e.status === "APPROVED");
-  
+  /**
+   * Is this request resting on the viewer's own approval step?
+   *
+   * PENDING_APPROVAL covers the departmental approver and the Finance Officer
+   * alike, so the status cannot tell the two queues apart. `currentStageRole`
+   * is resolved server-side against the configured chain; the step-index
+   * fallback keeps records fetched before that field existed in the right
+   * queue rather than dropping them out of every tab.
+   */
+  const isOwnPendingStep = (e: any) => {
+    if (e.status !== "PENDING_APPROVAL") return false;
+    if (e.currentStageRole) return e.currentStageRole === currentUser?.role;
+    return isApprover
+      ? !(typeof e.currentStepIndex === "number" && e.currentStepIndex > 0)
+      : typeof e.currentStepIndex === "number" && e.currentStepIndex > 0;
+  };
+
+  // Grouping expense items based on Finance views and user role.
+  // The Finance Officer's inbound work now arrives at PENDING_APPROVAL on their
+  // own step — their review *is* an approval step — so without it this tab read
+  // as permanently empty for them while requests piled up waiting on them.
+  const newRequests = expenses.filter(
+    e =>
+      e.status === "SENT_TO_FINANCE" ||
+      e.status === "APPROVED" ||
+      (isFinanceOfficer && isOwnPendingStep(e))
+  );
+
   const processingRequests = expenses.filter(e => {
     if (![...BANK_STAGE_STATUSES, ...OVER_BUDGET_STATUSES, "RETURNED", "BUDGET_CHECK", "PENDING_APPROVAL"].includes(e.status)) {
       return false;
@@ -459,7 +485,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     // For Departmental Approver, filter out requests already approved by them or moved to subsequent steps
     if (isApprover) {
       if (hasUserApproved(e)) return false;
-      if (e.status === "PENDING_APPROVAL" && typeof e.currentStepIndex === "number" && e.currentStepIndex > 0) return false;
+      if (e.status === "PENDING_APPROVAL" && !isOwnPendingStep(e)) return false;
     }
     return true;
   });

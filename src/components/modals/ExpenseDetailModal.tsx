@@ -21,8 +21,6 @@ interface ExpenseDetailModalProps {
   setActionComment: (comment: string) => void;
   adjustedAmount: number;
   setAdjustedAmount: (amount: number) => void;
-  paymentRef: string;
-  setPaymentRef: (ref: string) => void;
   /** Identity re-confirmation; the server rejects a decision without it. */
   decisionSignature: string;
   setDecisionSignature: (signature: string) => void;
@@ -35,7 +33,6 @@ interface ExpenseDetailModalProps {
   onRemoveAttachment: (requestId: string, attachmentId: string) => void;
   attachmentsUploading?: boolean;
   handleFinanceUpload: (id: string) => Promise<void>;
-  handlePaymentRelease: (id: string) => Promise<void>;
 }
 
 export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
@@ -48,15 +45,12 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   setActionComment,
   adjustedAmount,
   setAdjustedAmount,
-  paymentRef,
-  setPaymentRef,
   decisionSignature,
   setDecisionSignature,
   handleCancelRequest,
   handleExceptionalBudgetAction,
   handleWorkflowAction,
   handleFinanceUpload,
-  handlePaymentRelease,
   onViewAttachment,
   onAddAttachments,
   onRemoveAttachment,
@@ -86,8 +80,21 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
     );
   }, [selectedExpense?.history, currentUser]);
 
+  // Whose step the request is resting on. `currentStageRole` is resolved by the
+  // list route against the configured chain, so this no longer depends on the
+  // step *index* (wrong as soon as a step is skipped on its amount threshold)
+  // or on matching the step's display name, which an admin can rename.
   const isStepForCurrentRole = React.useMemo(() => {
     if (selectedExpense?.status !== "PENDING_APPROVAL") return false;
+    if (selectedExpense.currentStageRole) {
+      // An approver who already signed off is looking at their own past
+      // decision, not a new one, even if the chain loops back to their role.
+      return (
+        selectedExpense.currentStageRole === currentUser?.role &&
+        !(currentUser?.role === "APPROVER" && hasUserApproved)
+      );
+    }
+    // Records from before the stage role was sent down keep the old heuristics.
     if (currentUser?.role === "APPROVER") {
       return !hasUserApproved && (!selectedExpense.currentStepIndex || selectedExpense.currentStepIndex === 0);
     }
@@ -95,7 +102,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
       return selectedExpense.currentStepIndex === 1 || selectedExpense.currentStageName === "Finance Officer Review";
     }
     return true;
-  }, [selectedExpense?.status, selectedExpense?.currentStepIndex, selectedExpense?.currentStageName, currentUser?.role, hasUserApproved]);
+  }, [selectedExpense?.status, selectedExpense?.currentStepIndex, selectedExpense?.currentStageName, selectedExpense?.currentStageRole, currentUser?.role, hasUserApproved]);
 
   // Every decision button in this modal commits a financial transition, so all
   // of them are gated on the signature the server will verify.
@@ -489,33 +496,18 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             )}
 
+            {/* Finance Manager — release is not offered here. This screen has no
+                receipt upload, so releasing from it recorded a placeholder
+                document against the payment. The Approvals screen's release
+                dialog captures the bank reference, the transfer evidence and
+                the signature together, which is what the audit trail needs. */}
             {currentUser?.role === "FINANCE_MANAGER" && BANK_STAGE_STATUSES.includes(selectedExpense.status) && (
               <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-secondary))", marginBottom: "0.5rem" }}>Finance Manager Action: Authorize Cash Release</p>
-                <div className="form-group">
-                  <label className="form-label">Bank Transaction Reference (Mandatory for ledger closure)</label>
-                  <input
-                    type="text"
-                    required
-                    value={paymentRef}
-                    onChange={(e) => setPaymentRef(e.target.value)}
-                    placeholder="e.g. TXN-10928374-RELEASE"
-                    className="form-input"
-                  />
-                </div>
-
-                <div style={{ marginBottom: "1rem" }}>
-                  <ElectronicSignatureField
-                    value={decisionSignature}
-                    onChange={setDecisionSignature}
-                  />
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button onClick={() => handlePaymentRelease(selectedExpense._id)} className="btn btn-primary" style={{ background: "rgb(var(--color-secondary))" }} disabled={!signed}>
-                    Release Cash Payment
-                  </button>
-                </div>
+                <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", margin: 0 }}>
+                  Open this request from the <strong style={{ color: "rgb(var(--color-text))" }}>Approvals</strong> screen to release
+                  it. The release dialog there records the bank reference and the transfer receipt against the payment.
+                </p>
               </div>
             )}
 

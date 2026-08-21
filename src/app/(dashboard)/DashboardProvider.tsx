@@ -143,7 +143,6 @@ function useDashboardState() {
   const [selectedExpense, setSelectedExpense] = useState<any>(null);
   const [actionComment, setActionComment] = useState("");
   const [adjustedAmount, setAdjustedAmount] = useState<number>(0);
-  const [paymentRef, setPaymentRef] = useState("");
   // Identity re-confirmation for decisions taken from the detail modal. Held
   // here (not in the modal) so it is cleared alongside the rest of the form.
   const [decisionSignature, setDecisionSignature] = useState("");
@@ -805,23 +804,10 @@ function useDashboardState() {
     }
   };
 
-  // Finance Manager release payment
-  const handlePaymentRelease = async (id: string) => {
-    if (!paymentRef) {
-      notifyError("A payment transaction reference is required to release cash.");
-      return;
-    }
-    try {
-      await ExpenseClient.releasePayment(id, paymentRef, decisionSignature);
-      setSelectedExpense(null);
-      setPaymentRef("");
-      setDecisionSignature("");
-      loadDashboardData(currentUser);
-      notifySuccess(`Payment released. Reference: ${paymentRef}`);
-    } catch (err) {
-      notifyError(toErrorMessage(err));
-    }
-  };
+  // Payment release is deliberately absent here. It belongs to the Approvals
+  // screen's release dialog, which is the only place that captures the transfer
+  // receipt alongside the bank reference; this provider had no receipt to send,
+  // so releasing from a detail modal filed the payment with no evidence.
 
   // Admin dynamic workflow update
   const handleSaveWorkflowConfig = async () => {
@@ -918,7 +904,6 @@ function useDashboardState() {
     selectedExpense, setSelectedExpense,
     actionComment, setActionComment,
     adjustedAmount, setAdjustedAmount,
-    paymentRef, setPaymentRef,
     decisionSignature, setDecisionSignature,
     workflowSteps, setWorkflowSteps,
     workflowMessage, setWorkflowMessage,
@@ -990,7 +975,6 @@ function useDashboardState() {
     handleExceptionalBudgetAction,
     handleWorkflowAction,
     handleFinanceUpload,
-    handlePaymentRelease,
     budgetItems,
     budgetItemsLoading,
     handleSaveWorkflowConfig,

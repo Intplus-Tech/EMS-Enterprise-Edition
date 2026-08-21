@@ -98,6 +98,8 @@ export interface ExpenseRequestDto {
    * server-side against the configured chain; absent for every other status.
    */
   currentStageName?: string;
+  /** Role the active step belongs to; separates the two PENDING_APPROVAL queues. */
+  currentStageRole?: string;
   exceptionalBudgetApproved?: boolean;
   exceptionalApprovedBy?: PopulatedRef | string | null;
   originalAmount?: number;

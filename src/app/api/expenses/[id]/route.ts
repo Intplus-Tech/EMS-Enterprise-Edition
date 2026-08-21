@@ -7,6 +7,8 @@ import { SystemRole } from "../../../../enums/roles";
 import { POST_APPROVAL_STATUSES, RequestStatus } from "../../../../enums/statuses";
 import { ExpenseInitiateSchema } from "../../../../validators/validation";
 import { scopeForFinanceManager } from "../../../../domains/expense/finance-manager.view";
+import { isVisibleToFinanceOfficer } from "../../../../domains/expense/visibility";
+import { WorkflowService } from "../../../../domains/workflow/workflow.service";
 import { LoggerService } from "../../../../domains/logs/logger.service";
 import { AuditAction } from "../../../../enums/auditActions";
 
@@ -31,13 +33,23 @@ export const GET = withErrorHandling(async (req: NextRequest, { params }: { para
   if (user.role === SystemRole.APPROVER && expense.departmentId._id.toString() !== user.departmentId) {
     throw new Error("Forbidden: You do not have permission to view this request.");
   }
-  // Both finance processing roles pick the pipeline up after approval. Without
-  // this the list filter could be stepped around by requesting an id directly.
+  // The Finance Manager picks the pipeline up after approval. Without this the
+  // list filter could be stepped around by requesting an id directly.
   if (
-    (user.role === SystemRole.FINANCE_OFFICER || user.role === SystemRole.FINANCE_MANAGER) &&
+    user.role === SystemRole.FINANCE_MANAGER &&
     !POST_APPROVAL_STATUSES.includes(expense.status)
   ) {
     throw new Error("Forbidden: You do not have permission to view this request.");
+  }
+  // The officer additionally owns their own approval step, which rests at
+  // PENDING_APPROVAL — but only while the request is on *their* step, never
+  // while it is still with the departmental approver. Mirrors the list route's
+  // scope so fetching by id is not a way around it.
+  if (user.role === SystemRole.FINANCE_OFFICER) {
+    const active = await WorkflowService.getNextStepForRequest(expense);
+    if (!isVisibleToFinanceOfficer(expense.status, active?.step.role)) {
+      throw new Error("Forbidden: You do not have permission to view this request.");
+    }
   }
 
   // Same permitted field set as the list route — fetching by id must not be a

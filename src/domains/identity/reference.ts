@@ -14,6 +14,22 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+/**
+ * Author recorded on the history rows the flow writes for itself — a budget
+ * flag, an automatic routing, the closure that follows a payment release.
+ *
+ * These rows carry the *acting* user's id (there is no system account to point
+ * at), so an id match alone cannot tell "this person did it" from "this
+ * happened while this person was acting". Readers that care about the
+ * difference — notably who to credit with a decision — check the name.
+ */
+export const SYSTEM_ACTOR_NAME = "System Engine";
+
+/** True when a history row was written by the flow rather than by a person. */
+export function isSystemEntry(entry?: { actorName?: string } | null): boolean {
+  return entry?.actorName === SYSTEM_ACTOR_NAME;
+}
+
 /** Normalises a reference (string, ObjectId, or populated doc) to its id string. */
 export function idOf(value: any): string {
   if (!value) return "";

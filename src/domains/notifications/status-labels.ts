@@ -19,7 +19,9 @@ const LABELS: Record<RequestStatus, string> = {
   [RequestStatus.UPLOADED_TO_BANK]: "Uploaded to the bank platform",
   [RequestStatus.AWAITING_RELEASE]: "Awaiting payment release",
   [RequestStatus.PAID]: "Paid",
-  [RequestStatus.CLOSED]: "Closed",
+  // Reads as an outcome rather than a filing state: this label is what both the
+  // initiator and every reviewer who handled the request see in their email.
+  [RequestStatus.CLOSED]: "Completed — payment released and ledger closed",
   [RequestStatus.REJECTED]: "Rejected",
   [RequestStatus.RETURNED]: "Returned to you for clarification",
   [RequestStatus.CANCELLED]: "Withdrawn",

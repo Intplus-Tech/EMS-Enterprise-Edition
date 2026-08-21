@@ -1,9 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BANK_STAGE_STATUSES, OVER_BUDGET_STATUSES, RequestStatus } from "../../enums/statuses";
 import { SystemRole } from "../../enums/roles";
-import { NotificationType, collapsesInto, notificationTypeFor } from "./notifiable-events";
+import {
+  NotificationType,
+  collapsesInto,
+  isCompletionStatus,
+  notificationTypeFor,
+} from "./notifiable-events";
 import { requestStateLabel } from "./status-labels";
-import { idOf } from "../identity/reference";
+import { idOf, isSystemEntry } from "../identity/reference";
 import { formatNaira } from "../../components/ui/format";
 
 export type { NotificationType };
@@ -114,6 +119,11 @@ function messageFor(type: NotificationType, expense: any, entry: any): string {
  * Returns a set rather than one status because two stages can share an owner:
  * the Finance Head rules on a request whether it is still flagged or already
  * routed to them, and the Finance Manager releases from either bank state.
+ *
+ * The approver and the Finance Officer are both approval steps, so both wait at
+ * PENDING_APPROVAL — the status alone cannot tell their queues apart, which is
+ * what `isOwnStage` below settles. SENT_TO_FINANCE stays on the officer's list
+ * for records parked there before their approval carried the bank leg.
  */
 function pendingStatusesForRole(role: string | undefined): string[] {
   switch (role) {
@@ -122,12 +132,28 @@ function pendingStatusesForRole(role: string | undefined): string[] {
     case SystemRole.APPROVER:
       return [RequestStatus.PENDING_APPROVAL];
     case SystemRole.FINANCE_OFFICER:
-      return [RequestStatus.SENT_TO_FINANCE];
+      return [RequestStatus.PENDING_APPROVAL, RequestStatus.SENT_TO_FINANCE];
     case SystemRole.FINANCE_MANAGER:
       return BANK_STAGE_STATUSES;
     default:
       return [];
   }
+}
+
+/**
+ * Whether a pending request is resting on this role's own step.
+ *
+ * Only PENDING_APPROVAL is ambiguous: it covers the departmental approver and
+ * the Finance Officer alike, so matching on status alone told the approver that
+ * a request already sitting with the officer was "awaiting your review". The
+ * list route resolves the active step and sends its role down as
+ * `currentStageRole`; requests from before that field existed fall back to the
+ * old behaviour rather than vanishing from the queue.
+ */
+function isOwnStage(expense: any, role: string | undefined): boolean {
+  if (expense.status !== RequestStatus.PENDING_APPROVAL) return true;
+  if (!expense.currentStageRole) return true;
+  return expense.currentStageRole === role;
 }
 
 function buildOwnRequestNotifications(expenses: any[], userId: string): AppNotification[] {
@@ -197,6 +223,7 @@ function buildReviewQueueNotifications(
     .filter(
       (expense) =>
         pendingStatuses.includes(expense.status) &&
+        isOwnStage(expense, role) &&
         idOf(expense.initiatorId) !== userId &&
         // Nothing for the Finance Head to act on while a request is held for a
         // missing budget period — telling them it "is waiting on your action"
@@ -227,9 +254,78 @@ function buildReviewQueueNotifications(
 }
 
 /**
+ * Tells a reviewer that a request they handled has been paid and closed.
+ *
+ * Everything else in this feed is queue-derived, so a reviewer's notification
+ * disappeared the moment the request left their stage: the approver and Finance
+ * Officer who cleared a request — and, on the over-budget path, the Finance
+ * Head who funded it — never learned whether it was ultimately paid. This is
+ * the completion half of their feed, keyed off the closing history row so it
+ * appears exactly once and carries the payment facts with it.
+ */
+function buildCompletionNotifications(expenses: any[], userId: string): AppNotification[] {
+  const results: AppNotification[] = [];
+
+  for (const expense of expenses) {
+    if (!isCompletionStatus(expense.status)) continue;
+    // The initiator's own feed already reports this; it is built from every
+    // transition rather than just the last one.
+    if (idOf(expense.initiatorId) === userId) continue;
+
+    const history: any[] = Array.isArray(expense.history) ? expense.history : [];
+
+    // Did this user actually handle the request? A finance role can see closed
+    // requests they had no part in, and those are not their news. System rows
+    // do not count: they carry the acting user's id but nobody decided them.
+    const acted = history.some(
+      (entry) => idOf(entry.actorId) === userId && !isSystemEntry(entry)
+    );
+    if (!acted) continue;
+
+    // Anchored on the closing row so the card carries the release timestamp
+    // rather than whenever the reader's own approval happened.
+    const closing = [...history].reverse().find((entry) => isCompletionStatus(entry.statusAfter));
+
+    // The Finance Manager who released the payment does not need telling that
+    // they released it — same rule the initiator's own feed follows.
+    const released = history.find((entry) => entry.statusAfter === RequestStatus.PAID);
+    if (idOf(released?.actorId) === userId) continue;
+
+    const requestNumber = expense.requestNumber || "Request";
+
+    results.push({
+      id: `${idOf(expense._id)}:completed`,
+      type: "PAID",
+      title: `Payment Completed: ${requestNumber}`,
+      message:
+        `The ${expense.category || "expense"} request for ${money(expense.amount)} you reviewed has been paid and closed.` +
+        (expense.paymentReference ? ` Bank Ref: ${expense.paymentReference}` : ""),
+      timestamp: new Date(
+        closing?.timestamp || expense.paymentDate || expense.updatedAt || Date.now()
+      ).toISOString(),
+      requestId: idOf(expense._id),
+      meta: {
+        requestNumber,
+        category: expense.category,
+        amount: expense.amount,
+        description: expense.description,
+        status: expense.status,
+        auditor: closing?.actorName,
+        auditorRole: closing?.actorRole,
+        reference: expense.paymentReference,
+        receipt: expense.paymentReceipt,
+      },
+    });
+  }
+
+  return results;
+}
+
+/**
  * Derives the notification feed from real expense workflow history.
  * Initiators are told what happened to their own requests; reviewers are told
- * what is currently sitting in their queue.
+ * what is currently sitting in their queue, and what became of the requests they
+ * have already handled.
  */
 export function buildNotifications(
   expenses: any[],
@@ -244,6 +340,7 @@ export function buildNotifications(
   return [
     ...buildOwnRequestNotifications(expenses, userId),
     ...buildReviewQueueNotifications(expenses, userId, currentUser.role),
+    ...buildCompletionNotifications(expenses, userId),
   ]
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, limit);

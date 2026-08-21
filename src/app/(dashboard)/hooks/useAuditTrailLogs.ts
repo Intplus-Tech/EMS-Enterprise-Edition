@@ -45,6 +45,9 @@ export const AUDIT_ACTION_OPTIONS: { label: string; value: string }[] = [
   { label: "Exceptional Approval", value: AuditAction.EXCEPTIONAL_BUDGET_APPROVED },
   { label: "Generate Payment Instruction", value: AuditAction.EXPENSE_BANK_UPLOADED },
   { label: "Payment Released", value: AuditAction.PAYMENT_RELEASED },
+  // Closure only became filterable here once it was written as an audit entry;
+  // as an APP log it carried no actor and matched none of these filters.
+  { label: "Request Closed", value: AuditAction.EXPENSE_CLOSED },
   { label: "Approve", value: AuditAction.EXPENSE_STEP_APPROVED },
 ];
 

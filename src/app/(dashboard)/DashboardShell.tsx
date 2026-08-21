@@ -74,13 +74,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     budgetItems, budgetItemsLoading,
     actionComment, setActionComment,
     adjustedAmount, setAdjustedAmount,
-    paymentRef, setPaymentRef,
     decisionSignature, setDecisionSignature,
     handleCancelRequest,
     handleExceptionalBudgetAction,
     handleWorkflowAction,
     handleFinanceUpload,
-    handlePaymentRelease,
     showResubmitModal, setShowResubmitModal,
     selectedResubmitExpense, setSelectedResubmitExpense,
     resubmitForm, setResubmitForm,
@@ -434,15 +432,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         setActionComment={setActionComment}
         adjustedAmount={adjustedAmount}
         setAdjustedAmount={setAdjustedAmount}
-        paymentRef={paymentRef}
-        setPaymentRef={setPaymentRef}
         decisionSignature={decisionSignature}
         setDecisionSignature={setDecisionSignature}
         handleCancelRequest={handleCancelRequest}
         handleExceptionalBudgetAction={handleExceptionalBudgetAction}
         handleWorkflowAction={handleWorkflowAction}
         handleFinanceUpload={handleFinanceUpload}
-        handlePaymentRelease={handlePaymentRelease}
         onViewAttachment={setViewedAttachment}
         onAddAttachments={addAttachments}
         onRemoveAttachment={removeAttachment}

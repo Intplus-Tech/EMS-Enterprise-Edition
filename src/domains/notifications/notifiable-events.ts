@@ -52,15 +52,18 @@ export const NOTIFIABLE_TRANSITIONS: Partial<Record<RequestStatus, NotificationT
  * Transitions the workflow writes as a pair, and the half that represents the
  * whole event to a reader.
  *
- * Two stages of the flow are recorded in one atomic step: the budget flag is
- * immediately routed to the Finance Head, and the bank upload immediately hands
- * over to the Finance Manager. Both halves are real states — the email reports
- * whichever one the request came to rest on — but they are one thing happening,
- * so the bell must not raise a notification for each.
+ * Three stages of the flow are recorded in one atomic step: the budget flag is
+ * immediately routed to the Finance Head, the bank upload immediately hands
+ * over to the Finance Manager, and the payment release immediately closes the
+ * request. Both halves are real states — the email reports whichever one the
+ * request came to rest on — but they are one thing happening, so the bell must
+ * not raise a notification for each. Releasing a payment used to put two
+ * "Payment Completed" cards in the initiator's bell for the single release.
  */
 const COLLAPSED_PAIRS: Partial<Record<RequestStatus, RequestStatus>> = {
   [RequestStatus.PENDING_EXCEPTIONAL]: RequestStatus.INSUFFICIENT_BUDGET,
   [RequestStatus.AWAITING_RELEASE]: RequestStatus.UPLOADED_TO_BANK,
+  [RequestStatus.CLOSED]: RequestStatus.PAID,
 };
 
 /**
@@ -81,4 +84,23 @@ export function isNotifiableStatus(status: RequestStatus | string): boolean {
 /** The bell's category for a transition, or null when it is not surfaced. */
 export function notificationTypeFor(status: RequestStatus | string): NotificationType | null {
   return NOTIFIABLE_TRANSITIONS[status as RequestStatus] ?? null;
+}
+
+/**
+ * The end of the payment flow: cash released and the ledger closed.
+ *
+ * Everyone who handled the request — the approver, the Finance Officer, and on
+ * the over-budget path the Finance Head — is told when it completes. Their
+ * queue-derived notifications disappear the moment a request leaves their
+ * stage, so without this the only person who ever learned the outcome was the
+ * initiator; every reviewer had to go looking for it.
+ */
+export const COMPLETION_STATUSES: RequestStatus[] = [
+  RequestStatus.PAID,
+  RequestStatus.CLOSED,
+];
+
+/** True once a request has been paid and closed out. */
+export function isCompletionStatus(status?: string | null): boolean {
+  return COMPLETION_STATUSES.includes(status as RequestStatus);
 }
