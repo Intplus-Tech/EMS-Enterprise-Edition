@@ -201,6 +201,9 @@ export class UserService {
     if (!user) throw new Error("User not found");
 
     user.sessionsValidFrom = new Date();
+    // The watermark alone would leave a stale id on the account, so the next
+    // sign-in would be compared against a session nobody holds any more.
+    user.activeSessionId = undefined;
     await user.save();
 
     await LoggerService.logAudit(

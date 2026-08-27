@@ -12,7 +12,8 @@ import { useBudgetItems } from "./hooks/useBudgetItems";
 import { ExpenseClient } from "../../services/expense.client";
 import { AdminClient, InviteInput } from "../../services/admin.client";
 import { AuthClient } from "../../services/auth.client";
-import { ApiRequestError, toErrorMessage } from "../../services/http";
+import { ApiRequestError, onSessionLost, toErrorMessage } from "../../services/http";
+import { SESSION_REASON_PARAM } from "../../domains/auth/session";
 import {
   firstNewRequestError,
   validateNewRequestForm,
@@ -399,6 +400,19 @@ function useDashboardState() {
     fetchSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // A session taken away mid-visit — displaced by a sign-in on another device,
+  // or revoked by an administrator — lands the user back on the sign-in screen
+  // with the reason, instead of leaving them on a dashboard whose every request
+  // now fails silently. `replace`, not `push`: the dead session is not
+  // somewhere the back button should return to.
+  useEffect(
+    () =>
+      onSessionLost((reason) => {
+        router.replace(`/login?${SESSION_REASON_PARAM}=${reason}`);
+      }),
+    [router]
+  );
 
   // Client-side Role-based Navigation Guard.
   // Redirects to the role's default route only when the current path is not permitted.

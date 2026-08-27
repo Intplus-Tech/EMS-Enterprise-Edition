@@ -25,7 +25,11 @@ import { StatCard } from "./ui/StatCard";
 import { EmptyState } from "./ui/EmptyState";
 import { formatNaira, formatDate, formatDateTime, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
-import { sameId } from "../domains/identity/reference";
+import {
+  hasLeftApproverDesk,
+  hasRuledOnRequest,
+  isRestingOnRole,
+} from "../domains/expense/review-stage";
 import { ExpenseClient } from "../services/expense.client";
 import { toErrorMessage } from "../services/http";
 import {
@@ -438,34 +442,15 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     }
   };
 
-  // Helper: has current user already approved this request in workflow history?
-  const hasUserApproved = (e: any) => {
-    if (!Array.isArray(e?.history)) return false;
-    return e.history.some(
-      (h: any) =>
-        h.actorRole === currentUser?.role || (currentUser?.id && sameId(h.actorId, currentUser.id))
-    );
-  };
+  // Has the viewer personally ruled on this request as it now stands? Shared
+  // with the detail dialog so the queue and the buttons cannot disagree.
+  const hasUserApproved = (e: any) => hasRuledOnRequest(e, currentUser);
 
   const isApprover = currentUser?.role === "APPROVER";
   const isFinanceOfficer = currentUser?.role === "FINANCE_OFFICER";
 
-  /**
-   * Is this request resting on the viewer's own approval step?
-   *
-   * PENDING_APPROVAL covers the departmental approver and the Finance Officer
-   * alike, so the status cannot tell the two queues apart. `currentStageRole`
-   * is resolved server-side against the configured chain; the step-index
-   * fallback keeps records fetched before that field existed in the right
-   * queue rather than dropping them out of every tab.
-   */
-  const isOwnPendingStep = (e: any) => {
-    if (e.status !== "PENDING_APPROVAL") return false;
-    if (e.currentStageRole) return e.currentStageRole === currentUser?.role;
-    return isApprover
-      ? !(typeof e.currentStepIndex === "number" && e.currentStepIndex > 0)
-      : typeof e.currentStepIndex === "number" && e.currentStepIndex > 0;
-  };
+  /** Is this request resting on the viewer's own approval step? */
+  const isOwnPendingStep = (e: any) => isRestingOnRole(e, currentUser?.role);
 
   // Grouping expense items based on Finance views and user role.
   // The Finance Officer's inbound work now arrives at PENDING_APPROVAL on their
@@ -482,19 +467,16 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     if (![...BANK_STAGE_STATUSES, ...OVER_BUDGET_STATUSES, "RETURNED", "BUDGET_CHECK", "PENDING_APPROVAL"].includes(e.status)) {
       return false;
     }
-    // For Departmental Approver, filter out requests already approved by them or moved to subsequent steps
-    if (isApprover) {
-      if (hasUserApproved(e)) return false;
-      if (e.status === "PENDING_APPROVAL" && !isOwnPendingStep(e)) return false;
-    }
+    // The departmental approver's in-flight list is everything that has not yet
+    // left their desk — the one rule, applied here and inverted below, so a
+    // request can never fall out of both tabs.
+    if (isApprover && hasLeftApproverDesk(e, currentUser)) return false;
     return true;
   });
 
   const completedRequests = expenses.filter(e => {
     if (["PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(e.status)) return true;
-    if (isApprover && (e.status === "SENT_TO_FINANCE" || e.status === "PENDING_EXCEPTIONAL" || hasUserApproved(e))) {
-      return true;
-    }
+    if (isApprover && hasLeftApproverDesk(e, currentUser)) return true;
     return false;
   });
 

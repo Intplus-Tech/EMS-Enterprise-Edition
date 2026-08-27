@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
 import { SubmitButton } from "../../components/ui/SubmitButton";
+import { SESSION_REASON_PARAM, sessionEndNotice } from "../../domains/auth/session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +18,9 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Why the user is back here, when they did not choose to be. Set from the
+  // query string the dashboard adds when the server ends a session.
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
 
   // Theme state
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -27,6 +31,12 @@ export default function LoginPage() {
       setTheme(savedTheme);
       document.documentElement.setAttribute("data-theme", savedTheme);
     }
+
+    // Read straight off the location rather than through `useSearchParams`,
+    // which would force this prerendered route into a Suspense boundary purely
+    // to surface one banner.
+    const reason = new URLSearchParams(window.location.search).get(SESSION_REASON_PARAM);
+    setSessionNotice(sessionEndNotice(reason));
   }, []);
 
   const toggleTheme = () => {
@@ -39,6 +49,8 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    // The explanation is about the session that just ended, not this attempt.
+    setSessionNotice(null);
     setLoading(true);
 
     try {
@@ -192,6 +204,26 @@ export default function LoginPage() {
           <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
             Secure access to your expense workflow
           </p>
+
+          {/* Why the user was returned here — only shown when a session was
+              taken away, never on an ordinary first visit. */}
+          {sessionNotice && !error && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              background: "rgb(var(--color-primary) / 0.08)",
+              border: "1px solid rgb(var(--color-primary) / 0.3)",
+              borderRadius: "8px",
+              padding: "0.75rem 1rem",
+              color: "rgb(var(--color-text))",
+              fontSize: "0.875rem",
+              marginBottom: "1.5rem"
+            }}>
+              <Icons.Info size={18} style={{ flexShrink: 0, color: "rgb(var(--color-primary))" }} />
+              <span>{sessionNotice}</span>
+            </div>
+          )}
 
           {error && (
             <div style={{ 

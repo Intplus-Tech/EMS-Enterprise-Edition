@@ -19,6 +19,12 @@ const UserSchema = new Schema(
     // Any session issued before this instant is rejected. Bumping it is how an
     // admin force-signs-out a user, since JWTs are otherwise valid until expiry.
     sessionsValidFrom: { type: Date, required: false },
+    // The one session this account is allowed to hold. Each sign-in mints a new
+    // id and stores it here; `assertSessionNotRevoked` rejects any token
+    // carrying a different one, so signing in anywhere displaces the previous
+    // device rather than running alongside it. Cleared on logout and on an
+    // admin force-log-out.
+    activeSessionId: { type: String, required: false },
     // Notifications are derived from expense history rather than stored, so only
     // the per-user read/dismissed state needs persisting. Kept on the user so it
     // follows them across devices instead of living in one browser's storage.

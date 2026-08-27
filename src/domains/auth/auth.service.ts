@@ -1,10 +1,12 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 import { connectToDatabase } from "../../config/db";
 import { ENV } from "../../config/env";
 import { User } from "../../models/User";
 import { LoggerService } from "../logs/logger.service";
 import { EmailService } from "../email/email.service";
+import { idOf } from "../identity/reference";
 
 const JWT_SECRET = ENV.JWT_SECRET;
 
@@ -15,6 +17,12 @@ const SESSION_TTL = {
   remembered: "7d",
   rememberedSeconds: 60 * 60 * 24 * 7,
 } as const;
+
+/** What a freshly minted session hands back to the route that sets the cookie. */
+export interface IssuedSession {
+  token: string;
+  expiresInSeconds: number;
+}
 
 export class AuthService {
   /**
@@ -58,21 +66,7 @@ export class AuthService {
       throw new Error("Invalid email or password");
     }
 
-    // The cookie and the token must expire together, so both take this value.
-    const expiresIn = rememberDevice ? SESSION_TTL.remembered : SESSION_TTL.default;
-
-    // Sign the JSON Web Token
-    const token = jwt.sign(
-      {
-        id: user._id.toString(),
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        departmentId: user.departmentId?._id?.toString() || null,
-      },
-      JWT_SECRET,
-      { expiresIn }
-    );
+    const { token, expiresInSeconds } = await AuthService.issueSession(user, rememberDevice);
 
     await LoggerService.logAudit(
       "USER_LOGIN", 
@@ -83,7 +77,7 @@ export class AuthService {
 
     return {
       token,
-      expiresInSeconds: rememberDevice ? SESSION_TTL.rememberedSeconds : SESSION_TTL.defaultSeconds,
+      expiresInSeconds,
       user: {
         id: user._id.toString(),
         email: user.email,
@@ -93,6 +87,78 @@ export class AuthService {
         departmentId: user.departmentId?._id?.toString() || null,
       }
     };
+  }
+
+  /**
+   * Mints the account's session and makes it the only one that works.
+   *
+   * The id is written to the user *before* the token is signed and is carried
+   * in the token as `sid`; `assertSessionNotRevoked` rejects anything holding
+   * a different one. That is the whole of the single-session rule: a second
+   * sign-in overwrites the stored id, so the first device's token — still
+   * cryptographically valid, and still in its cookie — stops being accepted on
+   * its very next request.
+   *
+   * Shared by sign-in and by invitation setup, which also drops the user
+   * straight into the dashboard and so must claim the session the same way.
+   */
+  public static async issueSession(
+    // Structurally typed rather than tied to Mongoose's document generics: both
+    // callers hand over a live `User` document, populated or not.
+    user: {
+      _id: { toString(): string };
+      email: string;
+      name: string;
+      role: string;
+      // Populated to a document on the login path, a bare ObjectId on the
+      // setup path; `idOf` normalises both.
+      departmentId?: unknown;
+      activeSessionId?: string;
+      save(): Promise<unknown>;
+    },
+    rememberDevice = false
+  ): Promise<IssuedSession> {
+    const sessionId = randomUUID();
+    user.activeSessionId = sessionId;
+    await user.save();
+
+    // The cookie and the token must expire together, so both take this value.
+    const expiresIn = rememberDevice ? SESSION_TTL.remembered : SESSION_TTL.default;
+
+    const token = jwt.sign(
+      {
+        id: user._id.toString(),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        departmentId: idOf(user.departmentId) || null,
+        sid: sessionId,
+      },
+      JWT_SECRET,
+      { expiresIn }
+    );
+
+    return {
+      token,
+      expiresInSeconds: rememberDevice
+        ? SESSION_TTL.rememberedSeconds
+        : SESSION_TTL.defaultSeconds,
+    };
+  }
+
+  /**
+   * Releases the account's session on sign-out.
+   *
+   * Scoped to the id the caller actually holds: a stale tab pressing Logout
+   * must not release the session of the device that displaced it.
+   */
+  public static async endSession(userId: string, sessionId?: string): Promise<void> {
+    if (!sessionId) return;
+    await connectToDatabase();
+    await User.updateOne(
+      { _id: userId, activeSessionId: sessionId },
+      { $unset: { activeSessionId: "" } }
+    );
   }
 
   /**
@@ -139,6 +205,8 @@ export class AuthService {
         departmentId: string | null;
         /** Issued-at, in seconds; compared against `sessionsValidFrom`. */
         iat?: number;
+        /** The session this token belongs to; see `issueSession`. */
+        sid?: string;
       };
     } catch (e) {
       return null;

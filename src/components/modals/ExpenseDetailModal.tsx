@@ -9,7 +9,7 @@ import { AttachmentList } from "../ui/AttachmentList";
 import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
 import { BudgetItemOptionDto } from "../../types/api";
-import { sameId } from "../../domains/identity/reference";
+import { hasRuledOnRequest, isRestingOnRole } from "../../domains/expense/review-stage";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
@@ -71,38 +71,28 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
     setBudgetItem("");
   }, [selectedExpense?._id]);
 
-  // Check if current user has already signed off on this request in history
-  const hasUserApproved = React.useMemo(() => {
-    if (!Array.isArray(selectedExpense?.history)) return false;
-    return selectedExpense.history.some(
-      (h: any) =>
-        h.actorRole === currentUser?.role || (currentUser?.id && sameId(h.actorId, currentUser.id))
-    );
-  }, [selectedExpense?.history, currentUser]);
+  // Has this user already signed off on the request as it now stands? A
+  // decision taken before a return does not count: the initiator has amended
+  // the request since, so it is back for a fresh ruling. Shared with the
+  // approvals queue, which buckets the same request off the same answer.
+  const hasUserApproved = React.useMemo(
+    () => hasRuledOnRequest(selectedExpense, currentUser),
+    [selectedExpense, currentUser]
+  );
 
   // Whose step the request is resting on. `currentStageRole` is resolved by the
   // list route against the configured chain, so this no longer depends on the
   // step *index* (wrong as soon as a step is skipped on its amount threshold)
   // or on matching the step's display name, which an admin can rename.
-  const isStepForCurrentRole = React.useMemo(() => {
-    if (selectedExpense?.status !== "PENDING_APPROVAL") return false;
-    if (selectedExpense.currentStageRole) {
-      // An approver who already signed off is looking at their own past
-      // decision, not a new one, even if the chain loops back to their role.
-      return (
-        selectedExpense.currentStageRole === currentUser?.role &&
-        !(currentUser?.role === "APPROVER" && hasUserApproved)
-      );
-    }
-    // Records from before the stage role was sent down keep the old heuristics.
-    if (currentUser?.role === "APPROVER") {
-      return !hasUserApproved && (!selectedExpense.currentStepIndex || selectedExpense.currentStepIndex === 0);
-    }
-    if (currentUser?.role === "FINANCE_OFFICER") {
-      return selectedExpense.currentStepIndex === 1 || selectedExpense.currentStageName === "Finance Officer Review";
-    }
-    return true;
-  }, [selectedExpense?.status, selectedExpense?.currentStepIndex, selectedExpense?.currentStageName, selectedExpense?.currentStageRole, currentUser?.role, hasUserApproved]);
+  const isStepForCurrentRole = React.useMemo(
+    () =>
+      isRestingOnRole(selectedExpense, currentUser?.role) &&
+      // The chain can come back round to a role that has already signed off —
+      // on a later step, or because a returned request re-entered at the top.
+      // Only a ruling on the *current* revision discharges the step.
+      !(currentUser?.role === "APPROVER" && hasUserApproved),
+    [selectedExpense, currentUser?.role, hasUserApproved]
+  );
 
   // Every decision button in this modal commits a financial transition, so all
   // of them are gated on the signature the server will verify.

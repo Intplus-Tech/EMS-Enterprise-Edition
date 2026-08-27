@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { connectToDatabase } from "../../../../config/db";
 import { User } from "../../../../models/User";
 import { AuthService } from "../../../../domains/auth/auth.service";
 import { LoggerService } from "../../../../domains/logs/logger.service";
 import { withErrorHandling } from "../../../../middlewares/errors";
 import { ENV } from "../../../../config/env";
-
-const JWT_SECRET = ENV.JWT_SECRET;
 
 // GET: Validate invitation token and return email address
 export const GET = withErrorHandling(async (req: NextRequest) => {
@@ -65,20 +62,13 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   user.inviteToken = undefined;
   user.inviteExpires = undefined;
 
-  await user.save();
-
-  // 2. Generate a valid session JWT for automatic login
-  const sessionToken = jwt.sign(
-    {
-      id: user._id.toString(),
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      departmentId: user.departmentId?.toString() || null,
-    },
-    JWT_SECRET,
-    { expiresIn: "8h" }
-  );
+  // 2. Generate a valid session JWT for automatic login.
+  //
+  // Through `issueSession` rather than signing here, so the account claims its
+  // one active session exactly as a sign-in does. A hand-rolled token carried
+  // no session id and would be rejected on its very next request. It also
+  // persists the password and activation set above.
+  const { token: sessionToken, expiresInSeconds } = await AuthService.issueSession(user);
 
   // 3. Log audit event
   await LoggerService.logAudit(
@@ -103,7 +93,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     httpOnly: true,
     secure: ENV.isProduction,
     sameSite: "strict",
-    maxAge: 60 * 60 * 8, // 8 hours
+    maxAge: expiresInSeconds,
     path: "/"
   });
 

@@ -232,6 +232,17 @@ export class ExpenseService {
     }
 
     const previousStatus = request.status;
+
+    // A returned request re-enters the chain where it stopped, so the reply
+    // goes back to whoever asked the question. When that stage is not part of
+    // the chain — the Finance Head's exceptional return fires only after every
+    // step is spent — the stored index points past the end and the routing
+    // below would find nothing to route to. See
+    // `resumeStepIndexForResubmission` for why that stranded the request.
+    if (previousStatus === RequestStatus.RETURNED) {
+      request.currentStepIndex = await WorkflowService.getResumeStepIndex(request);
+    }
+
     request.status = RequestStatus.SUBMITTED;
     await request.save();
     
@@ -410,8 +421,23 @@ export class ExpenseService {
         await RequestNotifier.notifyFinanceOfAllocation(request);
       }
     } else {
-      // No steps configured -> Auto approve to finance
+      // No steps configured -> Auto approve to finance.
+      //
+      // Only reachable when an administrator has emptied the approval chain,
+      // now that a resubmission rewinds to a step that exists. Recorded in
+      // history all the same: a request that skips every approval must not do
+      // so silently, or the audit shows an approved request nobody approved.
+      const statusBefore = request.status;
       request.status = RequestStatus.APPROVED;
+      request.history.push({
+        statusBefore,
+        statusAfter: RequestStatus.APPROVED,
+        actorId: actorId,
+        actorName: SYSTEM_ACTOR_NAME,
+        actorRole: SystemRole.ADMIN,
+        action: "Approved automatically — no approval steps are configured",
+        timestamp: new Date()
+      });
       await request.save();
     }
 

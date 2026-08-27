@@ -83,6 +83,28 @@ export function resolveActiveStep(
   return null; // No more steps remaining
 }
 
+/**
+ * Where a returned request re-enters the chain when the initiator answers.
+ *
+ * `currentStepIndex` is left where the request stopped, which is right when a
+ * step in the chain asked the question: the reply goes back to the person who
+ * asked it. It is wrong when the return came from a stage that is not part of
+ * the chain. The Finance Head's exceptional return happens only after every
+ * step has been consumed, so the index points past the end, `resolveActiveStep`
+ * finds nothing, and the resubmission was routed nowhere — it was flipped
+ * straight to APPROVED, a status no screen offers an action for. The request
+ * left the initiator's queue and arrived in nobody's.
+ *
+ * Rewinding to the top is also the right call on the merits: the initiator has
+ * amended a payload every approver signed off on a different version of.
+ */
+export function resumeStepIndexForResubmission(
+  steps: WorkflowStep[],
+  request: RoutableRequest
+): number {
+  return resolveActiveStep(steps, request) ? request.currentStepIndex : 0;
+}
+
 export class WorkflowService {
   /**
    * Get the active workflow configuration.
@@ -132,5 +154,11 @@ export class WorkflowService {
   public static async getNextStepForRequest(request: any): Promise<ActiveStep | null> {
     const config = await this.getActiveWorkflow();
     return resolveActiveStep(config.steps as WorkflowStep[], request);
+  }
+
+  /** See `resumeStepIndexForResubmission`; resolves the active config first. */
+  public static async getResumeStepIndex(request: any): Promise<number> {
+    const config = await this.getActiveWorkflow();
+    return resumeStepIndexForResubmission(config.steps as WorkflowStep[], request);
   }
 }
