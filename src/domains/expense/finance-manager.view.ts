@@ -37,6 +37,13 @@ export interface FinanceManagerRequestView {
   /** Set once released, so the manager can see their own completed payments. */
   paymentReference?: string;
   paymentDate?: Date | string;
+  /**
+   * The transfer evidence they themselves uploaded. Withholding it left the one
+   * person who filed the receipt unable to read it back: their Completed
+   * Release view fell through to an invented filename and a dead link.
+   */
+  paymentReceipt?: string;
+  paymentReceiptFile?: { name: string; url: string; mimeType?: string; size?: number; isLegacy?: boolean } | null;
   createdAt?: Date | string;
   updatedAt?: Date | string;
 }
@@ -88,6 +95,8 @@ export function scopeForFinanceManager(request: any): FinanceManagerRequestView 
     justifications,
     paymentReference: request.paymentReference,
     paymentDate: request.paymentDate,
+    paymentReceipt: request.paymentReceipt,
+    paymentReceiptFile: request.paymentReceiptFile ?? null,
     createdAt: request.createdAt,
     updatedAt: request.updatedAt,
   };

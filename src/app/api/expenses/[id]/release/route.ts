@@ -22,7 +22,8 @@ export const POST = withErrorHandling(async (req: NextRequest, { params }: { par
     id,
     user as any,
     validated.reference,
-    validated.receipt
+    validated.receipt,
+    validated.receiptDocument
   );
   return NextResponse.json({ success: true, request });
 });

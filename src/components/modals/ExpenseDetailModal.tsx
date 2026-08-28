@@ -10,6 +10,7 @@ import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
 import { BudgetItemOptionDto } from "../../types/api";
 import { hasRuledOnRequest, isRestingOnRole } from "../../domains/expense/review-stage";
+import { PaymentRecordCard } from "../ui/PaymentRecordCard";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
@@ -202,6 +203,20 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   uploading={attachmentsUploading}
                 />
               </div>
+            </div>
+
+            {/* Payment record — only once the money has actually moved. This is
+                the initiator's (and the approver's, and the Finance Head's)
+                only route to the receipt: the evidence used to be visible on
+                the two finance screens alone, so the person who raised the
+                request was never shown proof their payment was made. */}
+            <div style={{ marginTop: "1.5rem" }}>
+              <PaymentRecordCard
+                expense={selectedExpense}
+                onViewReceipt={(receipt) =>
+                  onViewAttachment({ ...receipt, requestNumber: selectedExpense.requestNumber })
+                }
+              />
             </div>
 
             {/* Footer buttons */}

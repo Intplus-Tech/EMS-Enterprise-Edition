@@ -143,3 +143,22 @@ export function statusBadgeClass(status?: string | null): string {
       return "badge-pending";
   }
 }
+
+/**
+ * Payment method for a released request.
+ *
+ * Nothing on the model stores it yet, so it is inferred from the reference
+ * prefix. Lived as two byte-identical private copies in ApprovalsTab and
+ * PaymentHistoryTab, each carrying a comment promising to keep the other in
+ * step; the payment record card is a third reader, so it lives here now.
+ */
+export function paymentMethodOf(expense?: {
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
+} | null): string {
+  if (expense?.paymentMethod) return expense.paymentMethod;
+  const reference = expense?.paymentReference || "";
+  if (reference.startsWith("CASH")) return "Cash";
+  if (reference.startsWith("CHQ")) return "Cheque";
+  return "Transfer";
+}

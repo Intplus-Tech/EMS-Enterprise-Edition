@@ -163,7 +163,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (notification.type === "PAID" && expense.paymentReceipt) {
+    // Opens for any completed payment, not only one carrying a receipt: the
+    // dialog reports the reference, method and date as well, and gating it on
+    // `paymentReceipt` sent a payment released without stored evidence to the
+    // generic request profile instead of to its own payment record.
+    if (notification.type === "PAID") {
       setSelectedReceiptData(expense);
       setShowReceiptModal(true);
       return;
@@ -471,6 +475,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         isOpen={showReceiptModal}
         onClose={() => { setShowReceiptModal(false); setSelectedReceiptData(null); }}
         selectedReceiptData={selectedReceiptData}
+        onViewReceipt={setViewedAttachment}
       />
 
 

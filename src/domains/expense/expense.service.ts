@@ -12,6 +12,7 @@ import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
 import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
 import { SYSTEM_ACTOR_NAME } from "../identity/reference";
+import { fileNameFromUrl } from "../attachments/attachment.rules";
 import { IAttachment, IUser } from "../../types";
 import { formatNaira } from "../../components/ui/format";
 
@@ -1000,7 +1001,13 @@ export class ExpenseService {
     actor: WorkflowActor,
     reference: string,
     /** Stored document reference for the transfer evidence. Required — see below. */
-    receiptFileName: string
+    receiptFileName: string,
+    /**
+     * The same evidence as a stored file. Optional so a caller following the
+     * previous contract still releases; the record below is synthesised from
+     * the reference when it is absent.
+     */
+    receiptDocument?: IAttachment
   ) {
     await connectToDatabase();
     if (actor.role !== SystemRole.FINANCE_MANAGER) {
@@ -1024,11 +1031,23 @@ export class ExpenseService {
     }
 
     const actorId = getActorId(actor);
+    const actorIdForReceipt = actorId || undefined;
     const previousStatus = request.status;
 
-    // Save bank transaction records
+    // Save bank transaction records.
+    //
+    // The evidence is stored as a document, not just a URL: the initiator and
+    // every reviewer are shown this receipt on the released request, and a bare
+    // URL gave them no filename, size or type to read. `paymentReceipt` stays
+    // in step through the model's pre-save hook, for readers on the old field.
     request.paymentReference = reference;
-    request.paymentReceipt = receiptFileName.trim();
+    request.paymentReceiptDocument = {
+      ...(receiptDocument ?? { name: fileNameFromUrl(receiptFileName.trim()) }),
+      url: receiptFileName.trim(),
+      uploadedById: actorIdForReceipt,
+      uploadedByName: actor.name,
+      uploadedAt: new Date(),
+    };
     request.paymentDate = new Date();
     request.status = RequestStatus.PAID;
     

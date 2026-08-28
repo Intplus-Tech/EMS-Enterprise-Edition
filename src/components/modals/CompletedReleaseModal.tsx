@@ -7,13 +7,16 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../ui/ModalShell";
-import { formatNairaPrecise, formatDateTime, justificationLabel } from "../ui/format";
+import { AttachmentDto } from "../../types/api";
+import { formatNairaPrecise, formatDateTime, justificationLabel, paymentMethodOf } from "../ui/format";
 
 interface CompletedReleaseModalProps {
   isOpen: boolean;
   onClose: () => void;
   expense: any;
   onViewThread?: (expense: any) => void;
+  /** Opens a stored document — receipt or supporting file — in the viewer. */
+  onViewAttachment?: (attachment: AttachmentDto & { requestNumber?: string }) => void;
 }
 
 export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
@@ -21,6 +24,7 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
   onClose,
   expense,
   onViewThread,
+  onViewAttachment,
 }) => {
   if (!isOpen || !expense) return null;
 
@@ -29,6 +33,11 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
   const justifications = (expense.history || []).filter(
     (h: any) => h.comment && justificationLabel(h.actorRole)
   );
+
+  // Resolved by the model, so a release recorded before the receipt was stored
+  // as a document still names its file.
+  const receipt: AttachmentDto | null = expense.paymentReceiptFile ?? null;
+  const receiptOpenable = Boolean(receipt?.url && !receipt?.isLegacy && onViewAttachment);
 
   const attachments: any[] = expense.attachments?.length
     ? expense.attachments
@@ -75,10 +84,14 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
               value={expense.paymentReference || "—"}
             />
 
+            {/* Inferred from the bank reference, as the pipeline and payment
+                history tables do. The "Bank Transfer (CBN NIP)" that used to
+                sit here was a design sample shown for every payment, cash and
+                cheque releases included. */}
             <DetailRow
               icon={<Icons.Landmark size={16} />}
               label="Payment Method"
-              value={expense.paymentMethod || "Bank Transfer (CBN NIP)"}
+              value={paymentMethodOf(expense)}
             />
 
             <DetailRow
@@ -100,21 +113,38 @@ export const CompletedReleaseModal: React.FC<CompletedReleaseModalProps> = ({
               background: "rgb(var(--color-surface-secondary) / 0.4)",
             }}
           >
+            {/* The receipt the Finance Manager uploaded. Both halves used to be
+                wrong: the name rendered `paymentReceipt`, which holds the
+                storage URL, so the row printed a full Cloudinary path — and
+                when it was empty it invented `payment_receipt_<id>.pdf` for a
+                file nobody had filed. The link pointed at that same value, so
+                for a release with no stored evidence it was `href="#"`. */}
             <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", minWidth: 0 }}>
               <Icons.FileText size={18} style={{ color: "#EF4444", flexShrink: 0 }} />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: "0.85rem", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {expense.paymentReceipt || `payment_receipt_${expense.requestNumber}.pdf`}
+                  {receipt?.name || "No receipt on file"}
                 </div>
-                <div style={{ fontSize: "0.72rem", color: "rgb(var(--color-text-muted))" }}>Generated System Receipt</div>
+                <div style={{ fontSize: "0.72rem", color: "rgb(var(--color-text-muted))" }}>
+                  {receipt ? "Proof of payment" : "The release was recorded without stored evidence."}
+                </div>
               </div>
             </div>
-            <a
-              href={expense.paymentReceipt || "#"}
-              style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", color: "#2563EB", fontSize: "0.85rem", fontWeight: 600, flexShrink: 0 }}
-            >
-              <Icons.Download size={15} /> Download
-            </a>
+            {receiptOpenable ? (
+              <button
+                type="button"
+                onClick={() => onViewAttachment!({ ...receipt!, requestNumber: expense.requestNumber })}
+                style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", background: "none", border: "none", color: "#2563EB", fontSize: "0.85rem", fontWeight: 600, flexShrink: 0, cursor: "pointer", padding: 0 }}
+              >
+                <Icons.Eye size={15} /> View
+              </button>
+            ) : (
+              receipt && (
+                <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))", flexShrink: 0 }}>
+                  Not available to view
+                </span>
+              )
+            )}
           </div>
         </div>
 

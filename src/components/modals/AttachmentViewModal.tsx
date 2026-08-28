@@ -14,6 +14,9 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { AttachmentDto } from "../../types/api";
+// Shared with the model's `paymentReceiptFile` virtual, so a stored reference
+// resolves to the same name and viewability wherever it is rendered.
+import { fileNameFromUrl, isStoredUrl } from "../../domains/attachments/attachment.rules";
 
 /**
  * What the viewer opens. Structurally an `AttachmentDto` plus the request it
@@ -31,18 +34,8 @@ interface AttachmentViewModalProps {
   attachment: AttachmentTarget | null;
 }
 
-/** A stored value is only openable if it is an absolute URL. */
-function isViewable(source: string): boolean {
-  return /^https?:\/\//i.test(source);
-}
-
-function fileNameOf(source: string): string {
-  const withoutQuery = source.split("?")[0];
-  return decodeURIComponent(withoutQuery.split("/").pop() || source);
-}
-
 function extensionOf(source: string): string {
-  const name = fileNameOf(source);
+  const name = fileNameFromUrl(source);
   const dot = name.lastIndexOf(".");
   return dot === -1 ? "" : name.slice(dot + 1).toLowerCase();
 }
@@ -57,9 +50,9 @@ export const AttachmentViewModal: React.FC<AttachmentViewModalProps> = ({
   if (!isOpen || !attachment) return null;
 
   const source = attachment.url;
-  const name = attachment.name || fileNameOf(source);
+  const name = attachment.name || fileNameFromUrl(source);
   const extension = extensionOf(source);
-  const viewable = isViewable(source);
+  const viewable = isStoredUrl(source);
   const isImage = viewable && IMAGE_EXTENSIONS.includes(extension);
   const isPdf = viewable && extension === "pdf";
 

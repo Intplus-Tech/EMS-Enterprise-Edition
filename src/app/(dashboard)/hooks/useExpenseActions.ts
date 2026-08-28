@@ -14,6 +14,7 @@ import { ExpenseClient } from "../../../services/expense.client";
 import { toErrorMessage } from "../../../services/http";
 import { SystemRole } from "../../../enums/roles";
 import { WorkflowActionType } from "../../../enums/workflowActions";
+import { AttachmentInput } from "../../../types/api";
 
 interface ExpenseActionOptions {
   currentUser: { role?: SystemRole | string } | null;
@@ -116,7 +117,7 @@ export function useExpenseActions({ currentUser, reload, onSuccess, onError }: E
 
   /** Finance Manager: release the payment and close the request. */
   const releasePayment = useCallback(
-    (id: string, reference: string, signature: string, receipt: string) =>
+    (id: string, reference: string, signature: string, receipt: AttachmentInput) =>
       perform(
         () => ExpenseClient.releasePayment(id, reference, signature, receipt),
         `Payment released. Reference: ${reference}`

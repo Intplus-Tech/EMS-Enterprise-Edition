@@ -103,7 +103,10 @@ export interface ExpenseRequestDto {
   exceptionalBudgetApproved?: boolean;
   exceptionalApprovedBy?: PopulatedRef | string | null;
   originalAmount?: number;
+  /** @deprecated Raw URL of the receipt; read `paymentReceiptFile` instead. */
   paymentReceipt?: string;
+  /** The transfer evidence, resolved by the model for every reader. */
+  paymentReceiptFile?: AttachmentDto | null;
   paymentReference?: string;
   paymentDate?: string;
   currentStepIndex: number;

@@ -9,7 +9,8 @@ import * as Icons from "lucide-react";
 import { Pagination } from "./ui/Pagination";
 import { EmptyState } from "./ui/EmptyState";
 import { CompletedReleaseModal } from "./modals/CompletedReleaseModal";
-import { formatNaira, formatDate } from "./ui/format";
+import { AttachmentDto } from "../types/api";
+import { formatNaira, formatDate, paymentMethodOf } from "./ui/format";
 
 const ROWS_PER_PAGE = 4;
 
@@ -40,6 +41,11 @@ interface ExpenseRow {
 
 interface PaymentHistoryTabProps {
   expenses: ExpenseRow[];
+  /**
+   * Opens the receipt in the shared viewer. The manager files the evidence on
+   * release, so their own ledger must be able to read it back.
+   */
+  onViewAttachment?: (attachment: AttachmentDto & { requestNumber?: string }) => void;
 }
 
 /**
@@ -50,16 +56,7 @@ interface PaymentHistoryTabProps {
  */
 const deptNameOf = (expense: ExpenseRow): string => expense.departmentId?.name || "";
 
-/** Payment method is inferred from the reference prefix when not stored explicitly. */
-const resolveMethod = (expense: ExpenseRow): string => {
-  if (expense.paymentMethod) return expense.paymentMethod;
-  const ref: string = expense.paymentReference || "";
-  if (ref.startsWith("CASH")) return "Cash";
-  if (ref.startsWith("CHQ")) return "Cheque";
-  return "Transfer";
-};
-
-export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }) => {
+export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses, onViewAttachment }) => {
   const [search, setSearch] = useState("");
   const [period, setPeriod] = useState(PERIOD_OPTIONS[0].label);
   const [method, setMethod] = useState("All");
@@ -76,7 +73,7 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }
       .filter(e => {
         const released = new Date(e.paymentDate || e.updatedAt || e.createdAt).getTime();
         if (cutoff && released < cutoff) return false;
-        if (method !== "All" && resolveMethod(e) !== method) return false;
+        if (method !== "All" && paymentMethodOf(e) !== method) return false;
         if (!term) return true;
         return (
           (e.requestNumber || "").toLowerCase().includes(term) ||
@@ -102,7 +99,7 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }
       e.description,
       e.amount,
       deptNameOf(e),
-      resolveMethod(e),
+      paymentMethodOf(e),
       e.paymentReference || "",
       formatDate(e.paymentDate || e.updatedAt || e.createdAt),
     ]);
@@ -191,7 +188,7 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }
                   <td>{e.description}</td>
                   <td style={{ textAlign: "right", fontWeight: 700 }}>{formatNaira(e.amount)}</td>
                   <td>{deptNameOf(e) || "—"}</td>
-                  <td>{resolveMethod(e)}</td>
+                  <td>{paymentMethodOf(e)}</td>
                   <td>{e.paymentReference || "—"}</td>
                   <td>{formatDate(e.paymentDate || e.updatedAt || e.createdAt)}</td>
                   <td style={{ textAlign: "right" }}>
@@ -233,6 +230,7 @@ export const PaymentHistoryTab: React.FC<PaymentHistoryTabProps> = ({ expenses }
         isOpen={!!selectedRelease}
         onClose={() => setSelectedRelease(null)}
         expense={selectedRelease}
+        onViewAttachment={onViewAttachment}
       />
     </div>
   );

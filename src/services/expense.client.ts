@@ -115,10 +115,15 @@ export const ExpenseClient = {
    * `receipt` is the stored URL of the uploaded transfer evidence — required,
    * since the payment record is filed against it.
    */
-  releasePayment: (id: string, reference: string, signature: string, receipt: string) =>
+  /**
+   * `receipt` carries the stored document, not a bare URL: the name and type
+   * are what the initiator and every reviewer see on the released request.
+   */
+  releasePayment: (id: string, reference: string, signature: string, receipt: AttachmentInput) =>
     http.post<{ request: ExpenseRequestDto }>(`/api/expenses/${id}/release`, {
       reference,
-      receipt,
+      receipt: receipt.url,
+      receiptDocument: { ...receipt },
       signature,
     }),
 

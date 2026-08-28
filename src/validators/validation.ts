@@ -101,6 +101,12 @@ export const PaymentReleaseSchema = z.object({
    * the service then recorded a placeholder filename pointing at nothing.
    */
   receipt: z.string().min(1, "Payment receipt or evidence of transfer is required"),
+  /**
+   * The same evidence as a stored file, so its real name, size and type reach
+   * every reader instead of a bare URL. Optional so an older client sending
+   * only `receipt` still releases; the service synthesises the rest.
+   */
+  receiptDocument: AttachmentInputSchema.optional(),
   signature: SignatureSchema,
 });
 

@@ -23,7 +23,7 @@ import { SubmitButton } from "./ui/SubmitButton";
 import { Pagination } from "./ui/Pagination";
 import { StatCard } from "./ui/StatCard";
 import { EmptyState } from "./ui/EmptyState";
-import { formatNaira, formatDate, formatDateTime, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
+import { formatNaira, formatDate, formatDateTime, humanizeStatus, paymentMethodOf, stageLabel, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import {
   hasLeftApproverDesk,
@@ -82,19 +82,6 @@ interface ApprovalsTabProps {
 
 /** Rows shown per page in the pipeline tables. */
 const ROWS_PER_PAGE = 10;
-
-/**
- * Payment method for a released request. Nothing on the model stores it yet, so
- * it is inferred from the reference prefix â€” the same rule PaymentHistoryTab
- * uses, kept identical so the two screens never disagree.
- */
-function resolvePaymentMethod(expense: any): string {
-  if (expense.paymentMethod) return expense.paymentMethod;
-  const reference: string = expense.paymentReference || "";
-  if (reference.startsWith("CASH")) return "Cash";
-  if (reference.startsWith("CHQ")) return "Cheque";
-  return "Transfer";
-}
 
 export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   currentUser,
@@ -390,7 +377,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       expToRelease._id,
       payload.reference,
       payload.signature,
-      receipt.url
+      receipt
     );
 
     if (ok) {
@@ -528,7 +515,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
       if (expDate.getTime() < Date.now() - 30 * 24 * 60 * 60 * 1000) return false;
     }
 
-    if (methodFilter !== "ALL" && resolvePaymentMethod(exp) !== methodFilter) return false;
+    if (methodFilter !== "ALL" && paymentMethodOf(exp) !== methodFilter) return false;
 
     return true;
   });
@@ -676,6 +663,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         isOpen={showCompletedReleaseModal}
         onClose={() => { setShowCompletedReleaseModal(false); focusReleaseItem(null); }}
         expense={activeReleaseItem}
+        onViewAttachment={onViewAttachment}
         onViewThread={() => setShowThreadModal(true)}
       />
 
@@ -1814,7 +1802,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     {exp.departmentId?.name || "â€”"}
                   </td>
                   <td style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
-                    {exp.paymentReference ? resolvePaymentMethod(exp) : "â€”"}
+                    {exp.paymentReference ? paymentMethodOf(exp) : "â€”"}
                   </td>
                   <td className="wrap-anywhere" style={{ padding: "1rem", color: "rgb(var(--color-text-muted))" }}>
                     {exp.paymentReference || "â€”"}

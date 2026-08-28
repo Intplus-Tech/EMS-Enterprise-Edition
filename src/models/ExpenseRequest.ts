@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import { RequestStatus } from "../enums/statuses";
 import { SystemRole } from "../enums/roles";
+import { fileNameFromUrl, isStoredUrl } from "../domains/attachments/attachment.rules";
 
 const WorkflowHistorySchema = new Schema({
   statusBefore: { type: String, enum: Object.values(RequestStatus), required: true },
@@ -112,7 +113,18 @@ const ExpenseRequestSchema = new Schema(
     originalAmount: { type: Number },
 
     // Payment release logs
+    /**
+     * @deprecated Superseded by `paymentReceiptDocument`.
+     *
+     * Held nothing but the receipt's Cloudinary URL, so every screen that
+     * showed it printed a URL where a filename belonged and had no size, type
+     * or uploader to report. Kept and auto-synced by the pre-save hook below so
+     * seeded and pre-existing records keep resolving; the `paymentReceiptFile`
+     * virtual reads through to it when the document is absent.
+     */
     paymentReceipt: { type: String },
+    /** The transfer evidence the Finance Manager uploaded, as a stored file. */
+    paymentReceiptDocument: { type: AttachmentSchema, required: false },
     paymentReference: { type: String },
     paymentDate: { type: Date },
 
@@ -157,11 +169,42 @@ ExpenseRequestSchema.virtual("attachments").get(function () {
   return [];
 });
 
-// Keep the deprecated single-document field pointing at the primary attachment.
+/**
+ * The payment receipt every reader renders — initiator, approver, finance
+ * officer, finance manager and finance head alike.
+ *
+ * Returns the stored document when present, and otherwise synthesises one from
+ * the legacy `paymentReceipt` URL so releases recorded before the document
+ * field existed still open. Deriving it here rather than at each screen is what
+ * lets one viewer serve them all, exactly as `attachments` does above.
+ */
+ExpenseRequestSchema.virtual("paymentReceiptFile").get(function () {
+  const stored = this.paymentReceiptDocument;
+  if (stored?.url) return stored;
+
+  const legacy = this.paymentReceipt;
+  if (!legacy) return null;
+
+  return {
+    _id: null,
+    name: fileNameFromUrl(legacy),
+    url: legacy,
+    uploadedAt: this.paymentDate ?? this.get("updatedAt"),
+    // A seeded or pre-upload record holds a bare filename, so there is no file
+    // to open; the viewer says so rather than offering a dead link.
+    isLegacy: !isStoredUrl(legacy),
+  };
+});
+
+// Keep the deprecated single-document fields pointing at their replacements.
 ExpenseRequestSchema.pre("save", function () {
   const documents = this.supportingDocuments ?? [];
   if (documents.length > 0) {
     this.supportingDocument = documents[0].name;
+  }
+
+  if (this.paymentReceiptDocument?.url) {
+    this.paymentReceipt = this.paymentReceiptDocument.url;
   }
 });
 
