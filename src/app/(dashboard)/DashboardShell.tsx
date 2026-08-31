@@ -36,6 +36,8 @@ import { AdminSuspendUserModal } from "../../components/admin/modals/AdminSuspen
 import { AdminEditRoleModal } from "../../components/admin/modals/AdminEditRoleModal";
 import { AdminSetBudgetModal } from "../../components/admin/modals/AdminSetBudgetModal";
 import { FiscalPeriod } from "../../domains/budget/fiscalPeriod";
+import { IN_FLIGHT_STATUSES, isStatusIn } from "../../enums/statuses";
+import { sameId } from "../../domains/identity/reference";
 
 import { useDashboard } from "./DashboardProvider";
 
@@ -626,10 +628,20 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         }}
       />
 
+      {/* Delete cancels the user's in-flight requests rather than refusing, so the
+          dialog is given the real count to warn with. */}
       <AdminDeleteUserModal
         isOpen={showAdminDeleteUserModal}
         onClose={() => setShowAdminDeleteUserModal(false)}
         user={selectedAdminUser}
+        inFlightCount={
+          selectedAdminUser
+            ? expenses.filter(
+                (e: any) =>
+                  sameId(e.initiatorId, selectedAdminUser.id) && isStatusIn(IN_FLIGHT_STATUSES, e.status)
+              ).length
+            : 0
+        }
         onConfirmDelete={(userId: string) => deleteUser(userId)}
       />
 

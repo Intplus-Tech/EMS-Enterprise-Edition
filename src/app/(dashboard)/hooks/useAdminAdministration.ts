@@ -288,13 +288,29 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     [run]
   );
 
+  /**
+   * Deletion cascades over the user's in-flight requests, so the toast names what
+   * it cancelled instead of a bare "deleted" — unlike a department, none of it
+   * can be restored, which is precisely why the admin has to be told.
+   */
   const deleteUser = useCallback(
-    (id: string) =>
-      run(async () => {
-        await AdminClient.deleteUser(id);
-        await loadUsers();
-      }, "User deleted."),
-    [run, loadUsers]
+    (id: string) => {
+      let summary = "User deleted.";
+      return run(
+        async () => {
+          const result = await AdminClient.deleteUser(id);
+          summary =
+            result.cancelledRequests > 0
+              ? `'${result.name}' deleted. ${result.cancelledRequests} in-flight request(s) cancelled and any reserved budget released.`
+              : `'${result.name}' deleted.`;
+          // Budgets are refetched too: cancelling the user's in-flight requests
+          // releases whatever they had reserved against their department.
+          await Promise.all([loadUsers(), loadBudgets()]);
+        },
+        () => summary
+      );
+    },
+    [run, loadUsers, loadBudgets]
   );
 
   /* --------------------------------------------------------------------- *

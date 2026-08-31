@@ -71,9 +71,15 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
         financeHead: e.exceptionalApprovedBy?.name || decision?.actorName || "—",
         period: `FY ${decidedOn.getFullYear()}`,
         status: e.status === "PENDING_EXCEPTIONAL" ? "Pending" : "Approved",
+        // Kept for ordering: `date` is a display string, so the raw decision
+        // instant is what the sort below has to read.
+        decidedAtMs: decidedOn.getTime(),
         rawExpense: e
       };
-    });
+    })
+    // Most recent expansion at the top — rows are keyed on the decision date,
+    // not the request's creation order, so the incoming list's order is wrong here.
+    .sort((a, b) => b.decidedAtMs - a.decidedAtMs);
 
   // Filtering logic
   const filteredRecords = allRecords.filter(rec => {

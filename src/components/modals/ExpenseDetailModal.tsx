@@ -8,7 +8,7 @@ import { AttachmentTarget } from "./AttachmentViewModal";
 import { AttachmentList } from "../ui/AttachmentList";
 import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
-import { BudgetItemOptionDto } from "../../types/api";
+import { BudgetItemOptionDto, WorkflowHistoryDto } from "../../types/api";
 import { hasRuledOnRequest, isRestingOnRole } from "../../domains/expense/review-stage";
 import { PaymentRecordCard } from "../ui/PaymentRecordCard";
 
@@ -104,6 +104,24 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   const willOverrun = Boolean(selectedItem && !selectedItem.coversRequest);
   const shortfall = selectedItem ? Math.max(0, (selectedExpense?.amount || 0) - selectedItem.available) : 0;
   const canApprove = signed && (!requiresBudgetItem || Boolean(budgetItem));
+
+  /**
+   * The released payment and its receipt.
+   *
+   * Built once and rendered in both branches below. It used to live inside the
+   * initiator branch alone, so the approver who authorised the spend and the
+   * Finance Officer who audited the payload had no route to the evidence the
+   * payment was actually made — the only readers who could see it were the
+   * initiator and the Finance Manager who filed it.
+   */
+  const paymentRecord = (
+    <PaymentRecordCard
+      expense={selectedExpense}
+      onViewReceipt={(receipt) =>
+        onViewAttachment({ ...receipt, requestNumber: selectedExpense.requestNumber })
+      }
+    />
+  );
 
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
@@ -205,19 +223,9 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             </div>
 
-            {/* Payment record — only once the money has actually moved. This is
-                the initiator's (and the approver's, and the Finance Head's)
-                only route to the receipt: the evidence used to be visible on
-                the two finance screens alone, so the person who raised the
-                request was never shown proof their payment was made. */}
-            <div style={{ marginTop: "1.5rem" }}>
-              <PaymentRecordCard
-                expense={selectedExpense}
-                onViewReceipt={(receipt) =>
-                  onViewAttachment({ ...receipt, requestNumber: selectedExpense.requestNumber })
-                }
-              />
-            </div>
+            {/* Payment record — only once the money has actually moved, so the
+                person who raised the request is shown proof it was paid. */}
+            <div style={{ marginTop: "1.5rem" }}>{paymentRecord}</div>
 
             {/* Footer buttons */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem" }}>
@@ -516,11 +524,21 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             )}
 
-            {/* Workflow logs history list */}
+            {/* Payment record — the outcome of the route above, so every reviewer
+                on the request (approver, Finance Officer, Finance Head, admin)
+                reads the same settlement facts and opens the same receipt the
+                initiator does. Renders nothing until the request is paid. */}
+            {paymentRecord}
+
+            {/* Workflow logs history list — ordered newest-first so the latest
+                routing decision is the one the reader lands on, rather than
+                having to scroll past the whole chain to reach it. */}
             <div>
               <p style={{ fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.5rem", color: "rgb(var(--color-text-muted))" }}>Approval Workflow History</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {selectedExpense.history?.map((hist: any, index: number) => (
+                {[...(selectedExpense.history ?? [])]
+                  .sort((a: WorkflowHistoryDto, b: WorkflowHistoryDto) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map((hist: any, index: number) => (
                   <div key={index} style={{ padding: "0.75rem", background: "rgb(var(--color-card-border) / 0.12)", borderRadius: "4px", fontSize: "0.85rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
                       <span><strong>{hist.actorName}</strong> ({hist.actorRole})</span>

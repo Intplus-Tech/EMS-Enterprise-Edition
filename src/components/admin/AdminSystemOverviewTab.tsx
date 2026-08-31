@@ -37,7 +37,13 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
-  const lastActivityAt = systemLogs[0]?.timestamp;
+  // Every log surface reads most-recent-first, so the ordering is asserted here
+  // rather than inherited from the caller — both the "last activity" stamp and
+  // the Recent System Activity table below read off the top of this list.
+  const logsNewestFirst = [...systemLogs].sort(
+    (a, b) => new Date(b?.timestamp ?? 0).getTime() - new Date(a?.timestamp ?? 0).getTime()
+  );
+  const lastActivityAt = logsNewestFirst[0]?.timestamp;
 
   // Enterprise allocation, summed from the real budget periods. This tile read
   // a hardcoded ₦250,000,000, and the period beside it a hardcoded "FY 2026".
@@ -65,7 +71,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
         ? `${activeNames.length} active`
         : latestName;
 
-  const recentActivities: any[] = systemLogs.slice(0, 5).map((l: any, idx: number) => ({
+  const recentActivities: any[] = logsNewestFirst.slice(0, 5).map((l: any, idx: number) => ({
     id: l._id || `act-${idx}`,
     timestamp: l.timestamp ? new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A",
     action: l.action || "System Event",

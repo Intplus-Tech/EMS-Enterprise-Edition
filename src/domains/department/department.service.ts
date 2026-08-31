@@ -1,4 +1,5 @@
 import { connectToDatabase } from "../../config/db";
+import { HIDDEN_ACCOUNT_QUERY } from "../../config/systemAccounts";
 import { Department } from "../../models/Department";
 import { User } from "../../models/User";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
@@ -6,22 +7,9 @@ import { LoggerService, ILogActor } from "../logs/logger.service";
 import { BudgetService } from "../budget/budget.service";
 import { RequestNotifier } from "../notifications/request-notifier";
 import { AuditAction } from "../../enums/auditActions";
-import { RequestStatus } from "../../enums/statuses";
+import { IN_FLIGHT_STATUSES, RequestStatus } from "../../enums/statuses";
 import { DepartmentDto } from "../../types/api";
 import { IBudgetLineItem } from "../../types/domain";
-
-/** Statuses that mean a request is still moving, so deletion cancels it. */
-const IN_FLIGHT_STATUSES = [
-  RequestStatus.SUBMITTED,
-  RequestStatus.BUDGET_CHECK,
-  RequestStatus.INSUFFICIENT_BUDGET,
-  RequestStatus.PENDING_EXCEPTIONAL,
-  RequestStatus.PENDING_APPROVAL,
-  RequestStatus.APPROVED,
-  RequestStatus.SENT_TO_FINANCE,
-  RequestStatus.UPLOADED_TO_BANK,
-  RequestStatus.AWAITING_RELEASE,
-];
 
 /**
  * Statuses whose amount is currently reserved in the period's `pendingBudget`.
@@ -56,7 +44,8 @@ export class DepartmentService {
 
     // One grouped count instead of a query per department.
     const userCounts = await User.aggregate([
-      { $match: { departmentId: { $ne: null } } },
+      // Concealed support accounts never contribute to a department's headcount.
+      { $match: { departmentId: { $ne: null }, ...HIDDEN_ACCOUNT_QUERY } },
       { $group: { _id: "$departmentId", count: { $sum: 1 } } },
     ]);
     const countByDept = new Map<string, number>(

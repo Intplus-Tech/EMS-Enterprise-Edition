@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { connectToDatabase } from "../../../../config/db";
+import { HIDDEN_ACCOUNT_QUERY } from "../../../../config/systemAccounts";
 import { User } from "../../../../models/User";
 import { Department } from "../../../../models/Department";
 import { authenticate } from "../../../../middlewares/auth";
@@ -151,7 +152,8 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   await connectToDatabase();
   await authenticate(req, [SystemRole.ADMIN]);
 
-  const users = await User.find({}).populate("departmentId").sort({ createdAt: -1 });
+  // Concealed support accounts stay out of the directory — see `systemAccounts.ts`.
+  const users = await User.find(HIDDEN_ACCOUNT_QUERY).populate("departmentId").sort({ createdAt: -1 });
   const departments = await Department.find({}).sort({ name: 1 });
 
   return NextResponse.json({

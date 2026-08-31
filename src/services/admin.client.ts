@@ -139,7 +139,9 @@ export const AdminClient = {
   setUserActive: (id: string, isActive: boolean) =>
     http.patch<{ user: { id: string; isActive: boolean } }>(`/api/admin/users/${id}`, { isActive }),
 
-  deleteUser: (id: string) => http.delete<{ id: string }>(`/api/admin/users/${id}`),
+  /** Cancels the user's in-flight requests as part of the delete; the count is reported back. */
+  deleteUser: (id: string) =>
+    http.delete<{ id: string; name: string; cancelledRequests: number }>(`/api/admin/users/${id}`),
 
   /** Force Log Out — ends every active session for the user. */
   revokeUserSessions: (id: string) =>

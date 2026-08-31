@@ -74,6 +74,31 @@ export const BANK_STAGE_STATUSES: RequestStatus[] = [
   RequestStatus.AWAITING_RELEASE,
 ];
 
+/**
+ * A request that is still moving — submitted, not yet resolved either way.
+ *
+ * This is what "in flight" means everywhere it matters: deleting a department or
+ * a user cancels exactly these, and the Delete dialogs count exactly these to
+ * state the impact. It lived as a private copy in `DepartmentService` and
+ * another in `UserService`, which is one copy too many for a list the UI now
+ * needs as well.
+ *
+ * DRAFT is absent (never submitted, so nothing to cancel), as are the terminal
+ * states PAID / CLOSED / REJECTED / CANCELLED and RETURNED, which is resting
+ * with the initiator rather than moving through the chain.
+ */
+export const IN_FLIGHT_STATUSES: RequestStatus[] = [
+  RequestStatus.SUBMITTED,
+  RequestStatus.BUDGET_CHECK,
+  RequestStatus.INSUFFICIENT_BUDGET,
+  RequestStatus.PENDING_EXCEPTIONAL,
+  RequestStatus.PENDING_APPROVAL,
+  RequestStatus.APPROVED,
+  RequestStatus.SENT_TO_FINANCE,
+  RequestStatus.UPLOADED_TO_BANK,
+  RequestStatus.AWAITING_RELEASE,
+];
+
 /** String-set membership test, for the many UI call sites holding raw statuses. */
 export function isStatusIn(statuses: RequestStatus[], status?: string | null): boolean {
   return statuses.includes(String(status) as RequestStatus);

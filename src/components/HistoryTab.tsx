@@ -119,7 +119,12 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({
     if (historySubTab === "approved") return ["PAID", "CLOSED", "APPROVED"].includes(e.status);
     if (historySubTab === "rejected") return ["REJECTED", "CANCELLED"].includes(e.status);
     return true;
-  }), [scoped, historyFilterCategory, historyFilterStatus, historySearchQuery, historySubTab, appliedFrom, appliedTo]);
+  })
+    // Newest first. The order was inherited from whatever `/api/expenses`
+    // returned, so any caller that passed an unsorted list silently produced a
+    // history table reading oldest-at-top.
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+  [scoped, historyFilterCategory, historyFilterStatus, historySearchQuery, historySubTab, appliedFrom, appliedTo]);
 
   // Guard against landing on a page that no longer exists after filtering.
   const safePage = Math.min(page, Math.max(1, Math.ceil(historical.length / ROWS_PER_PAGE)));

@@ -4,7 +4,7 @@ import { RequestJustificationModal } from "./RequestJustificationModal";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
 import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
-import { AttachmentDto, BudgetContextDto, ThreadEntryDto } from "../types/api";
+import { AttachmentDto, BudgetContextDto, ThreadEntryDto, WorkflowHistoryDto } from "../types/api";
 import { AttachmentTarget } from "./modals/AttachmentViewModal";
 import { formatNaira, formatNairaPrecise } from "./ui/format";
 
@@ -108,7 +108,12 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   const expansionDeficit = budgetContext?.itemShortfall ?? 0;
   const itemHeadroom = attachedItem?.remaining ?? budgetContext?.remaining ?? 0;
 
-  const historyTimeline: any[] = targetExp?.history && targetExp.history.length > 0 ? targetExp.history.map((h: any, idx: number) => ({
+  // Newest entry first: every log surface in the app reads most-recent-at-top,
+  // so the decision the Finance Head is about to take follows the last thing
+  // that happened rather than the request's opening note.
+  const historyTimeline: any[] = targetExp?.history && targetExp.history.length > 0 ? [...targetExp.history]
+    .sort((a: WorkflowHistoryDto, b: WorkflowHistoryDto) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .map((h: any, idx: number) => ({
     id: `hist-${idx}`,
     actor: `${h.actorName || "User"} (${h.actorRole || "Staff"})`,
     timestamp: h.timestamp ? new Date(h.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",

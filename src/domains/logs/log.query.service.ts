@@ -7,6 +7,8 @@
  * and filter in React, which does not survive a collection of any real size.
  */
 import { Log } from "../../models/Log";
+import { User } from "../../models/User";
+import { HIDDEN_SYSTEM_ACCOUNT_EMAILS } from "../../config/systemAccounts";
 import { LogType } from "../../enums/logTypes";
 
 export interface LogSearchFilters {
@@ -45,10 +47,32 @@ function contains(value: string) {
 /** Mongo filter document. Loosely typed because `Log` is an untyped model. */
 type LogFilter = Record<string, unknown>;
 
+/**
+ * Ids of the concealed support accounts, so their entries can be excluded.
+ *
+ * Resolved per query rather than cached: the account may be created after the
+ * process starts, and an audit feed that silently keeps showing rows it was told
+ * to hide is worse than one extra indexed lookup per page.
+ */
+async function hiddenActorIds(): Promise<unknown[]> {
+  if (HIDDEN_SYSTEM_ACCOUNT_EMAILS.length === 0) return [];
+  return User.find({ email: { $in: HIDDEN_SYSTEM_ACCOUNT_EMAILS } }).distinct("_id");
+}
+
 export class LogQueryService {
-  /** Translates the filter bar into a Mongo filter document. */
-  static buildQuery(filters: LogSearchFilters): LogFilter {
+  /**
+   * Translates the filter bar into a Mongo filter document.
+   *
+   * `excludeActorIds` conceals the support accounts: they are hidden from the
+   * user directory, so leaving their entries in the audit feed would put a name
+   * on screen that appears nowhere else in the system.
+   */
+  static buildQuery(filters: LogSearchFilters, excludeActorIds: unknown[] = []): LogFilter {
     const query: LogFilter = {};
+
+    // `$nin` also admits rows with no `actorId` at all, which is what system-written
+    // entries carry — those must keep showing.
+    if (excludeActorIds.length > 0) query.actorId = { $nin: excludeActorIds };
 
     if (filters.type) query.type = filters.type;
 
@@ -78,7 +102,7 @@ export class LogQueryService {
 
   /** One page of logs, newest first, plus the total the filter bar matched. */
   static async search(filters: LogSearchFilters): Promise<LogSearchResult> {
-    const query = LogQueryService.buildQuery(filters);
+    const query = LogQueryService.buildQuery(filters, await hiddenActorIds());
 
     const total = await Log.countDocuments(query);
     const totalPages = Math.max(1, Math.ceil(total / filters.limit));

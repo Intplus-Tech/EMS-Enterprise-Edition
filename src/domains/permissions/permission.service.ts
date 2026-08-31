@@ -1,4 +1,5 @@
 import { connectToDatabase } from "../../config/db";
+import { HIDDEN_ACCOUNT_QUERY } from "../../config/systemAccounts";
 import { RolePermission } from "../../models/RolePermission";
 import { User } from "../../models/User";
 import { SystemRole } from "../../enums/roles";
@@ -126,7 +127,12 @@ export class PermissionService {
 
     const [records, userCounts] = await Promise.all([
       RolePermission.find({}),
-      User.aggregate([{ $group: { _id: "$role", count: { $sum: 1 } } }]),
+      // Concealed support accounts are excluded so the matrix's "N users" agrees
+      // with the directory the admin can actually see.
+      User.aggregate([
+        { $match: HIDDEN_ACCOUNT_QUERY },
+        { $group: { _id: "$role", count: { $sum: 1 } } },
+      ]),
     ]);
 
     const countByRole = new Map<string, number>(
