@@ -8,7 +8,11 @@ import React, { useEffect, useState } from "react";
 import { ModalShell } from "../../ui/ModalShell";
 import { CURRENCY_SYMBOL } from "../../ui/format";
 
-// Default catalogue keeps the picker useful before a category API exists.
+// Mirrors BudgetLineItemSchema.name so the server never rejects what the form allowed.
+const CATEGORY_MIN_LENGTH = 2;
+const CATEGORY_MAX_LENGTH = 80;
+
+// Suggestions only — administrators may type any category name.
 const DEFAULT_CATEGORIES = [
   "Hardware & Infrastructure",
   "Software Subscriptions",
@@ -53,11 +57,12 @@ export const AdminAddBudgetItemModal: React.FC<AdminAddBudgetItemModalProps> = (
     }
   }, [isOpen]);
 
-  const canSubmit = category.trim().length > 0 && Number(amount) > 0;
+  const trimmedCategory = category.trim();
+  const canSubmit = trimmedCategory.length >= CATEGORY_MIN_LENGTH && Number(amount) > 0;
 
   const handleSubmit = () => {
     if (!canSubmit) return;
-    onAddItem({ category, description, amount: Number(amount) });
+    onAddItem({ category: trimmedCategory, description, amount: Number(amount) });
     onClose();
   };
 
@@ -88,12 +93,21 @@ export const AdminAddBudgetItemModal: React.FC<AdminAddBudgetItemModalProps> = (
       {/* Line Item Category */}
       <div style={{ marginBottom: "1.25rem" }}>
         <label className="form-label">Line Item Category</label>
-        <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="">Select a category</option>
+        {/* Free-text so each department can name its own lines; the datalist only suggests, it never restricts. */}
+        <input
+          type="text"
+          className="form-input"
+          list="budget-item-category-suggestions"
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="e.g. Cloud Hosting"
+          maxLength={CATEGORY_MAX_LENGTH}
+        />
+        <datalist id="budget-item-category-suggestions">
           {categories.map((c) => (
-            <option key={c} value={c}>{c}</option>
+            <option key={c} value={c} />
           ))}
-        </select>
+        </datalist>
       </div>
 
       {/* Description / justification */}
