@@ -12,6 +12,7 @@
 import React, { useEffect, useState } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
+import { SubmitButton } from "../../ui/SubmitButton";
 import { humanizeStatus } from "../../ui/format";
 import {
   PermissionAction,
@@ -80,15 +81,9 @@ export const AdminEditRoleModal: React.FC<AdminEditRoleModalProps> = ({
           <button type="button" onClick={onClose} className="btn btn-secondary">
             Cancel
           </button>
-          <button
-            type="submit"
-            form="edit-role-form"
-            disabled={busy}
-            className="btn btn-primary"
-            style={{ opacity: busy ? 0.6 : 1 }}
-          >
-            {busy ? "Saving…" : "Save Changes"}
-          </button>
+          <SubmitButton type="submit" form="edit-role-form" loading={busy} loadingLabel="Saving…">
+            Save Changes
+          </SubmitButton>
         </>
       }
     >
@@ -217,8 +212,8 @@ export const AdminEditRoleModal: React.FC<AdminEditRoleModalProps> = ({
                 <div
                   key={resource}
                   style={{
-                    backgroundColor: granted ? "rgba(37, 99, 235, 0.15)" : "rgba(var(--color-text-dim), 0.12)",
-                    color: granted ? "#60A5FA" : "rgb(var(--color-text-dim))",
+                    backgroundColor: granted ? "rgba(37, 99, 235, 0.15)" : "rgb(var(--color-text-dim) / 0.12)",
+                    color: granted ? "rgb(var(--color-primary))" : "rgb(var(--color-text-dim))",
                     borderRadius: "0.375rem",
                     padding: "0.5rem 0.75rem",
                     fontSize: "0.78rem",

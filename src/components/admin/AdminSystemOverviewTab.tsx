@@ -1,14 +1,18 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { formatNaira, formatDateTime } from "../ui/format";
+import { BudgetPeriodDto } from "../../types/api";
+import { periodCovers } from "../../domains/budget/fiscalPeriod";
 
 interface AdminSystemOverviewTabProps {
   currentUser: any;
   systemUsersCount?: number;
   departmentsCount?: number;
   systemLogs?: any[];
-  /** Server-computed budget summaries, for the period and total tiles. */
-  budgets?: { totalBudget: number; periodLabel?: string }[];
+  /** Server-computed budget summaries, for the total tile. */
+  budgets?: { totalBudget: number }[];
+  /** The configured periods themselves — the only place the period name lives. */
+  budgetPeriods?: BudgetPeriodDto[];
   onOpenAddUser: () => void;
   onOpenCreateDept: () => void;
   onOpenSetBudget: () => void;
@@ -20,6 +24,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
   departmentsCount = 0,
   systemLogs = [],
   budgets = [],
+  budgetPeriods = [],
   onOpenAddUser,
   onOpenCreateDept,
   onOpenSetBudget
@@ -32,14 +37,41 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
   const today = new Date().toLocaleDateString(undefined, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
-  const lastActivityAt = systemLogs[0]?.timestamp;
+  // Every log surface reads most-recent-first, so the ordering is asserted here
+  // rather than inherited from the caller — both the "last activity" stamp and
+  // the Recent System Activity table below read off the top of this list.
+  const logsNewestFirst = [...systemLogs].sort(
+    (a, b) => new Date(b?.timestamp ?? 0).getTime() - new Date(a?.timestamp ?? 0).getTime()
+  );
+  const lastActivityAt = logsNewestFirst[0]?.timestamp;
 
   // Enterprise allocation, summed from the real budget periods. This tile read
   // a hardcoded ₦250,000,000, and the period beside it a hardcoded "FY 2026".
   const totalBudget = budgets.reduce((sum, b) => sum + (b.totalBudget || 0), 0);
-  const periodLabel = budgets.find((b) => b.periodLabel)?.periodLabel;
 
-  const recentActivities: any[] = systemLogs.slice(0, 5).map((l: any, idx: number) => ({
+  /**
+   * The fiscal period the enterprise is currently operating in.
+   *
+   * Read from the periods themselves: this tile used to look for a `periodLabel`
+   * on the departmental spend summaries, which never carried one, so it said
+   * "Not set" even once every department was funded. Departments are normally
+   * allocated against the same year, so distinct names are reported as a count
+   * rather than by arbitrarily picking one; with nothing covering today the
+   * newest configured period is shown so a closed or future year still reads.
+   */
+  const activeNames = [
+    ...new Set(budgetPeriods.filter((p) => periodCovers(p)).map((p) => p.periodName)),
+  ];
+  const latestName = [...budgetPeriods]
+    .sort((a, b) => Date.parse(b.startDate) - Date.parse(a.startDate))[0]?.periodName;
+  const periodLabel =
+    activeNames.length === 1
+      ? activeNames[0]
+      : activeNames.length > 1
+        ? `${activeNames.length} active`
+        : latestName;
+
+  const recentActivities: any[] = logsNewestFirst.slice(0, 5).map((l: any, idx: number) => ({
     id: l._id || `act-${idx}`,
     timestamp: l.timestamp ? new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A",
     action: l.action || "System Event",
@@ -129,7 +161,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               height: "48px",
               borderRadius: "50%",
               backgroundColor: "rgba(139, 92, 246, 0.15)",
-              color: "#a78bfa",
+              color: "rgb(var(--color-info))",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -225,7 +257,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(var(--color-card-border), 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -260,7 +292,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(var(--color-card-border), 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -295,7 +327,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                border: "1px solid rgba(var(--color-card-border), 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)",
                 transition: "all 0.2s ease"
               }}
             >
@@ -328,7 +360,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
           <div className="glass-panel" style={{ backgroundColor: "rgb(var(--color-surface))", borderRadius: "0.75rem", overflow: "hidden" }}>
             <table className="data-table" style={{ width: "100%" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", backgroundColor: "rgba(var(--color-background), 0.5)" }}>
+                <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", backgroundColor: "rgb(var(--color-background) / 0.5)" }}>
                   <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>TIMESTAMP</th>
                   <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>ACTION DESCRIPTION</th>
                   <th style={{ padding: "0.85rem 1.25rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>INITIATOR / CONTEXT</th>
@@ -336,7 +368,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
               </thead>
               <tbody>
                 {recentActivities.map((act) => (
-                  <tr key={act.id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.2)" }}>
+                  <tr key={act.id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.2)" }}>
                     <td style={{ padding: "1.1rem 1.25rem", fontSize: "0.85rem", color: "rgb(var(--color-text))", fontWeight: "600" }}>
                       {act.timestamp}
                     </td>
@@ -351,7 +383,7 @@ export const AdminSystemOverviewTab: React.FC<AdminSystemOverviewTabProps> = ({
                             width: "28px",
                             height: "28px",
                             borderRadius: "50%",
-                            backgroundColor: "rgba(var(--color-card-border), 0.3)",
+                            backgroundColor: "rgb(var(--color-card-border) / 0.3)",
                             color: "rgb(var(--color-text))",
                             fontSize: "0.7rem",
                             fontWeight: "700",

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
+import { isDepartmentScopedRole } from "../../../enums/roles";
+import { SubmitButton } from "../../ui/SubmitButton";
 
 interface AdminEditUserProfileModalProps {
   isOpen: boolean;
@@ -9,6 +11,8 @@ interface AdminEditUserProfileModalProps {
   onUpdateUser: (userData: any) => void;
   /** Ends every active session for this user. */
   onForceLogOut?: (userId: string, name: string) => void;
+  /** True while the profile change is being persisted. */
+  busy?: boolean;
 }
 
 export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps> = ({
@@ -17,7 +21,8 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
   user,
   departments,
   onUpdateUser,
-  onForceLogOut
+  onForceLogOut,
+  busy = false
 }) => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,12 +37,18 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
       // Empty when the account has no number on file. This prefilled a
       // sample number, so saving the form wrote it to the real record.
       setContactNumber(user.contactNumber || "");
-      setDepartmentId(user.departmentId?._id || user.departmentId || user.department?.id || departments[0]?._id || "");
+      // No fallback to the first department: a global-role account has none,
+      // and pre-filling one would reassign it on the next save.
+      setDepartmentId(user.departmentId?._id || user.departmentId || user.department?.id || "");
       setRole(user.role || "INITIATOR");
     }
   }, [user, departments]);
 
   if (!isOpen || !user) return null;
+
+  // Department applies to initiators and approvers only; global roles are
+  // enterprise-wide and have theirs cleared server-side on save.
+  const needsDepartment = isDepartmentScopedRole(role);
 
   const initials = fullName
     ? fullName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
@@ -50,7 +61,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
       fullName,
       email,
       contactNumber,
-      departmentId,
+      departmentId: needsDepartment ? departmentId : "",
       role
     });
     onClose();
@@ -60,7 +71,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgb(var(--color-overlay) / 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -73,7 +84,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
         maxWidth: "560px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
       }}>
@@ -125,7 +136,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 height: "24px",
                 borderRadius: "50%",
                 backgroundColor: "rgb(var(--color-background))",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
+                border: "1px solid rgb(var(--color-card-border))",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -147,8 +158,8 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -172,8 +183,8 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -192,8 +203,8 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -203,32 +214,40 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
             </div>
           </div>
 
-          {/* Department & Role */}
+          {/* Department & Role — department only applies to scoped roles */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
-                Department
+                {needsDepartment ? "Department" : "Scope"}
               </label>
-              <select
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "0.5rem",
-                  color: "rgb(var(--color-text))",
-                  fontSize: "0.9rem",
-                  outline: "none"
-                }}
-              >
-                {departments.map((d: any) => (
-                  <option key={d._id || d.id} value={d._id || d.id} style={{ background: "rgb(var(--color-card))" }}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+              {needsDepartment ? (
+                <select
+                  required
+                  value={departmentId}
+                  onChange={(e) => setDepartmentId(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem 0.85rem",
+                    backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                    border: "1px solid rgb(var(--color-card-border))",
+                    borderRadius: "0.5rem",
+                    color: "rgb(var(--color-text))",
+                    fontSize: "0.9rem",
+                    outline: "none"
+                  }}
+                >
+                  <option value="" style={{ background: "rgb(var(--color-card))" }}>Select a department</option>
+                  {departments.map((d: any) => (
+                    <option key={d._id || d.id} value={d._id || d.id} style={{ background: "rgb(var(--color-card))" }}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", paddingTop: "0.65rem" }}>
+                  Enterprise-wide
+                </p>
+              )}
             </div>
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
@@ -240,8 +259,8 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -301,7 +320,7 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
               style={{
                 padding: "0.65rem 1.25rem",
                 borderRadius: "0.5rem",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgb(var(--color-card-border))",
                 backgroundColor: "transparent",
                 color: "rgb(var(--color-text))",
                 fontWeight: "600",
@@ -311,22 +330,19 @@ export const AdminEditUserProfileModal: React.FC<AdminEditUserProfileModalProps>
             >
               Cancel
             </button>
-            <button
+            <SubmitButton
               type="submit"
+              loading={busy}
+              loadingLabel="Updating…"
               style={{
                 padding: "0.65rem 1.25rem",
-                borderRadius: "0.5rem",
-                border: "none",
-                backgroundColor: "#2563eb",
-                color: "#ffffff",
-                fontWeight: "600",
                 fontSize: "0.85rem",
-                cursor: "pointer",
+                fontWeight: 600,
                 boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
               }}
             >
               Update User
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

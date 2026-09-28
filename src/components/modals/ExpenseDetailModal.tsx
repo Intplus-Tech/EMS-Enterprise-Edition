@@ -3,53 +3,55 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { WorkflowActionType } from "../../enums/workflowActions";
+import { BANK_STAGE_STATUSES } from "../../enums/statuses";
 import { AttachmentTarget } from "./AttachmentViewModal";
 import { AttachmentList } from "../ui/AttachmentList";
 import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
-import { formatNaira } from "../ui/format";
+import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
+import { BudgetItemOptionDto, WorkflowHistoryDto } from "../../types/api";
+import { hasRuledOnRequest, isRestingOnRole } from "../../domains/expense/review-stage";
+import { PaymentRecordCard } from "../ui/PaymentRecordCard";
 
 interface ExpenseDetailModalProps {
   selectedExpense: any;
   currentUser: any;
   onClose: () => void;
+  budgetItems?: BudgetItemOptionDto[];
+  budgetItemsLoading?: boolean;
   actionComment: string;
   setActionComment: (comment: string) => void;
   adjustedAmount: number;
   setAdjustedAmount: (amount: number) => void;
-  paymentRef: string;
-  setPaymentRef: (ref: string) => void;
   /** Identity re-confirmation; the server rejects a decision without it. */
   decisionSignature: string;
   setDecisionSignature: (signature: string) => void;
   handleCancelRequest: (id: string) => Promise<void>;
   handleExceptionalBudgetAction: (id: string, action: WorkflowActionType) => Promise<void>;
-  handleWorkflowAction: (id: string, action: WorkflowActionType) => Promise<void>;
+  handleWorkflowAction: (id: string, action: WorkflowActionType, budgetItemId?: string) => Promise<void>;
   /** Opens the supporting document in the shared attachment viewer. */
   onViewAttachment: (attachment: AttachmentTarget) => void;
   onAddAttachments: (requestId: string, files: FileList | File[]) => void;
   onRemoveAttachment: (requestId: string, attachmentId: string) => void;
   attachmentsUploading?: boolean;
   handleFinanceUpload: (id: string) => Promise<void>;
-  handlePaymentRelease: (id: string) => Promise<void>;
 }
 
 export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   selectedExpense,
   currentUser,
   onClose,
+  budgetItems = [],
+  budgetItemsLoading = false,
   actionComment,
   setActionComment,
   adjustedAmount,
   setAdjustedAmount,
-  paymentRef,
-  setPaymentRef,
   decisionSignature,
   setDecisionSignature,
   handleCancelRequest,
   handleExceptionalBudgetAction,
   handleWorkflowAction,
   handleFinanceUpload,
-  handlePaymentRelease,
   onViewAttachment,
   onAddAttachments,
   onRemoveAttachment,
@@ -62,17 +64,77 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   const canEditDocuments =
     currentUser?.role === "INITIATOR" && ["DRAFT", "RETURNED"].includes(selectedExpense.status);
 
+  // Track selected budget item for departmental approver sign-off
+  const [budgetItem, setBudgetItem] = React.useState("");
+
+  // Reset the budget item selection whenever a new request is brought into focus
+  React.useEffect(() => {
+    setBudgetItem("");
+  }, [selectedExpense?._id]);
+
+  // Has this user already signed off on the request as it now stands? A
+  // decision taken before a return does not count: the initiator has amended
+  // the request since, so it is back for a fresh ruling. Shared with the
+  // approvals queue, which buckets the same request off the same answer.
+  const hasUserApproved = React.useMemo(
+    () => hasRuledOnRequest(selectedExpense, currentUser),
+    [selectedExpense, currentUser]
+  );
+
+  // Whose step the request is resting on. `currentStageRole` is resolved by the
+  // list route against the configured chain, so this no longer depends on the
+  // step *index* (wrong as soon as a step is skipped on its amount threshold)
+  // or on matching the step's display name, which an admin can rename.
+  const isStepForCurrentRole = React.useMemo(
+    () =>
+      isRestingOnRole(selectedExpense, currentUser?.role) &&
+      // The chain can come back round to a role that has already signed off —
+      // on a later step, or because a returned request re-entered at the top.
+      // Only a ruling on the *current* revision discharges the step.
+      !(currentUser?.role === "APPROVER" && hasUserApproved),
+    [selectedExpense, currentUser?.role, hasUserApproved]
+  );
+
   // Every decision button in this modal commits a financial transition, so all
   // of them are gated on the signature the server will verify.
   const signed = decisionSignature.trim().length > 0;
 
+  const requiresBudgetItem = currentUser?.role === "APPROVER";
+  const selectedItem = (budgetItems || []).find((item) => item.id === budgetItem);
+  const willOverrun = Boolean(selectedItem && !selectedItem.coversRequest);
+  const shortfall = selectedItem ? Math.max(0, (selectedExpense?.amount || 0) - selectedItem.available) : 0;
+  const canApprove = signed && (!requiresBudgetItem || Boolean(budgetItem));
+
+  /**
+   * The released payment and its receipt.
+   *
+   * Built once and rendered in both branches below. It used to live inside the
+   * initiator branch alone, so the approver who authorised the spend and the
+   * Finance Officer who audited the payload had no route to the evidence the
+   * payment was actually made — the only readers who could see it were the
+   * initiator and the Finance Manager who filed it.
+   */
+  const paymentRecord = (
+    <PaymentRecordCard
+      expense={selectedExpense}
+      onViewReceipt={(receipt) =>
+        onViewAttachment({ ...receipt, requestNumber: selectedExpense.requestNumber })
+      }
+    />
+  );
+
   return (
     <div style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", background: "rgba(0,0,0,0.6)", zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem 1rem", overflowY: "auto" }}>
-      <div className="glass-panel" style={{ width: "100%", maxWidth: "750px", maxHeight: "88vh", overflowY: "auto", padding: "2rem", margin: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* This dialog predates ModalShell and owns its own chrome, so it carries
+          `wrap-anywhere` itself: every value below is user-entered, and one
+          unbroken description used to widen the card past its own maxWidth. */}
+      <div className="glass-panel wrap-anywhere" style={{ width: "100%", maxWidth: "750px", maxHeight: "88vh", overflowY: "auto", padding: "2rem", margin: "auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h3 style={{ fontWeight: "bold", fontSize: "1.25rem" }}>Request Details: {selectedExpense.requestNumber}</h3>
-            <span className={`badge badge-${selectedExpense.status?.toLowerCase().replace(/_/g, '-')}`}>{selectedExpense.status}</span>
+            {/* Shared status→class map; a class built from the status string
+                (`badge-pending-approval`, …) matches nothing in globals.css. */}
+            <span className={`badge ${statusBadgeClass(selectedExpense.status)}`}>{humanizeStatus(selectedExpense.status)}</span>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer" }}>
             <Icons.X size={24} />
@@ -82,13 +144,13 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
         {currentUser?.role === "INITIATOR" ? (
           <>
             {/* Stepper tracking progress */}
-            <div className="glass-card" style={{ background: "rgba(15,23,42,0.2)", padding: "1.25rem", position: "relative", marginBottom: "0.5rem" }}>
+            <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.2)", padding: "1.25rem", position: "relative", marginBottom: "0.5rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 {[
-                  { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET"].includes(selectedExpense.status) },
-                  { name: "Approval", active: ["PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["PENDING_EXCEPTIONAL", "PENDING_APPROVAL"].includes(selectedExpense.status) },
-                  { name: "Finance", active: ["APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["APPROVED", "SENT_TO_FINANCE"].includes(selectedExpense.status) },
-                  { name: "Bank", active: ["UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["UPLOADED_TO_BANK"].includes(selectedExpense.status) },
+                  { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET"].includes(selectedExpense.status) },
+                  { name: "Approval", active: ["PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["PENDING_EXCEPTIONAL", "PENDING_APPROVAL"].includes(selectedExpense.status) },
+                  { name: "Finance", active: ["APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status), current: ["APPROVED", "SENT_TO_FINANCE"].includes(selectedExpense.status) },
+                  { name: "Bank", active: ["UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status), current: BANK_STAGE_STATUSES.includes(selectedExpense.status) },
                   { name: "Paid", active: ["PAID", "CLOSED"].includes(selectedExpense.status), current: ["PAID"].includes(selectedExpense.status) },
                   { name: "Closed", active: ["CLOSED"].includes(selectedExpense.status), current: ["CLOSED"].includes(selectedExpense.status) }
                 ].map((step, idx) => {
@@ -100,8 +162,8 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                         width: "2rem",
                         height: "2rem",
                         borderRadius: "50%",
-                        background: isActive ? "rgba(99, 102, 241, 0.2)" : isCompleted ? "rgba(16, 185, 129, 0.2)" : "rgba(var(--color-card-border), 0.15)",
-                        border: isActive ? "2px solid rgb(var(--color-primary))" : isCompleted ? "2px solid rgb(var(--color-secondary))" : "2px solid rgba(var(--color-card-border), 0.35)",
+                        background: isActive ? "rgba(99, 102, 241, 0.2)" : isCompleted ? "rgba(16, 185, 129, 0.2)" : "rgb(var(--color-card-border) / 0.15)",
+                        border: isActive ? "2px solid rgb(var(--color-primary))" : isCompleted ? "2px solid rgb(var(--color-secondary))" : "2px solid rgb(var(--color-card-border) / 0.35)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -116,9 +178,12 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+            {/* minmax(0, …) rather than a bare 1fr: a grid track's default floor
+                is its min-content width, which long free text pushes past the
+                card. Matches AuthorizeReleaseModal and CompletedReleaseModal. */}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "1.5rem" }}>
               {/* Left Column: Request Information */}
-              <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)" }}>
+              <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)" }}>
                 <h4 style={{ fontSize: "0.85rem", fontWeight: "bold", textTransform: "uppercase", color: "rgb(var(--color-text-dim))", marginBottom: "1rem" }}>Request Information</h4>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", fontSize: "0.9rem" }}>
                   <div>
@@ -141,7 +206,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
 
               {/* Right Column: Attachments */}
-              <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)", display: "flex", flexDirection: "column", gap: "1rem" }}>
                 {/* Real document set with a working upload. The count was
                     hardcoded to (1) and the size to "1.2 MB • Oct 14, 2023". */}
                 <AttachmentList
@@ -157,6 +222,10 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                 />
               </div>
             </div>
+
+            {/* Payment record — only once the money has actually moved, so the
+                person who raised the request is shown proof it was paid. */}
+            <div style={{ marginTop: "1.5rem" }}>{paymentRecord}</div>
 
             {/* Footer buttons */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1.5rem" }}>
@@ -178,19 +247,23 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
           </>
         ) : (
           <>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-              <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)" }}>
+            {/* Same floor as the initiator grid above — Purpose and the payee
+                fields are both free text. */}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: "1.5rem" }}>
+              <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)" }}>
                 <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Request Parameters</p>
                 <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <span>Department: <strong>{selectedExpense.departmentId?.name}</strong></span>
                   <span>Category: <strong>{selectedExpense.category}</strong></span>
-                  <span>Amount: <strong style={{ color: "rgb(var(--color-primary))" }}>${selectedExpense.amount?.toLocaleString()}</strong></span>
+                  {/* Naira via the shared helper — this read `$` while the
+                      queue tables behind it read `₦` for the same figure. */}
+                  <span>Amount: <strong style={{ color: "rgb(var(--color-primary))" }}>{formatNaira(selectedExpense.amount)}</strong></span>
                   <span>Required By: <strong>{selectedExpense.requiredPaymentDate ? new Date(selectedExpense.requiredPaymentDate).toLocaleDateString() : 'N/A'}</strong></span>
                   <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>Purpose: <em>"{selectedExpense.description}"</em></span>
                 </div>
               </div>
 
-              <div className="glass-card" style={{ background: "rgba(15,23,42,0.3)" }}>
+              <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.3)" }}>
                 <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Vendor Bank Target</p>
                 <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                   <span>Payee: <strong>{selectedExpense.vendorName}</strong></span>
@@ -203,15 +276,15 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             </div>
 
             {/* Stepper tracking */}
-            <div className="glass-card" style={{ background: "rgba(15,23,42,0.2)" }}>
+            <div className="glass-card" style={{ background: "rgb(var(--color-surface-secondary) / 0.2)" }}>
               <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))", marginBottom: "1rem" }}>Execution Route Progress</p>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
                 {[
-                  { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
-                  { name: "Budget Check", active: ["BUDGET_CHECK", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
-                  { name: "Approvals", active: ["PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) && selectedExpense.currentStepIndex > 0 },
-                  { name: "Finance Audit", active: ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
-                  { name: "Payment Release", active: ["UPLOADED_TO_BANK", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { name: "Initiation", active: ["DRAFT", "SUBMITTED", "BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { name: "Budget Check", active: ["BUDGET_CHECK", "INSUFFICIENT_BUDGET", "PENDING_EXCEPTIONAL", "PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { name: "Approvals", active: ["PENDING_APPROVAL", "APPROVED", "SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) && selectedExpense.currentStepIndex > 0 },
+                  { name: "Finance Audit", active: ["SENT_TO_FINANCE", "UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) },
+                  { name: "Payment Release", active: ["UPLOADED_TO_BANK", "AWAITING_RELEASE", "PAID", "CLOSED"].includes(selectedExpense.status) },
                   { name: "Closed", active: ["CLOSED"].includes(selectedExpense.status) }
                 ].map((step, idx) => (
                   <div key={idx} style={{ display: "flex", flexDirection: "column", alignItems: "center", zIndex: 2 }}>
@@ -220,7 +293,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                         width: "1.5rem",
                         height: "1.5rem",
                         borderRadius: "50%",
-                        background: step.active ? "rgb(var(--color-secondary))" : "rgba(var(--color-card-border), 0.15)",
+                        background: step.active ? "rgb(var(--color-secondary))" : "rgb(var(--color-card-border) / 0.15)",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -238,8 +311,24 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             </div>
 
             {/* Transition action controllers */}
-            {currentUser?.role === "FINANCE_HEAD" && selectedExpense.status === "PENDING_EXCEPTIONAL" && (
-              <div className="glass-card" style={{ border: "1px solid rgba(var(--color-accent), 0.3)" }}>
+            {selectedExpense.exceptionalBudgetApproved && (
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.4)", background: "rgb(var(--color-secondary) / 0.08)", padding: "1.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <Icons.CheckCircle2 size={22} style={{ color: "rgb(var(--color-secondary))", flexShrink: 0 }} />
+                  <div>
+                    <h4 style={{ margin: 0, fontWeight: "bold", color: "rgb(var(--color-secondary))", fontSize: "0.95rem" }}>
+                      One-Time Budget Expansion Authorized
+                    </h4>
+                    <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.82rem", color: "rgb(var(--color-text-muted))" }}>
+                      Finance Head authorized the budget overrun for this request. It has been forwarded to Finance for payment release.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {currentUser?.role === "FINANCE_HEAD" && selectedExpense.status === "PENDING_EXCEPTIONAL" && !selectedExpense.exceptionalBudgetApproved && (
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-accent) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-accent))", marginBottom: "0.5rem" }}>Finance Head Action Required: Budget Overrun detected</p>
                 <div className="form-group">
                   <label className="form-label">Adjust Approved Amount (Optional)</label>
@@ -284,9 +373,95 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             )}
 
-            {selectedExpense.status === "PENDING_APPROVAL" && (
-              <div className="glass-card" style={{ border: "1px solid rgba(var(--color-primary), 0.3)" }}>
+            {selectedExpense.status === "PENDING_APPROVAL" && (hasUserApproved || (currentUser?.role === "APPROVER" && selectedExpense.currentStepIndex > 0)) && (
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.4)", background: "rgb(var(--color-secondary) / 0.08)", padding: "1.25rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <Icons.CheckCircle2 size={22} style={{ color: "rgb(var(--color-secondary))", flexShrink: 0 }} />
+                  <div>
+                    <h4 style={{ margin: 0, fontWeight: "bold", color: "rgb(var(--color-secondary))", fontSize: "0.95rem" }}>
+                      Departmental Approval Signed Off
+                    </h4>
+                    <p style={{ margin: "0.2rem 0 0 0", fontSize: "0.82rem", color: "rgb(var(--color-text-muted))" }}>
+                      You have already approved this request. It is currently progressing through {selectedExpense.currentStageName || "Finance Review"}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedExpense.status === "PENDING_APPROVAL" && isStepForCurrentRole && (
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-primary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }}>Workflow Approval Step Required</p>
+
+                {/* Budget Item Selection — required for Departmental Approvers before signing off */}
+                {requiresBudgetItem && (
+                  <div className="form-group" style={{ marginBottom: "1rem" }}>
+                    <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                      Budget Item <span style={{ color: "rgb(var(--color-danger))" }}>*</span>
+                    </label>
+                    <select
+                      value={budgetItem}
+                      onChange={(e) => setBudgetItem(e.target.value)}
+                      className="form-select"
+                      disabled={budgetItemsLoading}
+                    >
+                      <option value="">
+                        {budgetItemsLoading ? "Loading budget items…" : "Select a Budget Item"}
+                      </option>
+                      {(budgetItems || []).map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name} — {formatNaira(item.available)} available
+                        </option>
+                      ))}
+                    </select>
+
+                    {!budgetItemsLoading && (!budgetItems || budgetItems.length === 0) && (
+                      <p style={{ fontSize: "0.78rem", color: "rgb(var(--color-danger))", marginTop: "0.4rem" }}>
+                        This department has no budget items for the requested payment date. An administrator must add them before this request can be approved.
+                      </p>
+                    )}
+
+                    {selectedItem && (
+                      <div
+                        style={{
+                          marginTop: "0.65rem",
+                          padding: "0.7rem 0.85rem",
+                          borderRadius: "0.5rem",
+                          border: `1px solid ${willOverrun ? "rgb(var(--color-danger) / 0.35)" : "rgb(var(--color-card-border))"}`,
+                          background: willOverrun
+                            ? "rgb(var(--color-danger) / 0.08)"
+                            : "rgb(var(--color-surface-secondary) / 0.45)",
+                          fontSize: "0.78rem",
+                          color: "rgb(var(--color-text-muted))",
+                          display: "flex",
+                          gap: "0.55rem",
+                        }}
+                      >
+                        {willOverrun ? (
+                          <Icons.AlertTriangle size={15} style={{ color: "rgb(var(--color-danger))", flexShrink: 0, marginTop: "1px" }} />
+                        ) : (
+                          <Icons.CheckCircle2 size={15} style={{ color: "rgb(var(--color-secondary))", flexShrink: 0, marginTop: "1px" }} />
+                        )}
+                        <span>
+                          {willOverrun ? (
+                            <>
+                              <strong style={{ color: "rgb(var(--color-danger))" }}>
+                                Overruns this item by {formatNaira(shortfall)}.
+                              </strong>{" "}
+                              Approving still sends the request forward, but it will need a one-time expansion from the Finance Head before payment.
+                            </>
+                          ) : (
+                            <>
+                              Leaves {formatNaira(selectedItem.available - selectedExpense.amount)} on{" "}
+                              <strong style={{ color: "rgb(var(--color-text))" }}>{selectedItem.name}</strong> after this request.
+                            </>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="form-group">
                   <label className="form-label">Approval comments / details</label>
                   <textarea
@@ -313,7 +488,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger" disabled={!signed}>
                     Reject
                   </button>
-                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.APPROVE)} className="btn btn-primary" disabled={!signed}>
+                  <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.APPROVE, budgetItem || undefined)} className="btn btn-primary" disabled={!canApprove}>
                     Approve Step
                   </button>
                 </div>
@@ -321,7 +496,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
             )}
 
             {currentUser?.role === "FINANCE_OFFICER" && selectedExpense.status === "SENT_TO_FINANCE" && (
-              <div className="glass-card" style={{ border: "1px solid rgba(var(--color-primary), 0.3)" }}>
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-primary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }}>Finance Officer Action: Payee Audit & Instruction Upload</p>
                 <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginBottom: "1rem" }}>
                   Please confirm that the payee invoice attachment matches the requested amount. Then click the button below to upload the payment file to the banking system.
@@ -334,42 +509,37 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
               </div>
             )}
 
-            {currentUser?.role === "FINANCE_MANAGER" && selectedExpense.status === "UPLOADED_TO_BANK" && (
-              <div className="glass-card" style={{ border: "1px solid rgba(var(--color-secondary), 0.3)" }}>
+            {/* Finance Manager — release is not offered here. This screen has no
+                receipt upload, so releasing from it recorded a placeholder
+                document against the payment. The Approvals screen's release
+                dialog captures the bank reference, the transfer evidence and
+                the signature together, which is what the audit trail needs. */}
+            {currentUser?.role === "FINANCE_MANAGER" && BANK_STAGE_STATUSES.includes(selectedExpense.status) && (
+              <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.3)" }}>
                 <p style={{ fontWeight: "bold", color: "rgb(var(--color-secondary))", marginBottom: "0.5rem" }}>Finance Manager Action: Authorize Cash Release</p>
-                <div className="form-group">
-                  <label className="form-label">Bank Transaction Reference (Mandatory for ledger closure)</label>
-                  <input
-                    type="text"
-                    required
-                    value={paymentRef}
-                    onChange={(e) => setPaymentRef(e.target.value)}
-                    placeholder="e.g. TXN-10928374-RELEASE"
-                    className="form-input"
-                  />
-                </div>
-
-                <div style={{ marginBottom: "1rem" }}>
-                  <ElectronicSignatureField
-                    value={decisionSignature}
-                    onChange={setDecisionSignature}
-                  />
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button onClick={() => handlePaymentRelease(selectedExpense._id)} className="btn btn-primary" style={{ background: "rgb(var(--color-secondary))" }} disabled={!signed}>
-                    Release Cash Payment
-                  </button>
-                </div>
+                <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", margin: 0 }}>
+                  Open this request from the <strong style={{ color: "rgb(var(--color-text))" }}>Approvals</strong> screen to release
+                  it. The release dialog there records the bank reference and the transfer receipt against the payment.
+                </p>
               </div>
             )}
 
-            {/* Workflow logs history list */}
+            {/* Payment record — the outcome of the route above, so every reviewer
+                on the request (approver, Finance Officer, Finance Head, admin)
+                reads the same settlement facts and opens the same receipt the
+                initiator does. Renders nothing until the request is paid. */}
+            {paymentRecord}
+
+            {/* Workflow logs history list — ordered newest-first so the latest
+                routing decision is the one the reader lands on, rather than
+                having to scroll past the whole chain to reach it. */}
             <div>
               <p style={{ fontSize: "0.85rem", fontWeight: "bold", marginBottom: "0.5rem", color: "rgb(var(--color-text-muted))" }}>Approval Workflow History</p>
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {selectedExpense.history?.map((hist: any, index: number) => (
-                  <div key={index} style={{ padding: "0.75rem", background: "rgba(255,255,255,0.03)", borderRadius: "4px", fontSize: "0.85rem" }}>
+                {[...(selectedExpense.history ?? [])]
+                  .sort((a: WorkflowHistoryDto, b: WorkflowHistoryDto) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map((hist: any, index: number) => (
+                  <div key={index} style={{ padding: "0.75rem", background: "rgb(var(--color-card-border) / 0.12)", borderRadius: "4px", fontSize: "0.85rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
                       <span><strong>{hist.actorName}</strong> ({hist.actorRole})</span>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>{new Date(hist.timestamp).toLocaleString()}</span>

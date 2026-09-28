@@ -18,6 +18,12 @@ const TYPE_STYLES: Record<string, { color: string; background: string; Icon: any
   APPROVED: { color: "#16A34A", background: "rgba(22, 163, 74, 0.12)", Icon: Icons.CheckCircle2, action: "View Details" },
   PAID: { color: "#0EA5E9", background: "rgba(14, 165, 233, 0.12)", Icon: Icons.Banknote, action: "View Receipt" },
   ACTION_REQUIRED: { color: "#2563EB", background: "rgba(37, 99, 235, 0.12)", Icon: Icons.ClipboardCheck, action: "Review Request" },
+  // Cancelled by someone else — in practice a department deletion, which is why
+  // the request has also vanished from the initiator's lists.
+  CANCELLED: { color: "#DC2626", background: "rgba(220, 38, 38, 0.12)", Icon: Icons.Ban, action: "View Details" },
+  // Progress the initiator can watch but not act on (over-budget review, bank
+  // upload). Neutral so it does not compete with the items needing attention.
+  IN_PROGRESS: { color: "#D97706", background: "rgba(217, 119, 6, 0.12)", Icon: Icons.Clock, action: "View Details" },
 };
 
 const FALLBACK_STYLE = { color: "#2563EB", background: "rgba(37, 99, 235, 0.12)", Icon: Icons.Info, action: "View Details" };
@@ -67,7 +73,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
           alignItems: "center",
           justifyContent: "space-between",
           padding: "1rem 1.15rem",
-          borderBottom: "1px solid rgba(var(--color-card-border), 0.6)",
+          borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)",
           position: "sticky",
           top: 0,
           background: "rgb(var(--color-surface))",
@@ -102,7 +108,7 @@ export const NotificationsPanel: React.FC<NotificationsPanelProps> = ({
                 display: "flex",
                 gap: "0.75rem",
                 padding: "1rem 1.15rem",
-                borderBottom: "1px solid rgba(var(--color-card-border), 0.4)",
+                borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)",
                 background: notification.read ? "transparent" : `${style.background.replace("0.12", "0.06")}`,
               }}
             >

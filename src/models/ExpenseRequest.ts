@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import { RequestStatus } from "../enums/statuses";
 import { SystemRole } from "../enums/roles";
+import { fileNameFromUrl, isStoredUrl } from "../domains/attachments/attachment.rules";
 
 const WorkflowHistorySchema = new Schema({
   statusBefore: { type: String, enum: Object.values(RequestStatus), required: true },
@@ -63,6 +64,42 @@ const ExpenseRequestSchema = new Schema(
     requiredPaymentDate: { type: Date, required: true },
     status: { type: String, enum: Object.values(RequestStatus), required: true, default: RequestStatus.DRAFT },
 
+    /**
+     * The budget item this request draws on, chosen by the approver.
+     *
+     * Points at a `lineItems` subdocument of the department's budget period.
+     * Everything downstream keys off it: the item's ledger is only moved for
+     * attached requests, and a Finance Head can only expand an item a request
+     * is actually attached to.
+     */
+    budgetItemId: { type: Schema.Types.ObjectId },
+    /** Denormalised for display, so tables need not resolve the period. */
+    budgetItemName: { type: String },
+
+    /**
+     * Shortfall the budget check found at submission, if any.
+     *
+     * The check runs early so the overrun is visible from the start, but the
+     * request still travels the normal approval chain — nobody is asked to fund
+     * an exception until the business approvals have passed. The Finance
+     * Officer's approval reads this to decide whether the request goes on to
+     * the Finance Head or straight to the Finance Manager.
+     */
+    budgetShortfall: { type: Number, default: 0 },
+
+    /**
+     * Held because no budget period covered the required payment date.
+     *
+     * Distinct from an ordinary overrun: there is no period to reserve against,
+     * so the request cannot travel the approval chain and no amount is locked.
+     * It parks here until an administrator creates a period covering the date,
+     * at which point `releaseRequestsAwaitingBudget` re-runs the check and
+     * routes it. Submission used to abort with an error in this case, leaving
+     * the request at INSUFFICIENT_BUDGET with no way back — `submitRequest`
+     * accepts only DRAFT and RETURNED, so the initiator could not retry.
+     */
+    awaitingBudgetPeriod: { type: Boolean, default: false },
+
     // Exceptional Approval parameters
     exceptionalBudgetApproved: { type: Boolean, default: false },
     exceptionalApprovedBy: { type: Schema.Types.ObjectId, ref: "User" },
@@ -76,7 +113,18 @@ const ExpenseRequestSchema = new Schema(
     originalAmount: { type: Number },
 
     // Payment release logs
+    /**
+     * @deprecated Superseded by `paymentReceiptDocument`.
+     *
+     * Held nothing but the receipt's Cloudinary URL, so every screen that
+     * showed it printed a URL where a filename belonged and had no size, type
+     * or uploader to report. Kept and auto-synced by the pre-save hook below so
+     * seeded and pre-existing records keep resolving; the `paymentReceiptFile`
+     * virtual reads through to it when the document is absent.
+     */
     paymentReceipt: { type: String },
+    /** The transfer evidence the Finance Manager uploaded, as a stored file. */
+    paymentReceiptDocument: { type: AttachmentSchema, required: false },
     paymentReference: { type: String },
     paymentDate: { type: Date },
 
@@ -121,11 +169,42 @@ ExpenseRequestSchema.virtual("attachments").get(function () {
   return [];
 });
 
-// Keep the deprecated single-document field pointing at the primary attachment.
+/**
+ * The payment receipt every reader renders — initiator, approver, finance
+ * officer, finance manager and finance head alike.
+ *
+ * Returns the stored document when present, and otherwise synthesises one from
+ * the legacy `paymentReceipt` URL so releases recorded before the document
+ * field existed still open. Deriving it here rather than at each screen is what
+ * lets one viewer serve them all, exactly as `attachments` does above.
+ */
+ExpenseRequestSchema.virtual("paymentReceiptFile").get(function () {
+  const stored = this.paymentReceiptDocument;
+  if (stored?.url) return stored;
+
+  const legacy = this.paymentReceipt;
+  if (!legacy) return null;
+
+  return {
+    _id: null,
+    name: fileNameFromUrl(legacy),
+    url: legacy,
+    uploadedAt: this.paymentDate ?? this.get("updatedAt"),
+    // A seeded or pre-upload record holds a bare filename, so there is no file
+    // to open; the viewer says so rather than offering a dead link.
+    isLegacy: !isStoredUrl(legacy),
+  };
+});
+
+// Keep the deprecated single-document fields pointing at their replacements.
 ExpenseRequestSchema.pre("save", function () {
   const documents = this.supportingDocuments ?? [];
   if (documents.length > 0) {
     this.supportingDocument = documents[0].name;
+  }
+
+  if (this.paymentReceiptDocument?.url) {
+    this.paymentReceipt = this.paymentReceiptDocument.url;
   }
 });
 

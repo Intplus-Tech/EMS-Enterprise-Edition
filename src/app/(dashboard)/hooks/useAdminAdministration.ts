@@ -11,6 +11,7 @@
 import { useCallback, useState } from "react";
 import { AdminClient, BudgetPeriodInput, DepartmentInput, UserProfileInput } from "../../../services/admin.client";
 import { toErrorMessage } from "../../../services/http";
+import { currentFiscalPeriod } from "../../../domains/budget/fiscalPeriod";
 import { SystemRole } from "../../../enums/roles";
 import { PermissionAction, PermissionResource } from "../../../enums/permissions";
 import {
@@ -91,11 +92,13 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
    * admin actions below stays a single expressive line.
    */
   const run = useCallback(
-    async (action: () => Promise<void>, successMessage: string) => {
+    // A thunk lets an action report what it actually did (how many requests were
+    // cancelled, say) instead of a message fixed before the call was made.
+    async (action: () => Promise<void>, successMessage: string | (() => string)) => {
       setAdminBusy(true);
       try {
         await action();
-        onSuccess(successMessage);
+        onSuccess(typeof successMessage === "function" ? successMessage() : successMessage);
         return true;
       } catch (error) {
         onError(toErrorMessage(error));
@@ -114,22 +117,24 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
   const createDepartment = useCallback(
     (input: DepartmentInput & { totalBudget?: number; lineItems?: { name: string; description?: string; amount: number }[] }) =>
       run(async () => {
-        const department = await AdminClient.createDepartment({
+        // A department is created *with* its budget in one call. Doing it as two
+        // meant a rejected allocation left the department standing with none —
+        // and a department with no budget period cannot accept a single request,
+        // because every submission fails the budget check outright. The server
+        // rolls the department back if the allocation is refused.
+        await AdminClient.createDepartment({
           name: input.name,
           description: input.description,
           headUserId: input.headUserId,
+          budget:
+            input.totalBudget && input.totalBudget > 0
+              ? {
+                  ...currentFiscalPeriod(),
+                  totalBudget: input.totalBudget,
+                  lineItems: input.lineItems ?? [],
+                }
+              : undefined,
         });
-
-        // The Create Department modal captures an opening allocation alongside
-        // the department itself, so persist it as the department's first period.
-        if (input.totalBudget && input.totalBudget > 0) {
-          await AdminClient.saveBudgetPeriod({
-            departmentId: department.id,
-            ...currentFiscalPeriod(),
-            totalBudget: input.totalBudget,
-            lineItems: input.lineItems ?? [],
-          });
-        }
 
         await Promise.all([loadDepartments(), loadBudgets()]);
       }, `Department "${input.name}" created.`),
@@ -144,8 +149,12 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
         totalBudget?: number;
         lineItems?: { name: string; description?: string; amount: number }[];
       }
-    ) =>
-      run(async () => {
+    ) => {
+      // Setting the allocation from here can release held requests just as the
+      // Set Budget modal does, so the same outcome is reported.
+      let summary = "Department updated.";
+
+      return run(async () => {
         await AdminClient.updateDepartment(id, {
           name: input.name,
           description: input.description,
@@ -154,25 +163,59 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
         });
 
         if (input.totalBudget !== undefined) {
-          await AdminClient.saveBudgetPeriod({
+          const { released } = await AdminClient.saveBudgetPeriod({
             departmentId: id,
             ...currentFiscalPeriod(),
             totalBudget: input.totalBudget,
             lineItems: input.lineItems ?? [],
           });
+
+          if (released > 0) {
+            summary += ` ${released} held request(s) released into the approval chain.`;
+          }
         }
 
         await Promise.all([loadDepartments(), loadBudgets()]);
-      }, "Department updated."),
+      }, () => summary);
+    },
     [run, loadDepartments, loadBudgets]
   );
 
+  /**
+   * Deletion cascades, so the toast reports what it actually reached rather than
+   * a bare "deleted" — the admin needs to see how many approvals were cancelled.
+   */
   const deleteDepartment = useCallback(
-    (id: string) =>
-      run(async () => {
-        await AdminClient.deleteDepartment(id);
-        await Promise.all([loadDepartments(), loadBudgets()]);
-      }, "Department deleted."),
+    (id: string) => {
+      let summary = "Department deleted.";
+      return run(
+        async () => {
+          const result = await AdminClient.deleteDepartment(id);
+          summary =
+            `'${result.name}' deleted. ${result.cancelledRequests} in-flight request(s) cancelled, ` +
+            `${result.revokedUsers} user assignment(s) revoked. Restore it to undo.`;
+          await Promise.all([loadDepartments(), loadBudgets()]);
+        },
+        () => summary
+      );
+    },
+    [run, loadDepartments, loadBudgets]
+  );
+
+  const restoreDepartment = useCallback(
+    (id: string) => {
+      let summary = "Department restored.";
+      return run(
+        async () => {
+          const result = await AdminClient.restoreDepartment(id);
+          summary =
+            `'${result.name}' restored. ${result.reinstatedRequests} request(s) reinstated, ` +
+            `${result.reassignedUsers} user assignment(s) returned.`;
+          await Promise.all([loadDepartments(), loadBudgets()]);
+        },
+        () => summary
+      );
+    },
     [run, loadDepartments, loadBudgets]
   );
 
@@ -180,13 +223,43 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
    * Users
    * --------------------------------------------------------------------- */
 
+  /**
+   * Invites a user and reports what actually happened to the email.
+   *
+   * Deliberately does not use `run`: creating the account and delivering the
+   * invitation are two outcomes, and `run` can only report one. A refused
+   * message used to surface as "Invitation sent to …" because the route's
+   * delivery result was discarded. Returns the result so the caller can offer
+   * a retry.
+   */
   const inviteUser = useCallback(
-    (input: { name: string; email: string; role: string; departmentId?: string }) =>
-      run(async () => {
-        await AdminClient.inviteUser(input);
+    async (input: { name: string; email: string; role: string; departmentId?: string }) => {
+      setAdminBusy(true);
+      try {
+        const result = await AdminClient.inviteUser(input);
         await loadUsers();
-      }, `Invitation sent to ${input.email}.`),
-    [run, loadUsers]
+
+        if (result.emailSimulated) {
+          onError(
+            `Account created for ${input.email}, but no email provider is configured — the invitation was only written to the server log. Share the activation link manually.`
+          );
+        } else if (!result.emailSent) {
+          onError(
+            `Account created for ${input.email}, but the invitation email was not delivered: ${result.emailError ?? "the provider gave no reason."}`
+          );
+        } else {
+          onSuccess(`Invitation sent to ${input.email}.`);
+        }
+
+        return result;
+      } catch (error) {
+        onError(toErrorMessage(error));
+        return null;
+      } finally {
+        setAdminBusy(false);
+      }
+    },
+    [onSuccess, onError, loadUsers]
   );
 
   const updateUser = useCallback(
@@ -215,13 +288,29 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     [run]
   );
 
+  /**
+   * Deletion cascades over the user's in-flight requests, so the toast names what
+   * it cancelled instead of a bare "deleted" — unlike a department, none of it
+   * can be restored, which is precisely why the admin has to be told.
+   */
   const deleteUser = useCallback(
-    (id: string) =>
-      run(async () => {
-        await AdminClient.deleteUser(id);
-        await loadUsers();
-      }, "User deleted."),
-    [run, loadUsers]
+    (id: string) => {
+      let summary = "User deleted.";
+      return run(
+        async () => {
+          const result = await AdminClient.deleteUser(id);
+          summary =
+            result.cancelledRequests > 0
+              ? `'${result.name}' deleted. ${result.cancelledRequests} in-flight request(s) cancelled and any reserved budget released.`
+              : `'${result.name}' deleted.`;
+          // Budgets are refetched too: cancelling the user's in-flight requests
+          // releases whatever they had reserved against their department.
+          await Promise.all([loadUsers(), loadBudgets()]);
+        },
+        () => summary
+      );
+    },
+    [run, loadUsers, loadBudgets]
   );
 
   /* --------------------------------------------------------------------- *
@@ -230,16 +319,30 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
 
   const saveBudgetPeriod = useCallback(
     (input: Omit<BudgetPeriodInput, "periodName" | "startDate" | "endDate"> &
-      Partial<Pick<BudgetPeriodInput, "periodName" | "startDate" | "endDate">>) =>
-      run(async () => {
-        const { budgets: summaries, periods } = await AdminClient.saveBudgetPeriod({
-          ...currentFiscalPeriod(),
-          ...input,
-        });
+      Partial<Pick<BudgetPeriodInput, "periodName" | "startDate" | "endDate">>) => {
+      // Reported back to the admin: funding a department can move requests that
+      // were waiting on it, and that is not something to leave them to discover.
+      let summary = "Departmental budget updated.";
+
+      return run(async () => {
+        const { budgets: summaries, periods, released, failed } =
+          await AdminClient.saveBudgetPeriod({
+            ...currentFiscalPeriod(),
+            ...input,
+          });
         setBudgets(summaries);
         setBudgetPeriods(periods);
+
+        if (released > 0) {
+          summary += ` ${released} held request(s) released into the approval chain.`;
+        }
+        if (failed?.length > 0) {
+          summary += ` ${failed.length} could not be released (${failed.join(", ")}) — see the audit log.`;
+        }
+
         await loadDepartments();
-      }, "Departmental budget updated."),
+      }, () => summary);
+    },
     [run, loadDepartments]
   );
 
@@ -274,6 +377,7 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     createDepartment,
     updateDepartment,
     deleteDepartment,
+    restoreDepartment,
     inviteUser,
     updateUser,
     setUserActive,
@@ -281,19 +385,5 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
     deleteUser,
     saveBudgetPeriod,
     saveRolePermissions,
-  };
-}
-
-/**
- * Default budget window when a screen does not ask for a specific one.
- * The admin modals set an annual allocation, so the period is the calendar
- * year — named `FY-<year>` to match the `periodName` shown in the designs.
- */
-function currentFiscalPeriod() {
-  const year = new Date().getFullYear();
-  return {
-    periodName: `FY-${year}`,
-    startDate: new Date(Date.UTC(year, 0, 1)).toISOString(),
-    endDate: new Date(Date.UTC(year, 11, 31, 23, 59, 59)).toISOString(),
   };
 }

@@ -24,7 +24,8 @@ export const POST = withErrorHandling(async (req: NextRequest, { params }: { par
     id,
     user as any,
     validated.action,
-    validated.comment
+    validated.comment,
+    validated.budgetItemId
   );
   return NextResponse.json({ success: true, request });
 });

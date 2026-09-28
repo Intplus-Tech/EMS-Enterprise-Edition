@@ -8,6 +8,7 @@ export default function HistoryPage() {
   const {
     currentUser,
     expenses,
+    setViewedAttachment,
     historyFilterCategory, setHistoryFilterCategory,
     historyFilterStatus, setHistoryFilterStatus,
     historySearchQuery, setHistorySearchQuery,
@@ -19,7 +20,7 @@ export default function HistoryPage() {
 
   // The Finance Manager's history is a payment ledger, not a request log.
   if (currentUser?.role === "FINANCE_MANAGER") {
-    return <PaymentHistoryTab expenses={expenses} />;
+    return <PaymentHistoryTab expenses={expenses} onViewAttachment={setViewedAttachment} />;
   }
 
   return (

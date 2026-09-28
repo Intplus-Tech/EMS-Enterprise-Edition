@@ -1,19 +1,26 @@
 import { connectToDatabase } from "../../config/db";
+import { HIDDEN_ACCOUNT_QUERY } from "../../config/systemAccounts";
 import { Department } from "../../models/Department";
 import { User } from "../../models/User";
-import { BudgetPeriod } from "../../models/BudgetPeriod";
 import { ExpenseRequest } from "../../models/ExpenseRequest";
 import { LoggerService, ILogActor } from "../logs/logger.service";
+import { BudgetService } from "../budget/budget.service";
+import { RequestNotifier } from "../notifications/request-notifier";
 import { AuditAction } from "../../enums/auditActions";
-import { RequestStatus } from "../../enums/statuses";
+import { IN_FLIGHT_STATUSES, RequestStatus } from "../../enums/statuses";
 import { DepartmentDto } from "../../types/api";
+import { IBudgetLineItem } from "../../types/domain";
 
-/** Statuses that mean a request is still moving and would be orphaned by a delete. */
-const IN_FLIGHT_STATUSES = [
-  RequestStatus.SUBMITTED,
-  RequestStatus.BUDGET_CHECK,
-  RequestStatus.INSUFFICIENT_BUDGET,
-  RequestStatus.PENDING_EXCEPTIONAL,
+/**
+ * Statuses whose amount is currently reserved in the period's `pendingBudget`.
+ *
+ * `lockBudget` runs at submission and at exceptional approval, and the
+ * reservation is only released by reject/return or converted by payment. A
+ * request cancelled from one of these must give the reservation back; one
+ * cancelled from any other in-flight status never held it, and unlocking would
+ * silently credit the department budget with money it never reserved.
+ */
+const BUDGET_LOCKED_STATUSES: string[] = [
   RequestStatus.PENDING_APPROVAL,
   RequestStatus.APPROVED,
   RequestStatus.SENT_TO_FINANCE,
@@ -21,9 +28,12 @@ const IN_FLIGHT_STATUSES = [
   RequestStatus.AWAITING_RELEASE,
 ];
 
+/** Shown on the cancelled request's history row and on the restore that undoes it. */
+const DELETION_ACTION = "Department Deleted";
+const RESTORE_ACTION = "Department Restored";
+
 /**
- * Department administration — create/read/update/delete plus the referential
- * safety checks that keep the Delete Department modal's promises honest.
+ * Department administration — create, read, update, delete and restore.
  * Consumed by `/api/admin/departments`.
  */
 export class DepartmentService {
@@ -34,7 +44,8 @@ export class DepartmentService {
 
     // One grouped count instead of a query per department.
     const userCounts = await User.aggregate([
-      { $match: { departmentId: { $ne: null } } },
+      // Concealed support accounts never contribute to a department's headcount.
+      { $match: { departmentId: { $ne: null }, ...HIDDEN_ACCOUNT_QUERY } },
       { $group: { _id: "$departmentId", count: { $sum: 1 } } },
     ]);
     const countByDept = new Map<string, number>(
@@ -50,14 +61,32 @@ export class DepartmentService {
       name: dept.name,
       description: dept.description || "",
       isActive: dept.isActive !== false,
+      // Distinguishes a department deliberately deactivated from one awaiting
+      // deletion — the table badges them differently and only the second offers
+      // Restore.
+      isPendingDeletion: Boolean(dept.pendingDeletion),
       headUserId: dept.headUserId ? String(dept.headUserId) : null,
       headName: dept.headUserId ? headById.get(String(dept.headUserId)) ?? null : null,
+      // Deletion clears the assignment, so a pending-deletion row correctly
+      // reports the users it no longer holds; Restore puts them back.
       usersCount: countByDept.get(String(dept._id)) ?? 0,
     }));
   }
 
   public static async create(
-    data: { name: string; description?: string; headUserId?: string | null },
+    data: {
+      name: string;
+      description?: string;
+      headUserId?: string | null;
+      /** Opening allocation, created alongside the department. */
+      budget?: {
+        periodName: string;
+        totalBudget: number;
+        lineItems?: IBudgetLineItem[];
+        startDate: string | Date;
+        endDate: string | Date;
+      };
+    },
     actor: ILogActor
   ) {
     await connectToDatabase();
@@ -84,6 +113,23 @@ export class DepartmentService {
       { departmentId: department._id },
       actor
     );
+
+    // A department is created *with* its budget: without a period covering the
+    // payment date, every request it raises fails the budget check outright, so
+    // funding it in the same step is what makes the department usable. If the
+    // allocation is rejected the department is rolled back rather than left
+    // standing in the unusable state the caller was trying to avoid.
+    if (data.budget) {
+      try {
+        await BudgetService.upsertBudgetPeriod(
+          { departmentId: department._id.toString(), ...data.budget },
+          actor
+        );
+      } catch (error) {
+        await Department.findByIdAndDelete(department._id);
+        throw error;
+      }
+    }
 
     return department;
   }
@@ -126,45 +172,212 @@ export class DepartmentService {
   }
 
   /**
-   * Deletes a department, refusing while anything still references it.
-   * Historical (closed/rejected) requests are left intact — the design states
-   * audit history is preserved — but in-flight work must be resolved first or
-   * it would become unroutable.
+   * Deletes a department, performing every effect the Delete Department modal
+   * warns about (`designs/system-admin/Admin_ Delete Department Modal.png`):
+   *
+   * 1. history is moved out of the active dashboard — `GET /api/expenses`
+   *    excludes requests belonging to a department pending deletion;
+   * 2. the cost centre stops accepting spend — `createRequest` refuses it;
+   * 3. in-flight approvals are cancelled, releasing any reserved budget;
+   * 4. department-scoped user access is revoked by clearing the assignment.
+   *
+   * A hard delete is deliberately not performed. It was previously attempted and
+   * refused while any user or in-flight request referenced the department, which
+   * is true of every department in a running system, so the action could only
+   * ever fail. The same design keeps the row in the table as pending deletion
+   * with a Restore beside it, so each cascaded change is recorded on the
+   * department and replayed in reverse by `restore` rather than being lost.
    */
-  public static async remove(id: string, actor: ILogActor) {
+  public static async beginDeletion(id: string, actor: ILogActor) {
     await connectToDatabase();
 
     const department = await Department.findById(id);
     if (!department) throw new Error("Department not found");
 
-    const [assignedUsers, inFlight] = await Promise.all([
-      User.countDocuments({ departmentId: id }),
-      ExpenseRequest.countDocuments({ departmentId: id, status: { $in: IN_FLIGHT_STATUSES } }),
-    ]);
-
-    if (assignedUsers > 0) {
-      throw new Error(
-        `Invalid request: ${assignedUsers} user(s) are still assigned to '${department.name}'. Reassign them first.`
-      );
-    }
-    if (inFlight > 0) {
-      throw new Error(
-        `Invalid request: ${inFlight} in-flight request(s) belong to '${department.name}'. Resolve them first.`
-      );
+    if (department.pendingDeletion) {
+      throw new Error(`Invalid request: '${department.name}' is already pending deletion.`);
     }
 
-    // Budget periods are department-owned and carry no independent history.
-    await BudgetPeriod.deleteMany({ departmentId: id });
-    await department.deleteOne();
+    // 1. Cancel in-flight approvals, remembering the state to rewind each to.
+    const inFlight = await ExpenseRequest.find({
+      departmentId: id,
+      status: { $in: IN_FLIGHT_STATUSES },
+    });
+
+    const cancelledRequests: {
+      requestId: string;
+      previousStatus: string;
+      previousStepIndex: number;
+      budgetWasLocked: boolean;
+    }[] = [];
+
+    for (const request of inFlight) {
+      const previousStatus = request.status;
+      const budgetWasLocked = BUDGET_LOCKED_STATUSES.includes(previousStatus);
+
+      if (budgetWasLocked) {
+        await BudgetService.unlockBudget(request._id.toString());
+      }
+
+      request.history.push({
+        statusBefore: previousStatus,
+        statusAfter: RequestStatus.CANCELLED,
+        actorId: actor.id,
+        actorName: actor.name,
+        actorRole: actor.role,
+        action: DELETION_ACTION,
+        comment: `Cancelled automatically because the '${department.name}' department was deleted.`,
+        timestamp: new Date(),
+      });
+      request.status = RequestStatus.CANCELLED;
+      await request.save();
+
+      cancelledRequests.push({
+        requestId: request._id.toString(),
+        previousStatus,
+        previousStepIndex: request.currentStepIndex ?? 0,
+        budgetWasLocked,
+      });
+
+      await LoggerService.logAudit(
+        AuditAction.EXPENSE_CANCELLED,
+        `Request ${request.requestNumber} cancelled: department '${department.name}' deleted`,
+        { requestId: request._id, previousStatus },
+        actor
+      );
+
+      // Tell the initiator their in-flight request was cancelled for them.
+      //
+      // Email is the only channel that can reach them here: requests belonging
+      // to a deleted department are excluded from `GET /api/expenses`, and the
+      // in-app bell is derived from that list — so the request, and any
+      // notification derived from it, disappear from their dashboard at the
+      // same moment. Silently losing a submitted request is not acceptable.
+      await RequestNotifier.notifyInitiator(request);
+    }
+
+    // 2. Revoke department-scoped access by clearing the assignment.
+    const revokedUserIds = await User.find({ departmentId: id }).distinct("_id");
+    if (revokedUserIds.length > 0) {
+      await User.updateMany({ departmentId: id }, { $unset: { departmentId: "" } });
+    }
+
+    department.isActive = false;
+    department.pendingDeletion = {
+      requestedAt: new Date(),
+      requestedById: actor.id,
+      requestedByName: actor.name,
+      revokedUserIds,
+      cancelledRequests,
+    };
+    await department.save();
 
     await LoggerService.logAudit(
       AuditAction.DEPARTMENT_DELETED,
-      `Department '${department.name}' deleted`,
-      { departmentId: id },
+      `Department '${department.name}' deleted — ${cancelledRequests.length} request(s) cancelled, ${revokedUserIds.length} user assignment(s) revoked`,
+      {
+        departmentId: id,
+        cancelledRequests: cancelledRequests.length,
+        revokedUsers: revokedUserIds.length,
+      },
       actor
     );
 
-    return { id, name: department.name };
+    return {
+      id,
+      name: department.name,
+      isActive: false,
+      isPendingDeletion: true,
+      cancelledRequests: cancelledRequests.length,
+      revokedUsers: revokedUserIds.length,
+    };
+  }
+
+  /**
+   * Reverses a deletion, replaying the recorded cascade backwards.
+   *
+   * Each step re-checks current state before touching it: a user reassigned to
+   * another department in the meantime keeps that assignment, and a request an
+   * operator has since moved on from is left alone. Restoring must not overwrite
+   * decisions taken after the deletion.
+   */
+  public static async restore(id: string, actor: ILogActor) {
+    await connectToDatabase();
+
+    const department = await Department.findById(id);
+    if (!department) throw new Error("Department not found");
+
+    const record = department.pendingDeletion;
+    let reassignedUsers = 0;
+    let reinstatedRequests = 0;
+
+    if (record) {
+      // 1. Re-assign only users who are still unassigned.
+      if (record.revokedUserIds?.length) {
+        const result = await User.updateMany(
+          { _id: { $in: record.revokedUserIds }, departmentId: { $in: [null, undefined] } },
+          { $set: { departmentId: department._id } }
+        );
+        reassignedUsers = result.modifiedCount ?? 0;
+      }
+
+      // 2. Rewind the requests this deletion cancelled.
+      for (const entry of record.cancelledRequests ?? []) {
+        const request = await ExpenseRequest.findById(entry.requestId);
+        if (!request || request.status !== RequestStatus.CANCELLED) continue;
+
+        request.history.push({
+          statusBefore: RequestStatus.CANCELLED,
+          statusAfter: entry.previousStatus,
+          actorId: actor.id,
+          actorName: actor.name,
+          actorRole: actor.role,
+          action: RESTORE_ACTION,
+          comment: `Reinstated because the '${department.name}' department was restored.`,
+          timestamp: new Date(),
+        });
+        request.status = entry.previousStatus;
+        request.currentStepIndex = entry.previousStepIndex ?? 0;
+        await request.save();
+        reinstatedRequests++;
+
+        if (entry.budgetWasLocked) {
+          // A period deleted since the cancellation must not block the restore —
+          // the request comes back either way and the gap is logged, matching how
+          // `unlockBudget` treats the same situation.
+          try {
+            await BudgetService.lockBudget(request._id.toString());
+          } catch {
+            await LoggerService.logApp(
+              AuditAction.BUDGET_PERIOD_MISSING,
+              `Could not re-reserve budget for reinstated request ${request.requestNumber}; no period covers its payment date.`
+            );
+          }
+        }
+      }
+    }
+
+    department.isActive = true;
+    // `set(..., undefined)` issues the $unset; a bare assignment can leave the
+    // subdocument in place and the row would stay flagged as pending deletion.
+    department.set("pendingDeletion", undefined);
+    await department.save();
+
+    await LoggerService.logAudit(
+      AuditAction.DEPARTMENT_RESTORED,
+      `Department '${department.name}' restored — ${reinstatedRequests} request(s) reinstated, ${reassignedUsers} user assignment(s) returned`,
+      { departmentId: id, reinstatedRequests, reassignedUsers },
+      actor
+    );
+
+    return {
+      id,
+      name: department.name,
+      isActive: true,
+      isPendingDeletion: false,
+      reinstatedRequests,
+      reassignedUsers,
+    };
   }
 }
 

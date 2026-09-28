@@ -6,9 +6,11 @@ import { PendingExceptionsOverviewTab } from "../../../components/PendingExcepti
 import { PendingExceptionsTab } from "../../../components/PendingExceptionsTab";
 import { useDashboard } from "../DashboardProvider";
 import { useBudgetContext } from "../hooks/useBudgetContext";
+import { useRequestThread } from "../hooks/useRequestThread";
 
 export default function PendingExceptionsPage() {
-  const { currentUser, expenses, expenseActions, setViewedAttachment, loadDashboardData } = useDashboard();
+  const { currentUser, expenses, expenseActions, setViewedAttachment, loadDashboardData, setAdminNotice } =
+    useDashboard();
 
   // The exception the Finance Head opened. This page used to hold only a
   // "list | details" flag and let the detail view re-derive its own target, so
@@ -24,6 +26,13 @@ export default function PendingExceptionsPage() {
 
   const { budgetContext } = useBudgetContext(request?._id ?? null);
 
+  // Backs the Request Justification dialog: the conversation so far, and the
+  // channel the Finance Head's question is actually posted through.
+  const { thread, threadLoading, threadSending, addComment } = useRequestThread(
+    request?._id ?? null,
+    (message) => setAdminNotice({ tone: "error", message })
+  );
+
   if (currentUser?.role !== "FINANCE_HEAD") return null;
 
   return request ? (
@@ -34,6 +43,11 @@ export default function PendingExceptionsPage() {
       budgetContext={budgetContext}
       onViewAttachment={setViewedAttachment}
       onBackToDashboard={() => setReviewingId(null)}
+      thread={thread}
+      threadLoading={threadLoading}
+      threadSending={threadSending}
+      // Visible to the approver being asked, so it is not an internal note.
+      onSendQuestion={(question: string) => addComment(question, false)}
     />
   ) : (
     <PendingExceptionsOverviewTab

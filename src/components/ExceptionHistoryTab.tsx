@@ -3,17 +3,26 @@ import * as Icons from "lucide-react";
 import { RequestJustificationModal } from "./RequestJustificationModal";
 import { formatNaira } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
+import { ThreadEntryDto } from "../types/api";
 
 interface ExceptionHistoryTabProps {
   currentUser?: any;
   expenses?: any[];
   setSelectedExpense?: (expense: any) => void;
+  /** Thread for whichever record the justification dialog is open on. */
+  thread?: ThreadEntryDto[];
+  threadLoading?: boolean;
+  /** Tells the page which request to load the thread for. */
+  onFocusThreadRequest?: (requestId: string | null) => void;
 }
 
 export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
   currentUser,
   expenses = [],
-  setSelectedExpense
+  setSelectedExpense,
+  thread = [],
+  threadLoading = false,
+  onFocusThreadRequest
 }) => {
   // Defaults to "All Periods" — the previous default was a literal "FY 2026"
   // which showed nothing at all in any other fiscal year.
@@ -62,9 +71,15 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
         financeHead: e.exceptionalApprovedBy?.name || decision?.actorName || "—",
         period: `FY ${decidedOn.getFullYear()}`,
         status: e.status === "PENDING_EXCEPTIONAL" ? "Pending" : "Approved",
+        // Kept for ordering: `date` is a display string, so the raw decision
+        // instant is what the sort below has to read.
+        decidedAtMs: decidedOn.getTime(),
         rawExpense: e
       };
-    });
+    })
+    // Most recent expansion at the top — rows are keyed on the decision date,
+    // not the request's creation order, so the incoming list's order is wrong here.
+    .sort((a, b) => b.decidedAtMs - a.decidedAtMs);
 
   // Filtering logic
   const filteredRecords = allRecords.filter(rec => {
@@ -130,7 +145,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
         className="glass-card"
         style={{
           background: "rgb(var(--color-card))",
-          border: "1px solid rgba(var(--color-card-border), 0.5)",
+          border: "1px solid rgb(var(--color-card-border) / 0.5)",
           borderRadius: "12px",
           padding: "1.25rem 1.5rem",
           display: "flex",
@@ -157,8 +172,8 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                 padding: "0.55rem 0.85rem",
                 fontSize: "0.85rem",
                 borderRadius: "8px",
-                background: "rgba(var(--color-surface-secondary), 0.5)",
-                border: "1px solid rgba(var(--color-card-border), 0.6)",
+                background: "rgb(var(--color-surface-secondary) / 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.6)",
                 fontWeight: "500"
               }}
             >
@@ -183,8 +198,8 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                 padding: "0.55rem 0.85rem",
                 fontSize: "0.85rem",
                 borderRadius: "8px",
-                background: "rgba(var(--color-surface-secondary), 0.5)",
-                border: "1px solid rgba(var(--color-card-border), 0.6)",
+                background: "rgb(var(--color-surface-secondary) / 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.6)",
                 fontWeight: "500"
               }}
             >
@@ -210,8 +225,8 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                   padding: "0.55rem 0.85rem 0.55rem 2.25rem",
                   fontSize: "0.85rem",
                   borderRadius: "8px",
-                  background: "rgba(var(--color-surface-secondary), 0.5)",
-                  border: "1px solid rgba(var(--color-card-border), 0.6)",
+                  background: "rgb(var(--color-surface-secondary) / 0.5)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)",
                   fontWeight: "600",
                   color: statusFilter === "Approved" ? "#2563EB" : "rgb(var(--color-text))"
                 }}
@@ -261,8 +276,8 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                   paddingTop: "0.55rem",
                   paddingBottom: "0.55rem",
                   borderRadius: "8px",
-                  background: "rgba(var(--color-surface-secondary), 0.5)",
-                  border: "1px solid rgba(var(--color-card-border), 0.6)"
+                  background: "rgb(var(--color-surface-secondary) / 0.5)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)"
                 }}
               />
             </div>
@@ -282,8 +297,8 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
               fontSize: "0.85rem",
               fontWeight: "600",
               borderRadius: "8px",
-              border: "1px solid rgba(var(--color-card-border), 0.8)",
-              background: "rgba(var(--color-surface), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.8)",
+              background: "rgb(var(--color-surface) / 0.6)",
               color: "rgb(var(--color-text))",
               cursor: "pointer",
               transition: "all 0.2s ease"
@@ -300,7 +315,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
         style={{
           borderRadius: "12px",
           overflow: "hidden",
-          border: "1px solid rgba(var(--color-card-border), 0.5)",
+          border: "1px solid rgb(var(--color-card-border) / 0.5)",
           background: "rgb(var(--color-card))",
           boxShadow: "var(--shadow-sm)"
         }}
@@ -308,7 +323,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
         <div className="table-container" style={{ overflowX: "auto" }}>
           <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
             <thead>
-              <tr style={{ background: "rgba(var(--color-surface-secondary), 0.5)", borderBottom: "1px solid rgba(var(--color-card-border), 0.6)" }}>
+              <tr style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)" }}>
                 <th style={{ padding: "0.9rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DATE</th>
                 <th style={{ padding: "0.9rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQ ID</th>
                 <th style={{ padding: "0.9rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEPT</th>
@@ -326,7 +341,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                     <tr
                       key={rec.id}
                       style={{
-                        borderBottom: "1px solid rgba(var(--color-card-border), 0.3)",
+                        borderBottom: "1px solid rgb(var(--color-card-border) / 0.3)",
                         transition: "background 0.15s ease"
                       }}
                     >
@@ -337,6 +352,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                         <button
                           onClick={() => {
                             setJustificationTarget(rec);
+                            onFocusThreadRequest?.(String(rec.rawExpense?._id ?? ""));
                             setShowJustificationModal(true);
                             if (setSelectedExpense) setSelectedExpense(rec.rawExpense);
                           }}
@@ -420,7 +436,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
               width: "44px",
               height: "44px",
               borderRadius: "10px",
-              background: "rgba(255, 255, 255, 0.2)",
+              background: "rgb(var(--color-card-border) / 0.80)",
               backdropFilter: "blur(8px)",
               display: "flex",
               alignItems: "center",
@@ -439,7 +455,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
                 fontWeight: "700",
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                color: "rgba(255, 255, 255, 0.9)",
+                color: "rgb(var(--color-card-border) / 1.00)",
                 display: "block",
                 marginBottom: "0.35rem"
               }}
@@ -450,7 +466,7 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
               <span style={{ fontSize: "2.35rem", fontWeight: "800", letterSpacing: "-0.03em", lineHeight: 1 }}>
                 {formatNaira(totalExpansionSum)}
               </span>
-              <span style={{ fontSize: "0.875rem", color: "rgba(255, 255, 255, 0.85)", fontWeight: "500" }}>
+              <span style={{ fontSize: "0.875rem", color: "rgb(var(--color-card-border) / 1.00)", fontWeight: "500" }}>
                 ({approvedCount} approved request{approvedCount !== 1 ? "s" : ""})
               </span>
             </div>
@@ -520,11 +536,18 @@ export const ExceptionHistoryTab: React.FC<ExceptionHistoryTabProps> = ({
       </div>
 
       {/* Request Justification Modal */}
+      {/* History is a record, not a conversation: the question box is hidden and
+          the timeline is the request's real thread. Both the number and the
+          title used to fall back to "#0044 / Cooling Unit Replacement" — the
+          design's sample request — whenever a row lacked them. */}
       <RequestJustificationModal
         isOpen={showJustificationModal}
-        onClose={() => setShowJustificationModal(false)}
-        requestNumber={justificationTarget?.reqId || "#0044"}
-        requestTitle={justificationTarget?.requestTitle || "Cooling Unit Replacement"}
+        onClose={() => { setShowJustificationModal(false); onFocusThreadRequest?.(null); }}
+        requestNumber={justificationTarget?.reqId}
+        requestTitle={justificationTarget?.requestTitle}
+        entries={thread}
+        loading={threadLoading}
+        readOnly
       />
     </div>
   );

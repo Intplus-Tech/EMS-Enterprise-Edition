@@ -4,8 +4,11 @@ import { ExpenseRequest } from "../../../../models/ExpenseRequest";
 import { authenticate } from "../../../../middlewares/auth";
 import { withErrorHandling } from "../../../../middlewares/errors";
 import { SystemRole } from "../../../../enums/roles";
-import { RequestStatus } from "../../../../enums/statuses";
+import { POST_APPROVAL_STATUSES, RequestStatus } from "../../../../enums/statuses";
 import { ExpenseInitiateSchema } from "../../../../validators/validation";
+import { scopeForFinanceManager } from "../../../../domains/expense/finance-manager.view";
+import { isVisibleToFinanceOfficer } from "../../../../domains/expense/visibility";
+import { WorkflowService } from "../../../../domains/workflow/workflow.service";
 import { LoggerService } from "../../../../domains/logs/logger.service";
 import { AuditAction } from "../../../../enums/auditActions";
 
@@ -29,6 +32,30 @@ export const GET = withErrorHandling(async (req: NextRequest, { params }: { para
   }
   if (user.role === SystemRole.APPROVER && expense.departmentId._id.toString() !== user.departmentId) {
     throw new Error("Forbidden: You do not have permission to view this request.");
+  }
+  // The Finance Manager picks the pipeline up after approval. Without this the
+  // list filter could be stepped around by requesting an id directly.
+  if (
+    user.role === SystemRole.FINANCE_MANAGER &&
+    !POST_APPROVAL_STATUSES.includes(expense.status)
+  ) {
+    throw new Error("Forbidden: You do not have permission to view this request.");
+  }
+  // The officer additionally owns their own approval step, which rests at
+  // PENDING_APPROVAL — but only while the request is on *their* step, never
+  // while it is still with the departmental approver. Mirrors the list route's
+  // scope so fetching by id is not a way around it.
+  if (user.role === SystemRole.FINANCE_OFFICER) {
+    const active = await WorkflowService.getNextStepForRequest(expense);
+    if (!isVisibleToFinanceOfficer(expense.status, active?.step.role)) {
+      throw new Error("Forbidden: You do not have permission to view this request.");
+    }
+  }
+
+  // Same permitted field set as the list route — fetching by id must not be a
+  // way around the Finance Manager's restricted view.
+  if (user.role === SystemRole.FINANCE_MANAGER) {
+    return NextResponse.json({ success: true, expense: scopeForFinanceManager(expense) });
   }
 
   return NextResponse.json({ success: true, expense });

@@ -19,7 +19,9 @@ const LABELS: Record<RequestStatus, string> = {
   [RequestStatus.UPLOADED_TO_BANK]: "Uploaded to the bank platform",
   [RequestStatus.AWAITING_RELEASE]: "Awaiting payment release",
   [RequestStatus.PAID]: "Paid",
-  [RequestStatus.CLOSED]: "Closed",
+  // Reads as an outcome rather than a filing state: this label is what both the
+  // initiator and every reviewer who handled the request see in their email.
+  [RequestStatus.CLOSED]: "Completed — payment released and ledger closed",
   [RequestStatus.REJECTED]: "Rejected",
   [RequestStatus.RETURNED]: "Returned to you for clarification",
   [RequestStatus.CANCELLED]: "Withdrawn",
@@ -27,4 +29,22 @@ const LABELS: Record<RequestStatus, string> = {
 
 export function humanizeRequestStatus(status: RequestStatus | string): string {
   return LABELS[status as RequestStatus] ?? String(status).replace(/_/g, " ");
+}
+
+/**
+ * What to tell the initiator their request is doing.
+ *
+ * A request held for a missing budget period carries INSUFFICIENT_BUDGET, but
+ * telling its owner it was "flagged as over budget" would be false — nothing
+ * has been ruled over budget, the department simply has no allocation yet, and
+ * there is nothing for the initiator to fix.
+ */
+export function requestStateLabel(request: {
+  status: RequestStatus | string;
+  awaitingBudgetPeriod?: boolean;
+}): string {
+  if (request.awaitingBudgetPeriod) {
+    return "Held until an administrator sets the department's budget";
+  }
+  return humanizeRequestStatus(request.status);
 }

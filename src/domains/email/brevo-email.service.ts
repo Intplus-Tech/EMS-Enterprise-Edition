@@ -1,6 +1,14 @@
-import { IEmailService } from "./email-service.interface";
-import { getInviteEmailHtml, getResetCodeEmailHtml, compileTemplate } from "./templates";
+import { EmailDispatchResult, IEmailService } from "./email-service.interface";
+import {
+  getInviteEmailHtml,
+  getInviteEmailText,
+  getResetCodeEmailHtml,
+  getResetCodeEmailText,
+  getExpenseNotificationText,
+  compileTemplate,
+} from "./templates";
 import { ENV } from "../../config/env";
+import { BRANDING } from "../../config/branding";
 
 export class BrevoEmailService implements IEmailService {
   private apiKey: string;
@@ -10,15 +18,34 @@ export class BrevoEmailService implements IEmailService {
   constructor(apiKey: string) {
     this.apiKey = apiKey;
     this.senderEmail = ENV.BREVO_SENDER_EMAIL;
-    this.senderName = ENV.BREVO_SENDER_NAME;
+    // Deployments may override the "from" name; otherwise it is the product name.
+    this.senderName = ENV.BREVO_SENDER_NAME || BRANDING.appName;
+  }
+
+  /**
+   * Pulls the human-readable reason out of a Brevo error body.
+   *
+   * Brevo replies with `{ code, message }`; the raw JSON is noise to an admin,
+   * and the `message` is the part that names the fix ("Validate your sender or
+   * authenticate your domain").
+   */
+  private static describeFailure(status: number, body: string): string {
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed?.message) return String(parsed.message);
+    } catch {
+      // Non-JSON body (gateway HTML, empty response) — fall through.
+    }
+    return body?.trim() ? `Email provider returned ${status}: ${body.slice(0, 300)}` : `Email provider returned ${status}.`;
   }
 
   private async sendSmtpEmail(
     toEmail: string,
     toName: string,
     subject: string,
-    htmlContent: string
-  ): Promise<boolean> {
+    htmlContent: string,
+    textContent?: string
+  ): Promise<EmailDispatchResult> {
     try {
       const response = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
@@ -38,22 +65,32 @@ export class BrevoEmailService implements IEmailService {
               name: toName,
             },
           ],
+          replyTo: {
+            email: this.senderEmail,
+            name: this.senderName,
+          },
           subject,
           htmlContent,
+          ...(textContent ? { textContent } : {}),
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`[BrevoEmailService] Error sending email (${response.status}):`, errorText);
-        return false;
+        return { sent: false, error: BrevoEmailService.describeFailure(response.status, errorText) };
       }
 
       console.log(`[BrevoEmailService] Email sent successfully to ${toEmail}`);
-      return true;
+      return { sent: true };
     } catch (error) {
       console.error("[BrevoEmailService] Exception during Brevo API fetch:", error);
-      return false;
+      // Network-level failure: the provider was never reached, so there is no
+      // provider message to quote.
+      return {
+        sent: false,
+        error: `Could not reach the email provider: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 
@@ -63,10 +100,11 @@ export class BrevoEmailService implements IEmailService {
     roleName: string,
     inviteUrl: string,
     origin?: string
-  ): Promise<boolean> {
+  ): Promise<EmailDispatchResult> {
     const htmlContent = getInviteEmailHtml(inviteUrl, roleName, recipientName, origin);
-    const subject = `Invitation to join SpendFlow EMS as ${roleName}`;
-    return this.sendSmtpEmail(to, recipientName, subject, htmlContent);
+    const textContent = getInviteEmailText(inviteUrl, roleName, recipientName);
+    const subject = `Invitation to join ${BRANDING.appName} as ${roleName}`;
+    return this.sendSmtpEmail(to, recipientName, subject, htmlContent, textContent);
   }
 
   public async sendPasswordResetEmail(
@@ -74,10 +112,11 @@ export class BrevoEmailService implements IEmailService {
     recipientName: string,
     code: string,
     origin?: string
-  ): Promise<boolean> {
+  ): Promise<EmailDispatchResult> {
     const htmlContent = getResetCodeEmailHtml(code, recipientName, origin);
-    const subject = "Your Password Reset Code - SpendFlow EMS";
-    return this.sendSmtpEmail(to, recipientName, subject, htmlContent);
+    const textContent = getResetCodeEmailText(code, recipientName);
+    const subject = `Your Password Reset Code - ${BRANDING.appName}`;
+    return this.sendSmtpEmail(to, recipientName, subject, htmlContent, textContent);
   }
 
   public async sendExpenseNotification(
@@ -87,7 +126,7 @@ export class BrevoEmailService implements IEmailService {
     status: string,
     actionUrl?: string,
     origin?: string
-  ): Promise<boolean> {
+  ): Promise<EmailDispatchResult> {
     const bodyText = `
       <h2 style="font-family: sans-serif; font-size: 20px; color: #0F172A;">Expense Request Update</h2>
       <p style="font-family: sans-serif; font-size: 15px; color: #475569;">Hello ${recipientName},</p>
@@ -105,7 +144,8 @@ export class BrevoEmailService implements IEmailService {
       title: `Expense #${requestNumber} Update`,
       origin,
     });
+    const textContent = getExpenseNotificationText(requestNumber, status, recipientName, actionUrl);
     const subject = `Expense Request #${requestNumber} Status: ${status}`;
-    return this.sendSmtpEmail(to, recipientName, subject, htmlContent);
+    return this.sendSmtpEmail(to, recipientName, subject, htmlContent, textContent);
   }
 }

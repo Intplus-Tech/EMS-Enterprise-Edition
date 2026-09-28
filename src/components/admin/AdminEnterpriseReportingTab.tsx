@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from "react";
 import * as Icons from "lucide-react";
 import { EmptyState } from "../ui/EmptyState";
-import { formatNaira, formatNairaCompact } from "../ui/format";
+import { CURRENCY_SYMBOL, formatNaira, formatNairaCompact } from "../ui/format";
 import { DepartmentDto, DepartmentSpendDto, PopulatedExpenseDto } from "../../types/api";
 import { datedFilename, downloadCsv } from "../ui/exportCsv";
+import { BANK_STAGE_STATUSES } from "../../enums/statuses";
 
 /** Period presets, expressed as a day window. 0 means "no cut-off". */
 const PERIOD_OPTIONS: { label: string; days: number }[] = [
@@ -73,7 +74,9 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
   const approvedCount = countOf(e => e.status === "APPROVED");
   const rejectedCount = countOf(e => e.status === "REJECTED");
   const paidCount = countOf(e => SPENT_STATUSES.includes(e.status));
-  const uploadedCount = countOf(e => e.status === "UPLOADED_TO_BANK");
+  // The whole bank leg, not just the upload instant — a request moves straight
+  // on to AWAITING_RELEASE, so keying on UPLOADED_TO_BANK alone reported zero.
+  const uploadedCount = countOf(e => BANK_STAGE_STATUSES.includes(e.status));
 
   // Utilisation reads the server-computed budget summaries rather than assuming
   // a ₦250,000 allocation for any department without one — an unbudgeted
@@ -95,7 +98,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
    */
   const statusSegments = [
     { label: "Approved", count: approvedCount, color: "#2563EB" },
-    { label: "Paid", count: paidCount, color: "#93C5FD" },
+    { label: "Paid", count: paidCount, color: "rgb(var(--color-primary))" },
     { label: "Pending", count: pendingCount, color: "#64748B" },
     { label: "Rejected", count: rejectedCount, color: "#EF4444" },
   ];
@@ -103,7 +106,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
 
   // Conic gradient stops, so the ring is proportional to the real counts.
   const donutGradient = (() => {
-    if (statusTotal === 0) return "rgba(var(--color-card-border), 0.5)";
+    if (statusTotal === 0) return "rgb(var(--color-card-border) / 0.5)";
     let cursor = 0;
     const stops = statusSegments.map(seg => {
       const start = (cursor / statusTotal) * 360;
@@ -258,7 +261,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
             borderRadius: "0.375rem",
             border: "1px solid #2563eb",
             backgroundColor: "transparent",
-            color: "#60a5fa",
+            color: "rgb(var(--color-primary))",
             fontWeight: "600",
             fontSize: "0.85rem",
             display: "flex",
@@ -319,7 +322,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
 
         {/* UPLOADED */}
         <div className="glass-panel" style={{ padding: "1.25rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem", display: "flex", alignItems: "center", gap: "0.85rem" }}>
-          <div style={{ width: "38px", height: "38px", borderRadius: "50%", backgroundColor: "rgba(139, 92, 246, 0.15)", color: "#a78bfa", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: "38px", height: "38px", borderRadius: "50%", backgroundColor: "rgba(139, 92, 246, 0.15)", color: "rgb(var(--color-info))", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Icons.Upload size={18} />
           </div>
           <div>
@@ -349,7 +352,7 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
                       : `${formatNaira(d.spent)} \u2022 no budget set`}
                   </span>
                 </div>
-                <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "3px" }}>
+                <div style={{ width: "100%", height: "6px", backgroundColor: "rgb(var(--color-card-border) / 0.5)", borderRadius: "3px" }}>
                   <div style={{ width: `${d.pct}%`, height: "100%", backgroundColor: d.pct > 90 ? "#ef4444" : "#2563eb", borderRadius: "3px" }} />
                 </div>
               </div>
@@ -421,14 +424,14 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)", textTransform: "uppercase" }}>
+                <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)", textTransform: "uppercase" }}>
                   <th style={{ textAlign: "left", paddingBottom: "0.5rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>DEPT</th>
-                  <th style={{ textAlign: "right", paddingBottom: "0.5rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>REMAINING (₦)</th>
+                  <th style={{ textAlign: "right", paddingBottom: "0.5rem", fontSize: "0.7rem", color: "rgb(var(--color-text-muted))" }}>REMAINING ({CURRENCY_SYMBOL})</th>
                 </tr>
               </thead>
               <tbody>
                 {budgetBalance.map((d) => (
-                  <tr key={d.id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.3)" }}>
+                  <tr key={d.id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.3)" }}>
                     <td style={{ padding: "0.75rem 0", color: "rgb(var(--color-text))", fontWeight: "600" }}>{d.name}</td>
                     <td style={{ textAlign: "right", fontWeight: "700", color: d.remaining <= 0 ? "#EF4444" : "rgb(var(--color-text))" }}>
                       {formatNaira(d.remaining)}
@@ -528,8 +531,8 @@ export const AdminEnterpriseReportingTab: React.FC<AdminEnterpriseReportingTabPr
               <div
                 key={requester.name}
                 style={{
-                  backgroundColor: "rgba(var(--color-surface-secondary), 0.5)",
-                  border: "1px solid rgba(var(--color-card-border), 0.5)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.5)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.5)",
                   borderRadius: "0.5rem",
                   padding: "1rem",
                   display: "flex",

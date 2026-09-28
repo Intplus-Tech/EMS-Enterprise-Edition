@@ -1,10 +1,25 @@
+/**
+ * Confirms deleting a department, with the design's warning copy.
+ *
+ * Every consequence listed here is carried out by `DepartmentService.beginDeletion`.
+ * The department then sits in Pending Deletion, where the table's Restore action
+ * replays the cascade in reverse. Rendered by DashboardShell.
+ */
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
+
+/** Minimal shape needed to identify and describe the department. */
+interface DeleteTargetDepartment {
+  id?: string;
+  _id?: string;
+  name?: string;
+  usersCount?: number;
+}
 
 interface AdminDeleteDepartmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  department: any;
+  department: DeleteTargetDepartment | null;
   onConfirmDelete: (deptId: string) => void;
 }
 
@@ -19,9 +34,10 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
   if (!isOpen || !department) return null;
 
   const deptName = department.name || "Selected Department";
+  const assignedUsers = department.usersCount ?? 0;
 
   const handleDelete = () => {
-    onConfirmDelete(department._id || department.id);
+    onConfirmDelete((department._id || department.id) as string);
     onClose();
   };
 
@@ -29,7 +45,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgb(var(--color-overlay) / 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -42,7 +58,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
         maxWidth: "520px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
       }}>
@@ -63,7 +79,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
           </div>
           <div style={{ flexGrow: 1 }}>
             <h3 style={{ fontSize: "1.15rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
-              Delete '{deptName}'?
+              Delete &apos;{deptName}&apos;?
             </h3>
             <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.2rem" }}>
               This action is permanent and cannot be reversed.
@@ -86,18 +102,30 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
             <Icons.AlertOctagon size={16} />
             Severe System Warning
           </div>
+          {/* Design copy, verbatim. Every line is now an effect the server
+              actually performs — see `DepartmentService.beginDeletion`. The
+              user count is appended because it is the one number the admin
+              cannot see from this modal. */}
           <ul style={{ fontSize: "0.8rem", color: "#fca5a5", paddingLeft: "1.25rem", lineHeight: "1.5" }}>
             <li style={{ marginBottom: "0.35rem" }}>All historical transaction data for this department will be moved to long-term cold storage (Archived).</li>
-            <li style={{ marginBottom: "0.35rem" }}>This department's cost centers will be immediately deactivated and rejected in all future expense reports.</li>
+            <li style={{ marginBottom: "0.35rem" }}>This department&apos;s cost centers will be immediately deactivated and rejected in all future expense reports.</li>
             <li style={{ marginBottom: "0.35rem" }}>Any pending approvals associated with this department will be automatically canceled.</li>
-            <li>User access permissions tied to this specific department will be revoked.</li>
+            <li>
+              User access permissions tied to this specific department will be revoked
+              {assignedUsers > 0 ? ` (${assignedUsers} user(s) affected).` : "."}
+            </li>
           </ul>
         </div>
 
+        {/* Implications line — present in the design, previously omitted. */}
+        <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text))", marginBottom: "1rem", lineHeight: "1.45" }}>
+          Please confirm that you understand the implications of this action for {deptName}.
+        </p>
+
         {/* Implications Confirmation Checkbox */}
         <div style={{
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          backgroundColor: "rgba(15, 23, 42, 0.5)",
+          border: "1px solid rgb(var(--color-card-border))",
+          backgroundColor: "rgb(var(--color-surface-secondary) / 0.5)",
           borderRadius: "0.5rem",
           padding: "0.85rem 1rem",
           display: "flex",
@@ -132,7 +160,7 @@ export const AdminDeleteDepartmentModal: React.FC<AdminDeleteDepartmentModalProp
             style={{
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
+              border: "1px solid rgb(var(--color-card-border))",
               backgroundColor: "transparent",
               color: "rgb(var(--color-text))",
               fontWeight: "600",

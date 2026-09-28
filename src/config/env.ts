@@ -22,7 +22,9 @@ export const ENV = {
   // Brevo Transactional Email Integration
   BREVO_API_KEY: process.env.BREVO_API_KEY || "",
   BREVO_SENDER_EMAIL: process.env.BREVO_SENDER_EMAIL || "noreply@spendflow.com",
-  BREVO_SENDER_NAME: process.env.BREVO_SENDER_NAME || "SpendFlow EMS",
+  // Empty by default: the email service falls back to BRANDING.appName, so the
+  // product name is not spelled out a second time here.
+  BREVO_SENDER_NAME: process.env.BREVO_SENDER_NAME || "",
   get isBrevoConfigured(): boolean {
     return !!(this.BREVO_API_KEY && this.BREVO_API_KEY.trim().length > 0);
   },

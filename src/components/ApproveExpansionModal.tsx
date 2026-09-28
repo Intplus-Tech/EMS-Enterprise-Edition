@@ -1,14 +1,19 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
+import { formatNairaPrecise } from "./ui/format";
 
 interface ApproveExpansionModalProps {
   isOpen: boolean;
   onClose: () => void;
   requestNumber?: string;
   requestAmount?: number;
+  /** Headroom on the budget item being expanded, not the department's. */
   remainingBudget?: number;
+  /** Deficit on that item — exactly what the expansion will cover. */
   deficitAmount?: number;
+  /** The item the expansion is granted against; names what is being decided. */
+  budgetItemName?: string;
   /** Receives the notes plus the signature the server verifies. */
   onConfirm?: (notes: string, signature: string) => void;
 }
@@ -23,6 +28,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
   requestAmount = 0,
   remainingBudget = 0,
   deficitAmount = 0,
+  budgetItemName,
   onConfirm
 }) => {
   const [acknowledged, setAcknowledged] = useState(false);
@@ -57,7 +63,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "rgba(15, 23, 42, 0.65)",
+        backgroundColor: "rgb(var(--color-overlay) / 0.65)",
         backdropFilter: "blur(4px)",
         zIndex: 1000,
         display: "flex",
@@ -74,7 +80,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
           maxHeight: "92vh",
           overflowY: "auto",
           background: "rgb(var(--color-card))",
-          border: "1px solid rgba(var(--color-card-border), 0.6)",
+          border: "1px solid rgb(var(--color-card-border) / 0.6)",
           borderRadius: "16px",
           padding: "1.75rem 2rem",
           boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
@@ -106,7 +112,10 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
                 Approve One-Time Budget Expansion
               </h2>
               <span style={{ fontSize: "0.825rem", color: "rgb(var(--color-text-muted))", marginTop: "0.15rem", display: "block" }}>
+                {/* The expansion is granted against one item, so the dialog
+                    names it — "expand the budget" alone does not say what. */}
                 Request {requestNumber}
+                {budgetItemName ? ` · Budget item: ${budgetItemName}` : ""}
               </span>
             </div>
           </div>
@@ -142,17 +151,17 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
             <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.3rem" }}>
               REQUEST AMOUNT
             </span>
-            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#0F172A" }}>
-              ₦{requestAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
+              {formatNairaPrecise(requestAmount)}
             </span>
           </div>
 
           <div>
             <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.3rem" }}>
-              REMAINING BUDGET
+              {budgetItemName ? "ITEM REMAINING" : "REMAINING BUDGET"}
             </span>
-            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#0F172A" }}>
-              ₦{remainingBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
+              {formatNairaPrecise(remainingBudget)}
             </span>
           </div>
 
@@ -161,7 +170,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
               DEFICIT
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#DC2626" }}>
-              -₦{deficitAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              -{formatNairaPrecise(deficitAmount)}
             </span>
           </div>
         </div>
@@ -182,7 +191,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", color: "#2563EB" }}>
             <Icons.Info size={20} />
             <span style={{ fontSize: "0.95rem", fontWeight: "700", color: "#1E3A8A" }}>
-              Expansion Amount: ₦{deficitAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              Expansion Amount: {formatNairaPrecise(deficitAmount)}
             </span>
           </div>
 
@@ -229,8 +238,16 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
                 accentColor: "#DC2626"
               }}
             />
+            {/* Wording matches what the grant actually does. It is recorded
+                against the item and sized to this request's deficit, so it
+                confers no headroom beyond it — but the allocation itself is
+                never rewritten and nothing "reverts" later, which the previous
+                copy promised. */}
             <span style={{ fontSize: "0.85rem", color: "#B91C1C", fontWeight: "600", lineHeight: "1.45" }}>
-              I acknowledge this expansion is ONE-TIME and REQUEST-SPECIFIC. It will NOT permanently increase the departmental budget. The department budget will revert to its original limit after this request is closed.
+              I acknowledge this expansion is ONE-TIME and REQUEST-SPECIFIC. It covers only this
+              request&apos;s deficit on {budgetItemName ? <>the <strong>{budgetItemName}</strong> budget item</> : "the budget item"} and
+              leaves no additional headroom for any other request. The department&apos;s own allocation
+              is unchanged; the grant is recorded separately and stays on the audit trail.
             </span>
           </label>
         </div>
@@ -250,8 +267,8 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
               padding: "0.85rem",
               fontSize: "0.875rem",
               borderRadius: "10px",
-              border: "1px solid rgba(var(--color-card-border), 0.6)",
-              background: "rgba(var(--color-surface), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.6)",
+              background: "rgb(var(--color-surface) / 0.5)",
               color: "rgb(var(--color-text))",
               outline: "none",
               lineHeight: "1.5"
@@ -285,7 +302,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
               borderRadius: "8px",
               fontSize: "0.875rem",
               fontWeight: "600",
-              border: "1px solid rgba(var(--color-card-border), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.6)",
               background: "transparent",
               color: "rgb(var(--color-text))",
               cursor: "pointer"

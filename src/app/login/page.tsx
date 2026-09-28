@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
+import { SubmitButton } from "../../components/ui/SubmitButton";
+import { SESSION_REASON_PARAM, sessionEndNotice } from "../../domains/auth/session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,6 +18,9 @@ export default function LoginPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Why the user is back here, when they did not choose to be. Set from the
+  // query string the dashboard adds when the server ends a session.
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
 
   // Theme state
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -26,6 +31,12 @@ export default function LoginPage() {
       setTheme(savedTheme);
       document.documentElement.setAttribute("data-theme", savedTheme);
     }
+
+    // Read straight off the location rather than through `useSearchParams`,
+    // which would force this prerendered route into a Suspense boundary purely
+    // to surface one banner.
+    const reason = new URLSearchParams(window.location.search).get(SESSION_REASON_PARAM);
+    setSessionNotice(sessionEndNotice(reason));
   }, []);
 
   const toggleTheme = () => {
@@ -38,6 +49,8 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    // The explanation is about the session that just ended, not this attempt.
+    setSessionNotice(null);
     setLoading(true);
 
     try {
@@ -79,7 +92,7 @@ export default function LoginPage() {
         justifyContent: "space-between", 
         alignItems: "center", 
         background: "rgb(var(--color-surface))",
-        borderBottom: "1px solid rgba(var(--color-card-border), 0.5)",
+        borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)",
         transition: "background var(--transition-normal), border var(--transition-normal)"
       }}>
         {/* Brand logo & text */}
@@ -87,20 +100,20 @@ export default function LoginPage() {
           <div style={{ 
             padding: "0.4rem", 
             borderRadius: "50%", 
-            background: "rgba(var(--color-primary), 0.15)",
+            background: "rgb(var(--color-primary) / 0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
           }}>
-            <img src={BRANDING.logoUrl || "/logo.svg"} alt="EMS Logo" style={{ width: 26, height: 26, objectFit: "contain", borderRadius: "50%" }} />
+            <img src={BRANDING.logoUrl || "/logo.svg"} alt={`${BRANDING.appName} Logo`} style={{ width: 26, height: 26, objectFit: "contain", borderRadius: "50%" }} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>EMS</span>
+              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>{BRANDING.appName}</span>
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 
-                background: "rgba(var(--color-card-border), 0.3)", 
+                background: "rgb(var(--color-card-border) / 0.3)", 
                 color: "rgb(var(--color-text-muted))", 
                 padding: "0.15rem 0.35rem", 
                 borderRadius: "4px" 
@@ -124,18 +137,18 @@ export default function LoginPage() {
               width: "36px",
               height: "36px",
               borderRadius: "8px",
-              border: "1px solid rgba(var(--color-card-border), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.6)",
               background: "rgb(var(--color-card))",
               color: "rgb(var(--color-text))",
               cursor: "pointer",
               transition: "all 0.15s ease"
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
-              e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
+              e.currentTarget.style.borderColor = "rgb(var(--color-primary) / 0.5)";
+              e.currentTarget.style.background = "rgb(var(--color-primary) / 0.05)";
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+              e.currentTarget.style.borderColor = "rgb(var(--color-card-border) / 0.6)";
               e.currentTarget.style.background = "rgb(var(--color-card))";
             }}
           >
@@ -151,7 +164,7 @@ export default function LoginPage() {
               gap: "0.5rem", 
               padding: "0.5rem 1rem", 
               borderRadius: "8px", 
-              border: "1px solid rgba(var(--color-card-border), 0.6)", 
+              border: "1px solid rgb(var(--color-card-border) / 0.6)", 
               background: "rgb(var(--color-card))",
               color: "rgb(var(--color-text-muted))",
               fontSize: "0.85rem",
@@ -160,12 +173,12 @@ export default function LoginPage() {
               transition: "all 0.15s ease"
             }}
             onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
-              e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
+              e.currentTarget.style.borderColor = "rgb(var(--color-primary) / 0.5)";
+              e.currentTarget.style.background = "rgb(var(--color-primary) / 0.05)";
               e.currentTarget.style.color = "rgb(var(--color-text))";
             }}
             onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+              e.currentTarget.style.borderColor = "rgb(var(--color-card-border) / 0.6)";
               e.currentTarget.style.background = "rgb(var(--color-card))";
               e.currentTarget.style.color = "rgb(var(--color-text-muted))";
             }}
@@ -181,7 +194,7 @@ export default function LoginPage() {
           maxWidth: "480px", 
           width: "100%", 
           background: "rgb(var(--color-surface))", 
-          border: "1px solid rgba(var(--color-card-border), 0.4)", 
+          border: "1px solid rgb(var(--color-card-border) / 0.4)", 
           borderRadius: "16px", 
           padding: "2.5rem", 
           boxShadow: "var(--shadow-lg)",
@@ -191,6 +204,26 @@ export default function LoginPage() {
           <p style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.9rem", lineHeight: "1.5", marginBottom: "2rem" }}>
             Secure access to your expense workflow
           </p>
+
+          {/* Why the user was returned here — only shown when a session was
+              taken away, never on an ordinary first visit. */}
+          {sessionNotice && !error && (
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              background: "rgb(var(--color-primary) / 0.08)",
+              border: "1px solid rgb(var(--color-primary) / 0.3)",
+              borderRadius: "8px",
+              padding: "0.75rem 1rem",
+              color: "rgb(var(--color-text))",
+              fontSize: "0.875rem",
+              marginBottom: "1.5rem"
+            }}>
+              <Icons.Info size={18} style={{ flexShrink: 0, color: "rgb(var(--color-primary))" }} />
+              <span>{sessionNotice}</span>
+            </div>
+          )}
 
           {error && (
             <div style={{ 
@@ -226,7 +259,7 @@ export default function LoginPage() {
                   width: "100%", 
                   padding: "0.75rem 1rem", 
                   background: "rgb(var(--color-background))", 
-                  border: "1px solid rgba(var(--color-card-border), 0.6)", 
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)", 
                   borderRadius: "8px", 
                   color: "rgb(var(--color-text))", 
                   fontSize: "0.95rem",
@@ -251,7 +284,7 @@ export default function LoginPage() {
                     width: "100%", 
                     padding: "0.75rem 2.75rem 0.75rem 1rem", 
                     background: "rgb(var(--color-background))", 
-                    border: "1px solid rgba(var(--color-card-border), 0.6)", 
+                    border: "1px solid rgb(var(--color-card-border) / 0.6)", 
                     borderRadius: "8px", 
                     color: "rgb(var(--color-text))", 
                     fontSize: "0.95rem",
@@ -290,7 +323,7 @@ export default function LoginPage() {
                   width: "16px", 
                   height: "16px", 
                   borderRadius: "4px", 
-                  border: "1px solid rgba(var(--color-card-border), 0.6)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)",
                   background: "rgb(var(--color-background))",
                   cursor: "pointer"
                 }} 
@@ -300,28 +333,15 @@ export default function LoginPage() {
               </label>
             </div>
 
-            {/* Sign in Button */}
-            <button 
-              type="submit" 
-              disabled={loading}
-              style={{ 
-                width: "100%", 
-                background: "rgb(var(--color-primary))", 
-                color: "#FFFFFF", 
-                border: "none", 
-                borderRadius: "8px", 
-                padding: "0.875rem", 
-                fontWeight: "600", 
-                fontSize: "1rem",
-                cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.7 : 1,
-                transition: "background-color 0.2s"
-              }}
-              onMouseOver={(e) => !loading && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary-hover))")}
-              onMouseOut={(e) => !loading && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary))")}
+            {/* Sign in Button — SubmitButton owns the spinner and disabled state */}
+            <SubmitButton
+              type="submit"
+              loading={loading}
+              loadingLabel="Signing in…"
+              style={{ width: "100%", padding: "0.875rem", fontSize: "1rem", fontWeight: 600 }}
             >
-              {loading ? "Signing in..." : "Sign in"}
-            </button>
+              Sign in
+            </SubmitButton>
           </form>
 
           {/* Forgot Password Link */}

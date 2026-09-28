@@ -4,7 +4,7 @@ import { RequestJustificationModal } from "./RequestJustificationModal";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
 import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
-import { AttachmentDto, BudgetContextDto } from "../types/api";
+import { AttachmentDto, BudgetContextDto, ThreadEntryDto, WorkflowHistoryDto } from "../types/api";
 import { AttachmentTarget } from "./modals/AttachmentViewModal";
 import { formatNaira, formatNairaPrecise } from "./ui/format";
 
@@ -26,6 +26,12 @@ interface PendingExceptionsTabProps {
   /** Opens a supporting document in the shared attachment viewer. */
   onViewAttachment: (attachment: AttachmentTarget) => void;
   onBackToDashboard?: () => void;
+  /** Persisted thread for this request, shown in the justification dialog. */
+  thread?: ThreadEntryDto[];
+  threadLoading?: boolean;
+  threadSending?: boolean;
+  /** Posts the Finance Head's question back to the approver. */
+  onSendQuestion?: (question: string) => Promise<boolean>;
 }
 
 export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
@@ -35,7 +41,11 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   actions,
   budgetContext,
   onViewAttachment,
-  onBackToDashboard
+  onBackToDashboard,
+  thread = [],
+  threadLoading = false,
+  threadSending = false,
+  onSendQuestion
 }) => {
   const [showJustificationModal, setShowJustificationModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
@@ -44,6 +54,12 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   // The request under review is whatever the queue handed over — never a
   // re-derived "first pending exception".
   const targetExp = request;
+
+  // The approver the Finance Head's question goes to: whoever last signed the
+  // request off, read from its own history rather than named in the markup.
+  const approverName: string | undefined = [...(targetExp?.history ?? [])]
+    .reverse()
+    .find((h: any) => h.actorRole === "APPROVER")?.actorName;
 
   const requestDetails = targetExp ? {
     requestNumber: targetExp.requestNumber ? `#${targetExp.requestNumber.replace(/^REQ-/, '')}` : `#${targetExp._id?.slice(-4)}`,
@@ -78,7 +94,26 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   // while authorising an over-budget request were unrelated to the department.
   const hasBudget = Boolean(budgetContext?.hasBudget);
 
-  const historyTimeline: any[] = targetExp?.history && targetExp.history.length > 0 ? targetExp.history.map((h: any, idx: number) => ({
+  /**
+   * The decision on this screen is a *budget item* expansion, so every figure
+   * that describes the deficit is the item's, not the department's.
+   *
+   * These read `criticalGap` — the department gap — which is a different
+   * number: a department can have ample headroom while the one item the spend
+   * is charged to is exhausted, and in that case the department gap is ₦0. The
+   * Finance Head was shown "CRITICAL BUDGET GAP -₦0.00" while approving a real
+   * expansion, and the confirm dialogs quoted the same zero back at them.
+   */
+  const attachedItem = budgetContext?.attachedItem ?? null;
+  const expansionDeficit = budgetContext?.itemShortfall ?? 0;
+  const itemHeadroom = attachedItem?.remaining ?? budgetContext?.remaining ?? 0;
+
+  // Newest entry first: every log surface in the app reads most-recent-at-top,
+  // so the decision the Finance Head is about to take follows the last thing
+  // that happened rather than the request's opening note.
+  const historyTimeline: any[] = targetExp?.history && targetExp.history.length > 0 ? [...targetExp.history]
+    .sort((a: WorkflowHistoryDto, b: WorkflowHistoryDto) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .map((h: any, idx: number) => ({
     id: `hist-${idx}`,
     actor: `${h.actorName || "User"} (${h.actorRole || "Staff"})`,
     timestamp: h.timestamp ? new Date(h.timestamp).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "N/A",
@@ -149,8 +184,8 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             style={{
               padding: "0.35rem 0.75rem",
               borderRadius: "8px",
-              background: "rgba(var(--color-surface-secondary), 0.5)",
-              border: "1px solid rgba(var(--color-card-border), 0.4)",
+              background: "rgb(var(--color-surface-secondary) / 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.4)",
               color: "rgb(var(--color-text-muted))",
               fontWeight: "600",
               fontSize: "0.775rem",
@@ -189,7 +224,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             className="glass-card"
             style={{
               background: "rgb(var(--color-card))",
-              border: "1px solid rgba(var(--color-card-border), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.5)",
               borderRadius: "16px",
               padding: "1.75rem",
               display: "flex",
@@ -198,7 +233,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               boxShadow: "var(--shadow-sm)"
             }}
           >
-            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", margin: 0, paddingBottom: "0.75rem", borderBottom: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", margin: 0, paddingBottom: "0.75rem", borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
               Request Details
             </h3>
 
@@ -276,8 +311,8 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                       gap: "0.6rem",
                       padding: "0.5rem 0.85rem",
                       borderRadius: "8px",
-                      border: "1px solid rgba(var(--color-card-border), 0.5)",
-                      background: "rgba(var(--color-surface-secondary), 0.5)",
+                      border: "1px solid rgb(var(--color-card-border) / 0.5)",
+                      background: "rgb(var(--color-surface-secondary) / 0.5)",
                       color: "rgb(var(--color-text))",
                       fontSize: "0.85rem",
                       fontWeight: "600",
@@ -298,7 +333,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             className="glass-card"
             style={{
               background: "rgb(var(--color-card))",
-              border: "1px solid rgba(var(--color-card-border), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.5)",
               borderRadius: "16px",
               padding: "1.75rem",
               display: "flex",
@@ -307,7 +342,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               boxShadow: "var(--shadow-sm)"
             }}
           >
-            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", margin: 0, paddingBottom: "0.75rem", borderBottom: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+            <h3 style={{ fontSize: "1.05rem", fontWeight: "700", color: "rgb(var(--color-text))", margin: 0, paddingBottom: "0.75rem", borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
               History & Communication
             </h3>
 
@@ -324,7 +359,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                           top: "22px",
                           bottom: "-18px",
                           width: "2px",
-                          background: "rgba(var(--color-card-border), 0.4)"
+                          background: "rgb(var(--color-card-border) / 0.4)"
                         }}
                       />
                     )}
@@ -356,7 +391,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                       }}
                     >
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <span style={{ fontSize: "0.825rem", fontWeight: "700", color: item.isOverbudget ? "#B91C1C" : "#1E293B" }}>
+                        <span style={{ fontSize: "0.825rem", fontWeight: "700", color: item.isOverbudget ? "#B91C1C" : "rgb(var(--color-text))" }}>
                           {item.actor}
                         </span>
                         <span style={{ fontSize: "0.725rem", color: "rgb(var(--color-text-dim))" }}>
@@ -381,7 +416,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             className="glass-card"
             style={{
               background: "rgb(var(--color-card))",
-              border: "1px solid rgba(var(--color-card-border), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.5)",
               borderRadius: "16px",
               padding: "1.75rem",
               display: "flex",
@@ -391,11 +426,11 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
             }}
           >
             {/* Header & Dept Badge */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(var(--color-card-border), 0.4)", paddingBottom: "0.75rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgb(var(--color-card-border) / 0.4)", paddingBottom: "0.75rem" }}>
               <h3 style={{ fontSize: "1rem", fontWeight: "800", color: "rgb(var(--color-text))", margin: 0, letterSpacing: "0.04em", textTransform: "uppercase" }}>
                 BUDGET CONTEXT
               </h3>
-              <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", padding: "0.2rem 0.6rem", borderRadius: "4px", background: "rgba(var(--color-surface-secondary), 0.6)" }}>
+              <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", padding: "0.2rem 0.6rem", borderRadius: "4px", background: "rgb(var(--color-surface-secondary) / 0.6)" }}>
                 {budgetContext?.periodLabel || requestDetails.departmentFull}
               </span>
             </div>
@@ -405,7 +440,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               <span style={{ fontSize: "0.7rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.2rem" }}>
                 TOTAL ANNUAL BUDGET
               </span>
-              <span style={{ fontSize: "1.45rem", fontWeight: "800", color: "#0F172A" }}>
+              <span style={{ fontSize: "1.45rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
                 {hasBudget ? formatNairaPrecise(budgetContext?.totalBudget) : "Not configured"}
               </span>
             </div>
@@ -416,7 +451,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                 <span style={{ fontSize: "0.675rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.2rem" }}>
                   UTILIZED YTD
                 </span>
-                <span style={{ fontSize: "1.05rem", fontWeight: "800", color: "#0F172A" }}>
+                <span style={{ fontSize: "1.05rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
                   {formatNairaPrecise(budgetContext?.utilisedYTD)}
                 </span>
               </div>
@@ -431,7 +466,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
               </div>
             </div>
 
-            {/* Critical Budget Gap Red Box */}
+            {/* Critical Budget Gap — the deficit on the item being expanded */}
             <div
               style={{
                 background: "rgba(254, 226, 226, 0.6)",
@@ -448,7 +483,14 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   CRITICAL BUDGET GAP
                 </span>
                 <span style={{ fontSize: "1.75rem", fontWeight: "800", color: "#DC2626", letterSpacing: "-0.02em" }}>
-                  {`-${formatNairaPrecise(budgetContext?.criticalGap)}`}
+                  {`-${formatNairaPrecise(expansionDeficit)}`}
+                </span>
+                {/* Names what is actually being expanded, so the figure above is
+                    attributable rather than reading as a department-wide gap. */}
+                <span style={{ fontSize: "0.75rem", color: "#B91C1C", display: "block", marginTop: "0.3rem" }}>
+                  {attachedItem
+                    ? <>on budget item <strong>{attachedItem.category}</strong> — {formatNaira(attachedItem.remaining)} of {formatNaira(attachedItem.allocated)} left</>
+                    : "This request is not attached to a budget item, so the gap is measured against the department."}
                 </span>
               </div>
 
@@ -461,7 +503,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                 Budget Item
               </span>
 
-              <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid rgba(var(--color-card-border), 0.4)" }}>
+              <div style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid rgb(var(--color-card-border) / 0.4)" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
                   <thead>
                     <tr style={{ background: "rgba(239, 246, 255, 0.9)", borderBottom: "1px solid #BFDBFE" }}>
@@ -472,8 +514,30 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
                   </thead>
                   <tbody>
                     {(budgetContext?.lineItems ?? []).map((item, idx, all) => (
-                      <tr key={item.category} style={{ borderBottom: idx < all.length - 1 ? "1px solid rgba(var(--color-card-border), 0.3)" : "none" }}>
-                        <td style={{ padding: "0.6rem 0.75rem", fontWeight: "600", color: item.isRequestCategory ? "#2563EB" : "rgb(var(--color-text))" }}>{item.category}</td>
+                      <tr
+                        key={item.id}
+                        style={{
+                          borderBottom: idx < all.length - 1 ? "1px solid rgb(var(--color-card-border) / 0.3)" : "none",
+                          // The row under review is tinted, not merely coloured:
+                          // it is the one line the decision applies to.
+                          background: item.isRequestCategory ? "rgb(var(--color-primary) / 0.08)" : "transparent",
+                        }}
+                      >
+                        <td style={{ padding: "0.6rem 0.75rem", fontWeight: "600", color: item.isRequestCategory ? "#2563EB" : "rgb(var(--color-text))" }}>
+                          {item.category}
+                          {item.isRequestCategory && (
+                            <span style={{ display: "block", fontSize: "0.625rem", fontWeight: 800, letterSpacing: "0.05em", color: "#2563EB" }}>
+                              THIS REQUEST
+                            </span>
+                          )}
+                          {/* An item already carrying a grant, so the Finance
+                              Head can see this is not its first exception. */}
+                          {item.expansionsGranted > 0 && (
+                            <span style={{ display: "block", fontSize: "0.625rem", fontWeight: 700, color: "#B45309" }}>
+                              +{formatNaira(item.expansionsGranted)} previously granted
+                            </span>
+                          )}
+                        </td>
                         <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", color: "rgb(var(--color-text-muted))" }}>{formatNaira(item.allocated)}</td>
                         <td style={{ padding: "0.6rem 0.75rem", textAlign: "right", fontWeight: "700", color: item.remaining <= 0 ? "#DC2626" : "#2563EB" }}>
                           {formatNaira(item.remaining)}
@@ -503,7 +567,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
           bottom: 0,
           right: 0,
           left: "260px",
-          background: "rgba(255, 255, 255, 0.95)",
+          background: "rgb(var(--color-card-border) / 1.00)",
           backdropFilter: "blur(12px)",
           borderTop: "1px solid #E2E8F0",
           padding: "1rem 2rem",
@@ -515,11 +579,11 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         }}
       >
         <div>
-          <span style={{ fontSize: "0.8rem", fontWeight: "800", color: "#1E293B", display: "block" }}>
+          <span style={{ fontSize: "0.8rem", fontWeight: "800", color: "rgb(var(--color-text))", display: "block" }}>
             Action Required
           </span>
           <span style={{ fontSize: "0.8rem", color: "#64748B" }}>
-            Exceptional Approval for ₦{requestDetails.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({requestDetails.departmentFull})
+            Exceptional Approval for {formatNairaPrecise(requestDetails.amount)} ({requestDetails.departmentFull})
           </span>
         </div>
 
@@ -585,11 +649,18 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
       </div>
 
       {/* Modals */}
+      {/* Real thread, and a Send Request that actually posts the question to the
+          request's audit trail rather than appending to local state. */}
       <RequestJustificationModal
         isOpen={showJustificationModal}
         onClose={() => setShowJustificationModal(false)}
         requestNumber={requestDetails.requestNumber}
         requestTitle={requestDetails.description}
+        departmentApprover={approverName}
+        entries={thread}
+        loading={threadLoading}
+        sending={threadSending}
+        onSendQuestion={onSendQuestion}
       />
 
       <ApproveExpansionModal
@@ -597,8 +668,9 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         onClose={() => setShowApproveModal(false)}
         requestNumber={requestDetails.requestNumber}
         requestAmount={requestDetails.amount}
-        remainingBudget={budgetContext?.remaining ?? 0}
-        deficitAmount={budgetContext?.criticalGap ?? 0}
+        remainingBudget={itemHeadroom}
+        deficitAmount={expansionDeficit}
+        budgetItemName={attachedItem?.category}
         onConfirm={async (notes, signature) => {
           if (!targetExp?._id) return;
           // Only close on a confirmed save — the previous version reported
@@ -614,8 +686,9 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
         onClose={() => setShowRejectModal(false)}
         requestNumber={requestDetails.requestNumber}
         requestAmount={requestDetails.amount}
-        remainingBudget={budgetContext?.remaining ?? 0}
-        deficitAmount={budgetContext?.criticalGap ?? 0}
+        remainingBudget={itemHeadroom}
+        deficitAmount={expansionDeficit}
+        budgetItemName={attachedItem?.category}
         onConfirm={async (reason, signature) => {
           if (!targetExp?._id) return;
           if (await actions.rejectExpansion(targetExp._id, reason, signature)) {

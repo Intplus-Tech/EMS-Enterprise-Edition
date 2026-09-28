@@ -29,6 +29,7 @@ export enum AuditAction {
   DEPARTMENT_CREATED = "DEPARTMENT_CREATED",
   DEPARTMENT_UPDATED = "DEPARTMENT_UPDATED",
   DEPARTMENT_DELETED = "DEPARTMENT_DELETED",
+  DEPARTMENT_RESTORED = "DEPARTMENT_RESTORED",
 
   // Budget administration
   BUDGET_PERIOD_CREATED = "BUDGET_PERIOD_CREATED",
@@ -37,6 +38,12 @@ export enum AuditAction {
   BUDGET_UNLOCKED = "BUDGET_UNLOCKED",
   BUDGET_COMMITTED = "BUDGET_COMMITTED",
   BUDGET_OVERRUN = "BUDGET_OVERRUN",
+  /** A Finance Head raised a budget item's ceiling to clear one request. */
+  BUDGET_EXPANDED = "BUDGET_EXPANDED",
+  /** An approver booked a request against one of the department's budget items. */
+  BUDGET_ITEM_ATTACHED = "BUDGET_ITEM_ATTACHED",
+  /** A reserve/commit was skipped because no period covers the payment date. */
+  BUDGET_PERIOD_MISSING = "BUDGET_PERIOD_MISSING",
 
   // Role administration
   ROLE_PERMISSIONS_UPDATED = "ROLE_PERMISSIONS_UPDATED",

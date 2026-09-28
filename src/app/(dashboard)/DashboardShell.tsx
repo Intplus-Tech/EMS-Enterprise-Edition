@@ -1,11 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
+import { useTransition } from "react";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
 
 import { DynamicIcon } from "../../components/DynamicIcon";
 import { NotificationsPanel } from "../../components/NotificationsPanel";
+import { SidebarNavItem } from "../../components/ui/SidebarNavItem";
+import { PageLoader } from "../../components/ui/PageLoader";
+import { getNavItemsForRole } from "./navItems";
 
 // Modular Dialog Modals
 import { InitiateExpenseRequestModal } from "../../components/modals/InitiateExpenseRequestModal";
@@ -31,6 +35,9 @@ import { AdminDeleteUserModal } from "../../components/admin/modals/AdminDeleteU
 import { AdminSuspendUserModal } from "../../components/admin/modals/AdminSuspendUserModal";
 import { AdminEditRoleModal } from "../../components/admin/modals/AdminEditRoleModal";
 import { AdminSetBudgetModal } from "../../components/admin/modals/AdminSetBudgetModal";
+import { FiscalPeriod } from "../../domains/budget/fiscalPeriod";
+import { IN_FLIGHT_STATUSES, isStatusIn } from "../../enums/statuses";
+import { sameId } from "../../domains/identity/reference";
 
 import { useDashboard } from "./DashboardProvider";
 
@@ -64,16 +71,16 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     isUploadingDoc,
     uploadDocError,
     handleCreateRequest,
+    requestSubmitting,
     selectedExpense, setSelectedExpense,
+    budgetItems, budgetItemsLoading,
     actionComment, setActionComment,
     adjustedAmount, setAdjustedAmount,
-    paymentRef, setPaymentRef,
     decisionSignature, setDecisionSignature,
     handleCancelRequest,
     handleExceptionalBudgetAction,
     handleWorkflowAction,
     handleFinanceUpload,
-    handlePaymentRelease,
     showResubmitModal, setShowResubmitModal,
     selectedResubmitExpense, setSelectedResubmitExpense,
     resubmitForm, setResubmitForm,
@@ -90,6 +97,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     inviteSubmitting,
     handleInviteUser,
     inviteResult, setInviteResult,
+    inviteAndReport, retryInvite, inviteRetrying,
     showEditProfileModal, setShowEditProfileModal,
     editProfileForm, setEditProfileForm,
     handleUpdateProfile,
@@ -103,10 +111,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     handleChangePassword,
     systemUsers,
     // Persisted admin mutations from useAdminAdministration.
-    createDepartment, updateDepartment, deleteDepartment,
-    inviteUser, updateUser, setUserActive, deleteUser, revokeUserSessions,
+    createDepartment, updateDepartment, deleteDepartment, loadDashboardData,
+    updateUser, setUserActive, deleteUser, revokeUserSessions,
     saveBudgetPeriod, saveRolePermissions,
     adminNotice, setAdminNotice, adminBusy,
+    accountBusy,
     showAdminAddUserModal, setShowAdminAddUserModal,
     showAdminEditUserProfileModal, setShowAdminEditUserProfileModal,
     selectedAdminUser,
@@ -119,16 +128,27 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     showAdminEditRoleModal, setShowAdminEditRoleModal,
     selectedAdminRole,
     showAdminSetBudgetModal, setShowAdminSetBudgetModal,
+    // Existing allocations, so Set Budget opens on the department's real items
+    // instead of an empty list that would overwrite them on save.
+    budgetPeriods,
     alertDialog, setAlertDialog,
   } = useDashboard();
 
-  const navTo = (route: string) => router.push(route);
+  // Sidebar navigation runs inside a transition so the shell can show the top
+  // progress bar while the next segment loads. Without this the sidebar simply
+  // froze on click with no indication anything was happening — the pages are
+  // client components, so `loading.tsx` alone does not cover the fetch that
+  // follows.
+  const [isNavigating, startNavigation] = useTransition();
+  const navTo = (route: string) => startNavigation(() => router.push(route));
   const isActive = (route: string) => pathname === route;
 
-  // Only these roles may raise a request — `POST /api/expenses` accepts nobody
-  // else. The button used to render for every role and 403 on submit; the
-  // finance and admin designs show it greyed out for exactly this reason.
-  const canRaiseRequest = ["INITIATOR", "APPROVER", "ADMIN"].includes(currentUser?.role);
+  // Raising a request is the initiator's job and nobody else's, so the control
+  // is absent rather than disabled for every other role — a greyed-out button
+  // still advertises an action they will never be given. The list also used to
+  // include APPROVER, who `POST /api/expenses` has never accepted: that button
+  // was enabled and 403'd on submit.
+  const canRaiseRequest = currentUser?.role === "INITIATOR";
 
   // Notification actions resolve back to the live expense record they were derived from.
   const handleNotificationAction = (notification: any) => {
@@ -145,7 +165,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (notification.type === "PAID" && expense.paymentReceipt) {
+    // Opens for any completed payment, not only one carrying a receipt: the
+    // dialog reports the reference, method and date as well, and gating it on
+    // `paymentReceipt` sent a payment released without stored evidence to the
+    // generic request profile instead of to its own payment record.
+    if (notification.type === "PAID") {
       setSelectedReceiptData(expense);
       setShowReceiptModal(true);
       return;
@@ -156,7 +180,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (startupError) {
     return (
-      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "#0F172A", color: "#F8FAFC", padding: "2rem", fontFamily: "var(--font-sans)" }}>
+      <div style={{ display: "flex", minHeight: "100vh", alignItems: "center", justifyContent: "center", background: "rgb(var(--color-background))", color: "rgb(var(--color-text))", padding: "2rem", fontFamily: "var(--font-sans)" }}>
         <div className="glass-panel" style={{ maxWidth: "520px", width: "100%", padding: "2.5rem", textAlign: "center" }}>
           <div style={{ display: "inline-flex", padding: "0.75rem", borderRadius: "50%", background: "rgba(239, 68, 68, 0.2)", color: "#EF4444", marginBottom: "1.5rem" }}>
             <Icons.AlertTriangle size={32} />
@@ -179,24 +203,27 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", backgroundColor: "rgb(15 23 42)", color: "#fff" }}>
-        <div style={{ textAlign: "center" }}>
-          <Icons.Loader className="animate-spin" size={48} style={{ color: "rgb(var(--color-primary))", margin: "0 auto 1rem" }} />
-          <p>Initialising spend management dashboard...</p>
-        </div>
-      </div>
+      <PageLoader
+        fullScreen
+        message="Initialising spend management dashboard"
+        hint="Loading your session, requests and approvals…"
+      />
     );
   }
 
   return (
     <div className="app-container">
+      {/* Route transition indicator — spans the viewport while a sidebar
+          destination resolves, so the chrome stays usable meanwhile. */}
+      {isNavigating && <div className="route-progress" role="progressbar" aria-label="Loading page" />}
+
       {/* Sidebar navigation */}
       <div className="sidebar">
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "2rem", padding: "0 0.5rem" }}>
           <div style={{
             padding: "0.5rem",
             borderRadius: "0.5rem",
-            background: "rgba(var(--color-primary), 0.2)",
+            background: "rgb(var(--color-primary) / 0.2)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -204,7 +231,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             height: 40
           }}>
             {BRANDING.logoUrl ? (
-              <img src={BRANDING.logoUrl} alt="Logo" style={{ width: 28, height: 28, objectFit: "contain" }} />
+              <img src={BRANDING.logoUrl} alt={`${BRANDING.appName} Logo`} style={{ width: 28, height: 28, objectFit: "contain" }} />
             ) : (
               <DynamicIcon name={BRANDING.logoIcon} style={{ color: "rgb(var(--color-primary))", width: 28, height: 28 }} />
             )}
@@ -215,364 +242,29 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Dynamic view filters based on active tabs */}
+        {/* Role navigation. Every role renders the same primitive from the same
+            config, so the active page reads identically everywhere. */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flexGrow: 1 }}>
-          {currentUser?.role === "INITIATOR" ? (
-            <>
-              <button
-                onClick={() => navTo("/requests")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/requests") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/requests") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.Receipt size={18} /> Requests
-                {(() => {
-                  const pendingCount = expenses.filter((e: any) => ["DRAFT", "RETURNED"].includes(e.status)).length;
-                  return pendingCount > 0 ? (
-                    <span style={{
-                      marginLeft: "auto",
-                      background: "rgba(99, 102, 241, 0.2)",
-                      color: "rgb(var(--color-primary))",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      padding: "0.15rem 0.5rem",
-                      borderRadius: "999px"
-                    }}>
-                      {pendingCount}
-                    </span>
-                  ) : null;
-                })()}
-              </button>
-
-              <button
-                onClick={() => navTo("/history")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/history") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/history") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.History size={18} /> History
-              </button>
-
-              <button
-                onClick={() => navTo("/settings")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/settings") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/settings") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.Settings size={18} /> Settings
-              </button>
-            </>
-          ) : currentUser?.role === "FINANCE_HEAD" ? (
-            <>
-              <div style={{ padding: "0.5rem 0.5rem 0.25rem", fontSize: "0.7rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                EXCEPTIONS
-              </div>
-
-              <button
-                onClick={() => navTo("/pending-exceptions")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/pending-exceptions") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/pending-exceptions") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/pending-exceptions") ? "700" : "500"
-                }}
-              >
-                <Icons.AlertTriangle size={18} /> Pending Exceptions
-                {/* Real queue depth; this badge was hardcoded to 12. */}
-                {(() => {
-                  const exceptionCount = expenses.filter((e: any) =>
-                    ["PENDING_EXCEPTIONAL", "INSUFFICIENT_BUDGET"].includes(e.status)
-                  ).length;
-                  return exceptionCount > 0 ? (
-                    <span style={{
-                      marginLeft: "auto",
-                      background: "#2563EB",
-                      color: "#FFFFFF",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      padding: "0.15rem 0.55rem",
-                      borderRadius: "999px"
-                    }}>
-                      {exceptionCount}
-                    </span>
-                  ) : null;
-                })()}
-              </button>
-
-              <button
-                onClick={() => navTo("/departmental-spend")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/departmental-spend") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/departmental-spend") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/departmental-spend") ? "700" : "500"
-                }}
-              >
-                <Icons.PieChart size={18} /> Departmental Spend
-              </button>
-
-              <button
-                onClick={() => navTo("/exception-history")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/exception-history") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/exception-history") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/exception-history") ? "700" : "500"
-                }}
-              >
-                <Icons.BarChart2 size={18} /> Exception History
-              </button>
-
-              <button
-                onClick={() => navTo("/settings")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/settings") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/settings") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/settings") ? "700" : "500"
-                }}
-              >
-                <Icons.Settings size={18} /> Settings
-              </button>
-            </>
-          ) : currentUser?.role === "ADMIN" ? (
-            <>
-              <button
-                onClick={() => navTo("/dashboard")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/dashboard") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/dashboard") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/dashboard") ? "700" : "500"
-                }}
-              >
-                <Icons.LayoutDashboard size={18} /> Dashboard
-              </button>
-
-              <button
-                onClick={() => navTo("/departmental-spend")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/departmental-spend") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/departmental-spend") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/departmental-spend") ? "700" : "500"
-                }}
-              >
-                <Icons.PieChart size={18} /> Departmental Spend
-              </button>
-
-              <button
-                onClick={() => navTo("/reports")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/reports") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/reports") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/reports") ? "700" : "500"
-                }}
-              >
-                <Icons.BarChart2 size={18} /> Report
-              </button>
-
-              <button
-                onClick={() => navTo("/users-roles")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/users-roles") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/users-roles") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/users-roles") ? "700" : "500"
-                }}
-              >
-                <Icons.Users size={18} /> Users & Roles
-              </button>
-
-              <button
-                onClick={() => navTo("/audit-trail")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/audit-trail") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/audit-trail") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/audit-trail") ? "700" : "500"
-                }}
-              >
-                <Icons.FileText size={18} /> Audit Trail
-              </button>
-
-              <button
-                onClick={() => navTo("/settings")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/settings") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/settings") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/settings") ? "700" : "500"
-                }}
-              >
-                <Icons.Settings size={18} /> Settings
-              </button>
-
-              <button
-                onClick={() => navTo("/workflow")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/workflow") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/workflow") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/workflow") ? "700" : "500"
-                }}
-              >
-                <Icons.GitFork size={18} /> Workflow Rules
-              </button>
-
-              {/* System Audits (/logs) and Users & Invites (/users) are withheld
-                  from the sidebar for now. Audit Trail already covers the log
-                  view and Users & Roles already covers user administration, so
-                  both entries duplicated an existing screen. The routes are
-                  also withheld in roleRoutes.ts — restore both together. */}
-              {/*
-              <button
-                onClick={() => navTo("/logs")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/logs") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/logs") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/logs") ? "700" : "500"
-                }}
-              >
-                <Icons.History size={18} /> System Audits
-              </button>
-
-              <button
-                onClick={() => navTo("/users")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/users") ? "rgba(37, 99, 235, 0.12)" : "transparent",
-                  color: isActive("/users") ? "#2563EB" : "rgb(var(--color-text-muted))",
-                  fontWeight: isActive("/users") ? "700" : "500"
-                }}
-              >
-                <Icons.Users size={18} /> Users & Invites
-              </button>
-              */}
-            </>
-          ) : (
-            <>
-              {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
-                <button
-                  onClick={() => navTo("/dashboard")}
-                  className="btn"
-                  style={{
-                    justifyContent: "flex-start",
-                    background: isActive("/dashboard") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                    color: isActive("/dashboard") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                  }}
-                >
-                  <Icons.LayoutDashboard size={18} /> Dashboard
-                </button>
-              )}
-
-              <button
-                onClick={() => navTo("/approvals")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/approvals") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/approvals") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.CheckSquare size={18} /> {["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) ? "Pipeline Overview" : "Pending Approvals"}
-                {(() => {
-                  const pendingCount = expenses.filter((exp: any) => {
-                    if (currentUser?.role === "FINANCE_HEAD" && exp.status === "PENDING_EXCEPTIONAL") return true;
-                    if (currentUser?.role === "APPROVER" && exp.status === "PENDING_APPROVAL" && exp.currentStepIndex === 0) return true;
-                    if (currentUser?.role === "FINANCE_OFFICER" && exp.status === "SENT_TO_FINANCE") return true;
-                    if (currentUser?.role === "FINANCE_MANAGER" && exp.status === "UPLOADED_TO_BANK") return true;
-                    return false;
-                  }).length;
-                  return pendingCount > 0 ? (
-                    <span style={{
-                      marginLeft: "auto",
-                      background: "rgba(239, 68, 68, 0.2)",
-                      color: "rgb(var(--color-danger))",
-                      fontSize: "0.75rem",
-                      fontWeight: "bold",
-                      padding: "0.15rem 0.5rem",
-                      borderRadius: "999px"
-                    }}>
-                      {pendingCount}
-                    </span>
-                  ) : null;
-                })()}
-              </button>
-
-              <button
-                onClick={() => navTo("/history")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/history") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/history") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.History size={18} /> History
-              </button>
-
-              {!["FINANCE_OFFICER", "FINANCE_HEAD", "FINANCE_MANAGER"].includes(currentUser?.role) && (
-                <button
-                  onClick={() => navTo("/requests")}
-                  className="btn"
-                  style={{
-                    justifyContent: "flex-start",
-                    background: isActive("/requests") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                    color: isActive("/requests") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                  }}
-                >
-                  <Icons.Receipt size={18} /> Requests
-                </button>
-              )}
-
-              <button
-                onClick={() => navTo("/settings")}
-                className="btn"
-                style={{
-                  justifyContent: "flex-start",
-                  background: isActive("/settings") ? "rgba(255, 255, 255, 0.08)" : "transparent",
-                  color: isActive("/settings") ? "rgb(var(--color-text))" : "rgb(var(--color-text-muted))"
-                }}
-              >
-                <Icons.Settings size={18} /> Settings
-              </button>
-            </>
-          )}
+          {getNavItemsForRole(currentUser?.role).map((item) => (
+            <SidebarNavItem
+              key={item.route}
+              label={item.label}
+              icon={item.icon}
+              isActive={isActive(item.route)}
+              onClick={() => navTo(item.route)}
+              badgeCount={item.badge?.({ expenses, role: currentUser?.role })}
+            />
+          ))}
         </div>
 
         {/* User profile card at bottom of sidebar */}
-        <div style={{ marginTop: "auto", paddingTop: "0.75rem", borderTop: "1px solid rgba(255,255,255,0.08)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+        <div style={{ marginTop: "auto", paddingTop: "0.75rem", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           <div
             style={{
               padding: "0.6rem 0.75rem",
               borderRadius: "10px",
-              background: "rgba(var(--color-surface), 0.5)",
-              border: "1px solid rgba(var(--color-card-border), 0.3)",
+              background: "rgb(var(--color-surface) / 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.3)",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -660,8 +352,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 paddingBottom: "0.55rem",
                 fontSize: "0.85rem",
                 borderRadius: "8px",
-                background: "rgba(var(--color-surface), 0.5)",
-                border: "1px solid rgba(var(--color-card-border), 0.5)"
+                background: "rgb(var(--color-surface) / 0.5)",
+                border: "1px solid rgb(var(--color-card-border) / 0.5)"
               }}
             />
           </div>
@@ -686,27 +378,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-            <button
-              onClick={() => setShowCreateModal(true)}
-              disabled={!canRaiseRequest}
-              title={canRaiseRequest ? undefined : "Your role does not raise expense requests"}
-              className="btn btn-primary"
-              style={{
-                background: "#2563EB",
-                padding: "0.55rem 1.15rem",
-                borderRadius: "8px",
-                fontWeight: "600",
-                fontSize: "0.85rem",
-                display: "flex",
-                alignItems: "center",
-                gap: "0.4rem",
-                boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)",
-                opacity: canRaiseRequest ? 1 : 0.45,
-                cursor: canRaiseRequest ? "pointer" : "not-allowed"
-              }}
-            >
-              <Icons.Plus size={16} /> New Request
-            </button>
+            {/* Initiators only — see `canRaiseRequest`. */}
+            {canRaiseRequest && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="btn btn-primary"
+                style={{
+                  // `btn-primary` already paints the brand blue; no override needed.
+                  padding: "0.55rem 1.15rem",
+                  borderRadius: "8px",
+                  fontWeight: "600",
+                  fontSize: "0.85rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.4rem",
+                  boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)",
+                }}
+              >
+                <Icons.Plus size={16} /> New Request
+              </button>
+            )}
           </div>
         </div>
 
@@ -733,25 +424,26 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         uploadDocError={uploadDocError}
         removeDraftAttachment={removeDraftAttachment}
         handleCreateRequest={handleCreateRequest}
+        // The Reply dialog owns "resubmit"; this one only reflects its own two.
+        submitting={requestSubmitting === "resubmit" ? null : requestSubmitting}
       />
 
       <ExpenseDetailModal
         selectedExpense={selectedExpense}
         currentUser={currentUser}
+        budgetItems={budgetItems}
+        budgetItemsLoading={budgetItemsLoading}
         onClose={() => { setSelectedExpense(null); setActionComment(""); setDecisionSignature(""); }}
         actionComment={actionComment}
         setActionComment={setActionComment}
         adjustedAmount={adjustedAmount}
         setAdjustedAmount={setAdjustedAmount}
-        paymentRef={paymentRef}
-        setPaymentRef={setPaymentRef}
         decisionSignature={decisionSignature}
         setDecisionSignature={setDecisionSignature}
         handleCancelRequest={handleCancelRequest}
         handleExceptionalBudgetAction={handleExceptionalBudgetAction}
         handleWorkflowAction={handleWorkflowAction}
         handleFinanceUpload={handleFinanceUpload}
-        handlePaymentRelease={handlePaymentRelease}
         onViewAttachment={setViewedAttachment}
         onAddAttachments={addAttachments}
         onRemoveAttachment={removeAttachment}
@@ -771,6 +463,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onViewAttachment={setViewedAttachment}
         isUploadingDoc={isUploadingDoc}
         handleResubmitRequest={handleResubmitRequest}
+        isResubmitting={requestSubmitting === "resubmit"}
         onWithdraw={(id: string) => { setShowResubmitModal(false); handleCancelRequest(id); }}
       />
 
@@ -784,6 +477,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         isOpen={showReceiptModal}
         onClose={() => { setShowReceiptModal(false); setSelectedReceiptData(null); }}
         selectedReceiptData={selectedReceiptData}
+        onViewReceipt={setViewedAttachment}
       />
 
 
@@ -801,6 +495,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <InviteResultModal
         inviteResult={inviteResult}
         onClose={() => { setInviteResult(null); setShowInviteModal(false); }}
+        onRetry={retryInvite}
+        retrying={inviteRetrying}
       />
 
       <EditProfileModal
@@ -814,6 +510,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           setShowEditProfileModal(false);
           setShowUpdatePhotoModal(true);
         }}
+        busy={accountBusy}
       />
 
       <UpdatePhotoModal
@@ -839,6 +536,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         showPasswordNewToggle={showPasswordNewToggle}
         setShowPasswordNewToggle={setShowPasswordNewToggle}
         handleChangePassword={handleChangePassword}
+        busy={accountBusy}
       />
 
       {/* SYSTEM ADMIN MODALS — every action persists via useAdminAdministration
@@ -848,13 +546,14 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onClose={() => setShowAdminAddUserModal(false)}
         departments={departments}
         onSaveUser={(userData: any) =>
-          inviteUser({
+          inviteAndReport({
             name: userData.fullName,
             email: userData.email,
             role: userData.role,
             departmentId: userData.departmentId || undefined,
           })
         }
+        busy={adminBusy}
       />
 
       <AdminEditUserProfileModal
@@ -872,12 +571,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           })
         }
         onForceLogOut={(userId: string, name: string) => revokeUserSessions(userId, name)}
+        busy={adminBusy}
       />
 
       <AdminCreateDepartmentModal
         isOpen={showAdminCreateDeptModal}
         onClose={() => setShowAdminCreateDeptModal(false)}
-        busy={adminBusy}
         onCreateDepartment={(deptData: any) =>
           createDepartment({
             name: deptData.name,
@@ -890,6 +589,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             })),
           })
         }
+        busy={adminBusy}
       />
 
       <AdminEditDepartmentModal
@@ -897,6 +597,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onClose={() => setShowAdminEditDeptModal(false)}
         department={selectedAdminDept}
         users={systemUsers}
+        // Assignment is a user mutation, not a department one, so it goes
+        // through the same persisted path the directory's role select uses.
+        onAssignUser={(userId: string) =>
+          updateUser(userId, { departmentId: selectedAdminDept?.id ?? selectedAdminDept?._id })
+        }
         onUpdateDepartment={(updatedDept: any) =>
           updateDepartment(updatedDept.id || updatedDept._id, {
             name: updatedDept.name,
@@ -915,13 +620,28 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         isOpen={showAdminDeleteDeptModal}
         onClose={() => setShowAdminDeleteDeptModal(false)}
         department={selectedAdminDept}
-        onConfirmDelete={(deptId: string) => deleteDepartment(deptId)}
+        // Deletion cancels requests and hides the department's history, so the
+        // request lists on screen are stale until they are refetched.
+        onConfirmDelete={async (deptId: string) => {
+          await deleteDepartment(deptId);
+          await loadDashboardData(currentUser);
+        }}
       />
 
+      {/* Delete cancels the user's in-flight requests rather than refusing, so the
+          dialog is given the real count to warn with. */}
       <AdminDeleteUserModal
         isOpen={showAdminDeleteUserModal}
         onClose={() => setShowAdminDeleteUserModal(false)}
         user={selectedAdminUser}
+        inFlightCount={
+          selectedAdminUser
+            ? expenses.filter(
+                (e: any) =>
+                  sameId(e.initiatorId, selectedAdminUser.id) && isStatusIn(IN_FLIGHT_STATUSES, e.status)
+              ).length
+            : 0
+        }
         onConfirmDelete={(userId: string) => deleteUser(userId)}
       />
 
@@ -929,7 +649,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         isOpen={showAdminSuspendUserModal}
         onClose={() => setShowAdminSuspendUserModal(false)}
         user={selectedAdminUser}
-        onConfirmSuspend={(userId: string) => setUserActive(userId, false)}
+        onConfirmToggleAccess={(userId: string, nextActive: boolean) => setUserActive(userId, nextActive)}
       />
 
       <AdminEditRoleModal
@@ -948,23 +668,41 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         onOpenMatrix={() => navTo("/users-roles")}
       />
 
-      <AdminSetBudgetModal
-        isOpen={showAdminSetBudgetModal}
-        onClose={() => setShowAdminSetBudgetModal(false)}
-        departments={departments}
-        busy={adminBusy}
-        onSetBudget={(departmentId: string, totalAmount: number, lineItems: any[]) =>
-          saveBudgetPeriod({
-            departmentId,
-            totalBudget: totalAmount,
-            lineItems: lineItems.map((item) => ({
-              name: item.name,
-              description: item.description,
-              amount: Number(item.amount) || 0,
-            })),
-          })
-        }
-      />
+      {/* Mounted only while open: the dialog seeds its rows from the selected
+          department's existing items on mount, so a stale copy must not survive
+          a save-and-reopen and overwrite the allocation that was just stored. */}
+      {showAdminSetBudgetModal && (
+        <AdminSetBudgetModal
+          isOpen={showAdminSetBudgetModal}
+          onClose={() => setShowAdminSetBudgetModal(false)}
+          departments={departments}
+          budgetPeriods={budgetPeriods}
+          initialDepartmentId={selectedAdminDept?.id || selectedAdminDept?._id}
+          onSetBudget={(
+            departmentId: string,
+            totalAmount: number,
+            lineItems: any[],
+            period: FiscalPeriod
+          ) =>
+            saveBudgetPeriod({
+              departmentId,
+              // The window the admin chose, rather than the hook's default —
+              // otherwise every allocation landed on the current calendar year.
+              ...period,
+              totalBudget: totalAmount,
+              lineItems: lineItems.map((item) => ({
+                // Sent back so the server can match an edited item to the one it
+                // already holds. Dropping it made every rename look like a new
+                // item, discarding its ledger and orphaning attached requests.
+                id: item.itemId,
+                name: item.name,
+                description: item.description,
+                amount: Number(item.amount) || 0,
+              })),
+            })
+          }
+        />
+      )}
 
       <GlobalAlertDialogModal
         alertDialog={alertDialog}

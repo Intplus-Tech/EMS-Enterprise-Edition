@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { connectToDatabase } from "../../../../config/db";
+import { HIDDEN_ACCOUNT_QUERY } from "../../../../config/systemAccounts";
 import { User } from "../../../../models/User";
 import { Department } from "../../../../models/Department";
 import { authenticate } from "../../../../middlewares/auth";
-import { SystemRole } from "../../../../enums/roles";
+import { SystemRole, isDepartmentScopedRole } from "../../../../enums/roles";
 import { withErrorHandling } from "../../../../middlewares/errors";
 import { EmailService } from "../../../../domains/email/email.service";
 import { LoggerService } from "../../../../domains/logs/logger.service";
@@ -30,6 +31,20 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     throw new Error(`Invalid role: '${role}' is not a recognized system role.`);
   }
 
+  // Only initiators and approvers belong to a department; for every other role
+  // the field is dropped so a global account never gets scoped to one silently.
+  let resolvedDepartmentId: string | null = null;
+  if (isDepartmentScopedRole(role)) {
+    if (!departmentId) {
+      throw new Error(`Invalid request: a ${role} must be assigned to a department.`);
+    }
+    const dept = await Department.findById(departmentId);
+    if (!dept) {
+      throw new Error("Invalid request: the selected department does not exist.");
+    }
+    resolvedDepartmentId = departmentId;
+  }
+
   // 3. Check if user already exists
   const existingUser = await User.findOne({ email: email.toLowerCase() });
   if (existingUser) {
@@ -40,25 +55,34 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       const inviteToken = crypto.randomUUID();
       existingUser.name = name;
       existingUser.role = role;
-      existingUser.departmentId = departmentId || null;
+      existingUser.departmentId = resolvedDepartmentId;
       existingUser.inviteToken = inviteToken;
-      existingUser.inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+      existingUser.inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
       await existingUser.save();
 
       const inviteUrl = `${req.nextUrl.origin}/setup?token=${inviteToken}`;
-      await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
+      // The delivery result is carried back to the caller: the account exists
+      // either way, so this stays a 200, but the admin must be told when the
+      // provider refused the message instead of being shown "Invitation sent".
+      const delivery = await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
 
       await LoggerService.logAudit(
         AuditAction.USER_RE_INVITED,
-        `User invitation re-sent for ${name} (${email}) as ${role}`,
-        { email, role },
+        `User invitation re-sent for ${name} (${email}) as ${role}` +
+          (delivery.sent ? "" : ` — email delivery FAILED: ${delivery.error}`),
+        { email, role, emailSent: delivery.sent },
         { id: actor.id, name: actor.name, role: actor.role }
       );
 
       return NextResponse.json({
         success: true,
-        message: "Invitation re-sent successfully.",
+        message: delivery.sent
+          ? "Invitation re-sent successfully."
+          : "Invitation updated, but the email could not be delivered.",
         inviteUrl,
+        emailSent: delivery.sent,
+        emailSimulated: delivery.simulated ?? false,
+        emailError: delivery.error,
         user: {
           id: existingUser._id.toString(),
           email: existingUser.email,
@@ -74,14 +98,14 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   // 4. Generate invitation token and expires time
   const inviteToken = crypto.randomUUID();
-  const inviteExpires = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+  const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
   // 5. Create new user with inactive status and placeholder password hash
   const newUser = new User({
     email: email.toLowerCase(),
     name,
     role,
-    departmentId: departmentId || null,
+    departmentId: resolvedDepartmentId,
     isActive: false,
     passwordHash: await AuthService.hashPassword(crypto.randomUUID()),
     inviteToken,
@@ -92,20 +116,27 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   // 6. Generate the invitation link and compile/send the email
   const inviteUrl = `${req.nextUrl.origin}/setup?token=${inviteToken}`;
-  await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
+  const delivery = await EmailService.sendInviteEmail(email, name, role, inviteUrl, req.nextUrl.origin);
 
-  // 7. Log audit entry
+  // 7. Log audit entry — a failed delivery is part of the record, since the
+  // account now exists but its owner was never told.
   await LoggerService.logAudit(
     AuditAction.USER_INVITED,
-    `User ${name} (${email}) invited as ${role} by ${actor.name}`,
-    { email, role },
+    `User ${name} (${email}) invited as ${role} by ${actor.name}` +
+      (delivery.sent ? "" : ` — email delivery FAILED: ${delivery.error}`),
+    { email, role, emailSent: delivery.sent },
     { id: actor.id, name: actor.name, role: actor.role }
   );
 
   return NextResponse.json({
     success: true,
-    message: "Invitation created successfully.",
+    message: delivery.sent
+      ? "Invitation created successfully."
+      : "Account created, but the invitation email could not be delivered.",
     inviteUrl,
+    emailSent: delivery.sent,
+    emailSimulated: delivery.simulated ?? false,
+    emailError: delivery.error,
     user: {
       id: newUser._id.toString(),
       email: newUser.email,
@@ -121,7 +152,8 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   await connectToDatabase();
   await authenticate(req, [SystemRole.ADMIN]);
 
-  const users = await User.find({}).populate("departmentId").sort({ createdAt: -1 });
+  // Concealed support accounts stay out of the directory — see `systemAccounts.ts`.
+  const users = await User.find(HIDDEN_ACCOUNT_QUERY).populate("departmentId").sort({ createdAt: -1 });
   const departments = await Department.find({}).sort({ name: 1 });
 
   return NextResponse.json({

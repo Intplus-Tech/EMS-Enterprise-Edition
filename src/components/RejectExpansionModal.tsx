@@ -1,14 +1,19 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
+import { formatNairaPrecise } from "./ui/format";
 
 interface RejectExpansionModalProps {
   isOpen: boolean;
   onClose: () => void;
   requestNumber?: string;
   requestAmount?: number;
+  /** Headroom on the budget item under review, not the department's. */
   remainingBudget?: number;
+  /** Deficit on that item — the expansion being refused. */
   deficitAmount?: number;
+  /** The item the refused expansion would have been granted against. */
+  budgetItemName?: string;
   /** Receives the reason plus the signature the server verifies. */
   onConfirm?: (reason: string, signature: string) => void;
 }
@@ -23,6 +28,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
   requestAmount = 0,
   remainingBudget = 0,
   deficitAmount = 0,
+  budgetItemName,
   onConfirm
 }) => {
   const [rejectionReason, setRejectionReason] = useState(
@@ -55,7 +61,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "rgba(15, 23, 42, 0.65)",
+        backgroundColor: "rgb(var(--color-overlay) / 0.65)",
         backdropFilter: "blur(4px)",
         zIndex: 1000,
         display: "flex",
@@ -72,7 +78,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
           maxHeight: "92vh",
           overflowY: "auto",
           background: "rgb(var(--color-card))",
-          border: "1px solid rgba(var(--color-card-border), 0.6)",
+          border: "1px solid rgb(var(--color-card-border) / 0.6)",
           borderRadius: "16px",
           padding: "1.75rem 2rem",
           boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.35)",
@@ -140,17 +146,17 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
             <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.3rem" }}>
               REQUEST AMOUNT
             </span>
-            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#0F172A" }}>
-              ₦{requestAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
+              {formatNairaPrecise(requestAmount)}
             </span>
           </div>
 
           <div>
             <span style={{ fontSize: "0.725rem", fontWeight: "700", color: "#64748B", textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "0.3rem" }}>
-              REMAINING BUDGET
+              {budgetItemName ? "ITEM REMAINING" : "REMAINING BUDGET"}
             </span>
-            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#0F172A" }}>
-              ₦{remainingBudget.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "rgb(var(--color-text))" }}>
+              {formatNairaPrecise(remainingBudget)}
             </span>
           </div>
 
@@ -159,7 +165,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
               DEFICIT
             </span>
             <span style={{ fontSize: "1.15rem", fontWeight: "800", color: "#DC2626" }}>
-              -₦{deficitAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              -{formatNairaPrecise(deficitAmount)}
             </span>
           </div>
         </div>
@@ -196,8 +202,8 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
               padding: "0.85rem 1rem",
               fontSize: "0.875rem",
               borderRadius: "10px",
-              border: "1px solid rgba(var(--color-card-border), 0.6)",
-              background: "rgba(var(--color-surface), 0.5)",
+              border: "1px solid rgb(var(--color-card-border) / 0.6)",
+              background: "rgb(var(--color-surface) / 0.5)",
               color: "rgb(var(--color-text))",
               outline: "none",
               lineHeight: "1.5"
@@ -249,7 +255,7 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
               borderRadius: "8px",
               fontSize: "0.875rem",
               fontWeight: "600",
-              border: "1px solid rgba(var(--color-card-border), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.6)",
               background: "transparent",
               color: "rgb(var(--color-text))",
               cursor: "pointer"

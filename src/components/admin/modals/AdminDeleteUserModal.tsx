@@ -1,3 +1,12 @@
+/**
+ * Delete User Account dialog.
+ *
+ * Deletion no longer stops at a user with work in flight — it cancels those
+ * requests and removes the account regardless — so this dialog's job is to state
+ * that impact accurately before the admin commits. The count comes from the
+ * caller, which holds the request list; the modal performs no I/O of its own
+ * (engineering rule 1-D).
+ */
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 
@@ -5,6 +14,8 @@ interface AdminDeleteUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: any;
+  /** Requests this user raised that are still moving, and so will be cancelled. */
+  inFlightCount?: number;
   onConfirmDelete: (userId: string) => void;
 }
 
@@ -12,6 +23,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
   isOpen,
   onClose,
   user,
+  inFlightCount = 0,
   onConfirmDelete
 }) => {
   const [confirmed, setConfirmed] = useState(false);
@@ -19,6 +31,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
   if (!isOpen || !user) return null;
 
   const userName = user.name || user.fullName || "User Account";
+  const requestWord = inFlightCount === 1 ? "request" : "requests";
 
   const handleDelete = () => {
     onConfirmDelete(user._id || user.id);
@@ -29,7 +42,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgb(var(--color-overlay) / 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -42,7 +55,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
         maxWidth: "500px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
       }}>
@@ -66,7 +79,8 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
               Delete User Account
             </h3>
             <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.25rem", lineHeight: "1.4" }}>
-              This action is permanent and will remove <strong style={{ color: "rgb(var(--color-text))" }}>{userName}</strong> from all active workflows. Historical audit logs will be preserved.
+              This action is permanent and will remove <strong style={{ color: "rgb(var(--color-text))" }}>{userName}</strong> from all active workflows,
+              cancelling any request still in flight. Historical audit logs will be preserved.
             </p>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", cursor: "pointer" }}>
@@ -82,14 +96,21 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
           padding: "1rem",
           marginBottom: "1.25rem"
         }}>
-          <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "#60a5fa", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-primary))", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
             <Icons.Info size={14} />
             IMPACT ASSESSMENT
           </div>
+          {/* Real consequences of this specific deletion. These were three fixed
+              sentences — including a "3 pending approvals" that had nothing to do
+              with the account being deleted. */}
           <ul style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))", paddingLeft: "1.25rem", lineHeight: "1.5" }}>
-            <li style={{ marginBottom: "0.3rem" }}>3 pending approvals will be cancelled</li>
-            <li style={{ marginBottom: "0.3rem" }}>Access to "Corporate Q3 Budget" workflow will be revoked immediately.</li>
-            <li>Assigned hardware assets will be flagged for recovery.</li>
+            <li style={{ marginBottom: "0.3rem" }}>
+              {inFlightCount > 0
+                ? `${inFlightCount} in-flight ${requestWord} will be cancelled, releasing any budget they reserved.`
+                : "No in-flight requests — nothing will be cancelled."}
+            </li>
+            <li style={{ marginBottom: "0.3rem" }}>Access is revoked immediately and every active session ends.</li>
+            <li>Completed requests stay in history and the audit trail is preserved.</li>
           </ul>
         </div>
 
@@ -110,7 +131,9 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
             style={{ cursor: "pointer" }}
           />
           <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>
-            I understand that this action cannot be undone.
+            {inFlightCount > 0
+              ? `I understand this cannot be undone and will cancel ${inFlightCount} in-flight ${requestWord}.`
+              : "I understand that this action cannot be undone."}
           </span>
         </div>
 
@@ -122,7 +145,7 @@ export const AdminDeleteUserModal: React.FC<AdminDeleteUserModalProps> = ({
             style={{
               padding: "0.65rem 1.25rem",
               borderRadius: "0.5rem",
-              border: "1px solid rgba(255, 255, 255, 0.15)",
+              border: "1px solid rgb(var(--color-card-border))",
               backgroundColor: "transparent",
               color: "rgb(var(--color-text))",
               fontWeight: "600",

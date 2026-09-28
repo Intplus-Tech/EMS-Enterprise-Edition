@@ -14,6 +14,7 @@ export default function SettingsPage() {
     setShowEditProfileModal,
     setShowUpdatePhotoModal,
     setEditProfileForm,
+    editProfileForm,
     handleUpdateProfile,
   } = useDashboard();
 
@@ -30,6 +31,7 @@ export default function SettingsPage() {
       setShowEditProfileModal={setShowEditProfileModal}
       setShowUpdatePhotoModal={setShowUpdatePhotoModal}
       setEditProfileForm={setEditProfileForm}
+      editProfileForm={editProfileForm}
       handleUpdateProfile={handleUpdateProfile}
     />
   );

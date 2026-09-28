@@ -7,6 +7,8 @@
  * call sites use plain try/catch instead of re-checking `data.success` each time.
  */
 
+import { SessionEndReason, sessionEndReasonFor } from "../domains/auth/session";
+
 export class ApiRequestError extends Error {
   public readonly status: number;
   public readonly details?: unknown;
@@ -20,6 +22,28 @@ export class ApiRequestError extends Error {
 }
 
 type Payload = Record<string, unknown> | undefined;
+
+/**
+ * Notified when the server takes a session away mid-visit.
+ *
+ * Every screen reaches the API through this module, so this is the one place
+ * that sees a session die on a call the user did not make deliberately. Without
+ * it a displaced device sat on a dashboard whose every request now 401s, with
+ * each call site quietly logging the failure to the console — the screen simply
+ * stopped updating and never said why.
+ *
+ * Registered by the dashboard provider rather than acted on here: navigation is
+ * the app's business, not the transport's (engineering rule 1-D).
+ */
+let sessionLostHandler: ((reason: SessionEndReason) => void) | null = null;
+
+/** Registers the handler; returns the unsubscribe for the caller's effect. */
+export function onSessionLost(handler: (reason: SessionEndReason) => void): () => void {
+  sessionLostHandler = handler;
+  return () => {
+    if (sessionLostHandler === handler) sessionLostHandler = null;
+  };
+}
 
 async function request<T>(method: string, url: string, body?: Payload): Promise<T> {
   let response: Response;
@@ -50,11 +74,18 @@ async function request<T>(method: string, url: string, body?: Payload): Promise<
   }
 
   if (!response.ok || data.success === false) {
-    throw new ApiRequestError(
-      data.error || "The request could not be completed.",
-      response.status,
-      data.details
-    );
+    const message = data.error || "The request could not be completed.";
+
+    // A 401 that names a session the server ended — displaced by a sign-in
+    // elsewhere, or revoked by an admin — is reported once, centrally. A 401
+    // with no session to speak of (no cookie at all) is the ordinary
+    // signed-out path and stays silent; see `sessionEndReasonFor`.
+    if (response.status === 401) {
+      const reason = sessionEndReasonFor(message);
+      if (reason) sessionLostHandler?.(reason);
+    }
+
+    throw new ApiRequestError(message, response.status, data.details);
   }
 
   return data as T;

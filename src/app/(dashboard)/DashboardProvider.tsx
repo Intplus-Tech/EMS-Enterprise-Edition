@@ -8,14 +8,35 @@ import { buildNotifications, formatRelativeTime } from "../../domains/notificati
 import { useAdminAdministration } from "./hooks/useAdminAdministration";
 import { useExpenseActions } from "./hooks/useExpenseActions";
 import { useAttachments } from "./hooks/useAttachments";
+import { useBudgetItems } from "./hooks/useBudgetItems";
 import { ExpenseClient } from "../../services/expense.client";
-import { AdminClient } from "../../services/admin.client";
+import { AdminClient, InviteInput } from "../../services/admin.client";
 import { AuthClient } from "../../services/auth.client";
-import { ApiRequestError, toErrorMessage } from "../../services/http";
-import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
-import { AttachmentInput } from "../../types/api";
+import { ApiRequestError, onSessionLost, toErrorMessage } from "../../services/http";
+import { SESSION_REASON_PARAM } from "../../domains/auth/session";
+import {
+  firstNewRequestError,
+  validateNewRequestForm,
+} from "../../domains/expense/request-form.rules";
+import { AttachmentInput, InviteResultDto } from "../../types/api";
 import type { AttachmentTarget } from "../../components/modals/AttachmentViewModal";
 import { WorkflowActionType } from "../../enums/workflowActions";
+
+/**
+ * Told to the initiator when a submission is accepted but held: the department
+ * has no budget period covering the payment date, so there is nothing to
+ * reserve against and no approver to route to yet.
+ */
+const HELD_FOR_BUDGET_MESSAGE =
+  "Request submitted, and on hold: your department has no budget set for that payment date. " +
+  "It continues to the approver automatically once an administrator sets one.";
+
+/**
+ * Which initiator write is currently in flight. The dialogs spin the button
+ * that started it and refuse a second click; `null` means idle. One flag covers
+ * all three because the New Request and Reply dialogs are never open together.
+ */
+export type RequestSubmitPhase = "draft" | "submit" | "resubmit" | null;
 
 const DISMISSED_NOTIFICATIONS_KEY = "ems.notifications.dismissed";
 const READ_NOTIFICATIONS_KEY = "ems.notifications.read";
@@ -34,7 +55,6 @@ function readStoredIds(key: string): string[] {
 /** Blank New Request form. Extracted so create and reset cannot drift apart. */
 function emptyRequestForm() {
   return {
-    category: DEFAULT_EXPENSE_CATEGORY as string,
     description: "",
     amount: "",
     supportingDocuments: [] as AttachmentInput[],
@@ -87,7 +107,7 @@ function useDashboardState() {
   const { systemUsers, departments } = admin;
 
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteResult, setInviteResult] = useState<any>(null);
+  const [inviteResult, setInviteResult] = useState<InviteResultDto | null>(null);
   const [inviteForm, setInviteForm] = useState({
     name: "",
     email: "",
@@ -96,6 +116,14 @@ function useDashboardState() {
   });
   const [inviteError, setInviteError] = useState("");
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  // The payload behind the invitation currently on screen, so a failed delivery
+  // can be retried after the form has been reset.
+  const [lastInvitePayload, setLastInvitePayload] = useState<InviteInput | null>(null);
+  const [inviteRetrying, setInviteRetrying] = useState(false);
+
+  // Covers both "my account" writes (profile edit, password change). They are
+  // never in flight at the same time, so one flag drives both dialogs' buttons.
+  const [accountBusy, setAccountBusy] = useState(false);
 
   // System Admin Modal States
   const [showAdminAddUserModal, setShowAdminAddUserModal] = useState(false);
@@ -116,7 +144,6 @@ function useDashboardState() {
   const [selectedExpense, setSelectedExpense] = useState<any>(null);
   const [actionComment, setActionComment] = useState("");
   const [adjustedAmount, setAdjustedAmount] = useState<number>(0);
-  const [paymentRef, setPaymentRef] = useState("");
   // Identity re-confirmation for decisions taken from the detail modal. Held
   // here (not in the modal) so it is cleared alongside the rest of the form.
   const [decisionSignature, setDecisionSignature] = useState("");
@@ -126,8 +153,10 @@ function useDashboardState() {
   const [workflowMessage, setWorkflowMessage] = useState("");
 
   // Logs data (Admin)
+  // Feeds "Recent System Activity" on the admin overview. The Audit Trail screen
+  // pages against the database itself (see useAuditTrailLogs) and does not read
+  // this snapshot, so no filter state is kept alongside it.
   const [systemLogs, setSystemLogs] = useState<any[]>([]);
-  const [logFilter, setLogFilter] = useState("ALL"); // ALL, AUDIT, EXCEPTION, APP
 
   // Dashboard metrics
   const [metrics, setMetrics] = useState<any>(null);
@@ -136,6 +165,8 @@ function useDashboardState() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newRequest, setNewRequest] = useState(emptyRequestForm);
   const [formError, setFormError] = useState("");
+  // Drives the in-flight state of Save Draft / Submit Request / Submit Reply.
+  const [requestSubmitting, setRequestSubmitting] = useState<RequestSubmitPhase>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resubmitFileInputRef = useRef<HTMLInputElement>(null);
@@ -191,6 +222,8 @@ function useDashboardState() {
 
     setIsUploadingDoc(false);
   };
+
+  const { budgetItems, budgetItemsLoading } = useBudgetItems(selectedExpense?._id);
 
   /** Drops a not-yet-submitted upload from the New Request / Resubmit form. */
   const removeDraftAttachment = useCallback((url: string, isResubmit = false) => {
@@ -368,6 +401,19 @@ function useDashboardState() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A session taken away mid-visit — displaced by a sign-in on another device,
+  // or revoked by an administrator — lands the user back on the sign-in screen
+  // with the reason, instead of leaving them on a dashboard whose every request
+  // now fails silently. `replace`, not `push`: the dead session is not
+  // somewhere the back button should return to.
+  useEffect(
+    () =>
+      onSessionLost((reason) => {
+        router.replace(`/login?${SESSION_REASON_PARAM}=${reason}`);
+      }),
+    [router]
+  );
+
   // Client-side Role-based Navigation Guard.
   // Redirects to the role's default route only when the current path is not permitted.
   useEffect(() => {
@@ -430,9 +476,12 @@ function useDashboardState() {
     }
   };
 
+  // Feeds the Logs tab's scrolling list. The Audit Trail screen does not read
+  // this — it pages against the database through `useAuditTrailLogs`.
   const loadLogs = async (filter: string) => {
     try {
-      setSystemLogs(await AdminClient.listLogs(filter));
+      const { logs } = await AdminClient.listLogs({ type: filter });
+      setSystemLogs(logs);
     } catch (e) {
       console.error("Error loading logs:", e);
     }
@@ -445,12 +494,51 @@ function useDashboardState() {
     try {
       const result = await AdminClient.inviteUser(inviteForm);
       setInviteResult(result);
+      // Kept so "Retry sending" can re-issue the same invitation; the form
+      // itself is cleared below, so it can no longer supply these values.
+      setLastInvitePayload(inviteForm);
       setInviteForm({ name: "", email: "", role: "INITIATOR", departmentId: "" });
       admin.loadUsers();
     } catch (err) {
       setInviteError(toErrorMessage(err, "Failed to invite user"));
     } finally {
       setInviteSubmitting(false);
+    }
+  };
+
+  /**
+   * Invites from the admin "Add User" screen and raises the result dialog when
+   * there is something to act on.
+   *
+   * A clean send is already reported by the notice banner, so the dialog is
+   * reserved for the cases that need a decision: delivery failed (retry), or no
+   * provider is configured (copy the link and send it yourself).
+   */
+  const inviteAndReport = async (payload: InviteInput) => {
+    const result = await admin.inviteUser(payload);
+    if (result) {
+      setLastInvitePayload(payload);
+      if (!result.emailSent || result.emailSimulated) setInviteResult(result);
+    }
+    return result;
+  };
+
+  /**
+   * Re-issues the last invitation after a failed delivery.
+   *
+   * Re-posting the same email inside the invite window takes the route's
+   * re-invite branch: a new token is generated and the mail is sent again. The
+   * result replaces what the dialog is showing, so a second failure reports the
+   * new reason rather than the stale one, and a success flips it to "sent".
+   */
+  const retryInvite = async () => {
+    if (!lastInvitePayload) return;
+    setInviteRetrying(true);
+    try {
+      const result = await admin.inviteUser(lastInvitePayload);
+      if (result) setInviteResult(result);
+    } finally {
+      setInviteRetrying(false);
     }
   };
 
@@ -470,67 +558,98 @@ function useDashboardState() {
   // Submit new request (Save Draft or Submit directly)
   const handleCreateRequest = async (e: React.FormEvent, shouldSubmit: boolean = false) => {
     if (e) e.preventDefault();
+    // Submitting takes two round-trips (create, then submit) with nothing on
+    // screen to say so, and both footer buttons stayed live throughout — a
+    // second click raised a second request. The guard is the real fix; the
+    // spinner the dialog now shows is what makes waiting make sense.
+    if (requestSubmitting) return;
     setFormError("");
 
-    if (!newRequest.description || !newRequest.amount || !newRequest.vendorName) {
-      setFormError("All required text fields must be filled.");
+    // One rule set, shared with the dialog's per-field messages, so the gate and
+    // the red text can never disagree. This replaced an if-chain that checked
+    // four of the eight fields — account name, the payment date and the *shape*
+    // of the amount and account number were never checked at all, and vendor
+    // bank details once fell back to placeholder values ("1234567890",
+    // "Corporate Bank Plc"), sending a payment instruction to an invented
+    // account. `ExpenseInitiateSchema` remains the real boundary (rule 5).
+    const errors = validateNewRequestForm(newRequest);
+    const firstError = firstNewRequestError(errors);
+    if (firstError) {
+      setFormError(firstError);
       return;
     }
 
-    if (newRequest.supportingDocuments.length === 0) {
-      setFormError("At least one supporting document is mandatory. Please upload a file.");
-      return;
-    }
-
-    // Vendor bank details used to fall back to placeholder values ("1234567890",
-    // "Corporate Bank Plc") when left blank, which would have sent a real payment
-    // instruction to a fabricated account. They are now required.
-    if (!newRequest.accountNumber || !newRequest.bankName) {
-      setFormError("Vendor bank name and account number are required to raise a payment request.");
-      return;
-    }
-
+    setRequestSubmitting(shouldSubmit ? "submit" : "draft");
     try {
+      // No `category`: the initiator does not classify their own spend, so the
+      // server applies the default. Resubmission (below) still sends the stored
+      // value, since that request already has one.
       const created = await ExpenseClient.create({
-        category: newRequest.category,
         description: newRequest.description,
         amount: Number(newRequest.amount),
         supportingDocuments: newRequest.supportingDocuments,
         vendorName: newRequest.vendorName,
         vendorBankDetails: {
+          // No `|| vendorName` fallback any more: account name is validated as
+          // its own field, and quietly paying "Acme Corp Int" into an account
+          // held under a different name is the mismatch a bank rejects.
           accountNumber: newRequest.accountNumber,
           bankName: newRequest.bankName,
-          accountName: newRequest.accountName || newRequest.vendorName,
+          accountName: newRequest.accountName,
         },
         requiredPaymentDate: newRequest.requiredPaymentDate,
       });
 
+      let heldForBudget = false;
       if (shouldSubmit) {
         try {
-          await ExpenseClient.submit(created._id);
+          const { request: submitted } = await ExpenseClient.submit(created._id);
+          // A request whose department has no budget period for that payment
+          // date is accepted but held, not routed. Saying nothing would leave
+          // the initiator watching a request that never reaches an approver.
+          heldForBudget = Boolean(submitted?.awaitingBudgetPeriod);
         } catch (submitError) {
           // The draft did save, so say so rather than implying nothing happened.
           setFormError(`Draft saved, but failed to submit: ${toErrorMessage(submitError)}`);
-          loadDashboardData(currentUser);
+          await loadDashboardData(currentUser);
           return;
         }
       }
 
+      // Refetch *before* closing. The reload used to be fire-and-forget, so the
+      // dialog closed onto a stale Active Requests list and the new row only
+      // appeared a round-trip later — reading as "it didn't update".
+      await loadDashboardData(currentUser);
+
       setShowCreateModal(false);
       setNewRequest(emptyRequestForm());
-      loadDashboardData(currentUser);
+      // A silent close left the initiator unsure the request had gone anywhere;
+      // only the held-for-budget case ever confirmed anything.
+      notifySuccess(
+        heldForBudget
+          ? HELD_FOR_BUDGET_MESSAGE
+          : shouldSubmit
+            ? "Request submitted for approval."
+            : "Draft saved. You can submit it from My Drafts."
+      );
     } catch (err) {
       setFormError(toErrorMessage(err, "Failed to create request"));
+    } finally {
+      setRequestSubmitting(null);
     }
   };
 
   // Initiator updates and resubmits a returned request
   const handleResubmitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Same two-call shape as a first submission (update, then submit), so it
+    // needs the same re-entry guard.
+    if (requestSubmitting) return;
     setFormError("");
 
     if (!selectedResubmitExpense) return;
 
+    setRequestSubmitting("resubmit");
     try {
       // Update the details, then re-enter the workflow. Both must succeed for
       // the resubmission to count, so they share one try block.
@@ -554,15 +673,24 @@ function useDashboardState() {
         vendorBankDetails: selectedResubmitExpense.vendorBankDetails,
         requiredPaymentDate: selectedResubmitExpense.requiredPaymentDate,
       });
-      await ExpenseClient.submit(selectedResubmitExpense._id);
+      const { request: resubmitted } = await ExpenseClient.submit(selectedResubmitExpense._id);
+
+      // Refetched before the dialog closes, so the request has already moved out
+      // of "Awaiting Your Response" by the time the initiator sees the screen.
+      await loadDashboardData(currentUser);
 
       setShowResubmitModal(false);
       setSelectedResubmitExpense(null);
       setResubmitForm({ justification: "", supportingDocuments: [] });
-      loadDashboardData(currentUser);
-      notifySuccess("Request updated and resubmitted.");
+      notifySuccess(
+        resubmitted?.awaitingBudgetPeriod
+          ? HELD_FOR_BUDGET_MESSAGE
+          : "Request updated and resubmitted."
+      );
     } catch (err) {
       setFormError(toErrorMessage(err, "Failed to resubmit request."));
+    } finally {
+      setRequestSubmitting(null);
     }
   };
 
@@ -594,24 +722,49 @@ function useDashboardState() {
       return;
     }
 
+    setAccountBusy(true);
     try {
       await AuthClient.changePassword(settingsForm.currentPassword, settingsForm.newPassword);
       setSettingsMessage("Password successfully updated!");
       setSettingsForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
     } catch (err) {
       setSettingsError(toErrorMessage(err, "Failed to update password."));
+    } finally {
+      setAccountBusy(false);
     }
   };
 
-  const handleUpdateProfile = async (e: React.FormEvent) => {
+  /**
+   * Persists the profile form.
+   *
+   * `override` exists for callers that compute the payload themselves — the
+   * Settings screen's "Save Update" button sets the staged form and submits in
+   * the same click, so reading `editProfileForm` here saw the *previous* render's
+   * value: on a fresh session that is the blank initial form, and the request
+   * cleared the account's name and email.
+   */
+  const handleUpdateProfile = async (
+    e: React.FormEvent | null,
+    override?: Partial<typeof editProfileForm>
+  ) => {
     if (e) e.preventDefault();
+    const form = { ...editProfileForm, ...override };
+
+    // Blank identity fields are never a legitimate edit; the server rejects them
+    // too, but failing here keeps the message specific to the field at fault.
+    if (!form.name?.trim() || !form.email?.trim()) {
+      notifyError("Name and email address are both required.");
+      return;
+    }
+
+    setAccountBusy(true);
     try {
       const user = await AuthClient.updateProfile({
-        name: editProfileForm.name,
-        email: editProfileForm.email,
-        officialContact: editProfileForm.officialContact,
-        personalContact: editProfileForm.personalContact,
-        avatar: editProfileForm.avatar,
+        name: form.name,
+        email: form.email,
+        officialContact: form.officialContact,
+        personalContact: form.personalContact,
+        avatar: form.avatar,
       });
       setCurrentUser({ ...currentUser, ...user });
       setShowEditProfileModal(false);
@@ -619,6 +772,8 @@ function useDashboardState() {
       notifySuccess("Profile updated.");
     } catch (err) {
       notifyError(toErrorMessage(err, "Failed to update profile."));
+    } finally {
+      setAccountBusy(false);
     }
   };
 
@@ -638,9 +793,9 @@ function useDashboardState() {
   };
 
   // Approver decision (from the request detail modal)
-  const handleWorkflowAction = async (id: string, action: WorkflowActionType) => {
+  const handleWorkflowAction = async (id: string, action: WorkflowActionType, budgetItemId?: string) => {
     try {
-      await ExpenseClient.workflowAction(id, action, actionComment, decisionSignature);
+      await ExpenseClient.workflowAction(id, action, actionComment, decisionSignature, budgetItemId);
       setSelectedExpense(null);
       setActionComment("");
       setDecisionSignature("");
@@ -663,23 +818,10 @@ function useDashboardState() {
     }
   };
 
-  // Finance Manager release payment
-  const handlePaymentRelease = async (id: string) => {
-    if (!paymentRef) {
-      notifyError("A payment transaction reference is required to release cash.");
-      return;
-    }
-    try {
-      await ExpenseClient.releasePayment(id, paymentRef, decisionSignature);
-      setSelectedExpense(null);
-      setPaymentRef("");
-      setDecisionSignature("");
-      loadDashboardData(currentUser);
-      notifySuccess(`Payment released. Reference: ${paymentRef}`);
-    } catch (err) {
-      notifyError(toErrorMessage(err));
-    }
-  };
+  // Payment release is deliberately absent here. It belongs to the Approvals
+  // screen's release dialog, which is the only place that captures the transfer
+  // receipt alongside the bank reference; this provider had no receipt to send,
+  // so releasing from a detail modal filed the payment with no evidence.
 
   // Admin dynamic workflow update
   const handleSaveWorkflowConfig = async () => {
@@ -755,9 +897,11 @@ function useDashboardState() {
     adminNotice, setAdminNotice,
     showInviteModal, setShowInviteModal,
     inviteResult, setInviteResult,
+    inviteAndReport, retryInvite, inviteRetrying,
     inviteForm, setInviteForm,
     inviteError, setInviteError,
     inviteSubmitting, setInviteSubmitting,
+    accountBusy,
     showAdminAddUserModal, setShowAdminAddUserModal,
     showAdminEditUserProfileModal, setShowAdminEditUserProfileModal,
     selectedAdminUser, setSelectedAdminUser,
@@ -774,16 +918,15 @@ function useDashboardState() {
     selectedExpense, setSelectedExpense,
     actionComment, setActionComment,
     adjustedAmount, setAdjustedAmount,
-    paymentRef, setPaymentRef,
     decisionSignature, setDecisionSignature,
     workflowSteps, setWorkflowSteps,
     workflowMessage, setWorkflowMessage,
     systemLogs, setSystemLogs,
-    logFilter, setLogFilter,
     metrics, setMetrics,
     showCreateModal, setShowCreateModal,
     newRequest, setNewRequest,
     formError, setFormError,
+    requestSubmitting,
     fileInputRef,
     resubmitFileInputRef,
     isUploadingDoc, setIsUploadingDoc,
@@ -846,7 +989,8 @@ function useDashboardState() {
     handleExceptionalBudgetAction,
     handleWorkflowAction,
     handleFinanceUpload,
-    handlePaymentRelease,
+    budgetItems,
+    budgetItemsLoading,
     handleSaveWorkflowConfig,
     moveWorkflowStep,
     handleStepDetailChange,

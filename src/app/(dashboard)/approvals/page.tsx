@@ -4,10 +4,12 @@
  * Approvals route. Supplies the tab with data and workflow callbacks; the tab
  * itself performs no I/O (engineering rule 1-D).
  */
+import { useState } from "react";
 import { ApprovalsTab } from "../../../components/ApprovalsTab";
 import { useDashboard } from "../DashboardProvider";
 import { SystemRole } from "../../../enums/roles";
 import { useBudgetContext } from "../hooks/useBudgetContext";
+import { useBudgetItems } from "../hooks/useBudgetItems";
 import { useRequestThread } from "../hooks/useRequestThread";
 
 export default function ApprovalsPage() {
@@ -30,9 +32,17 @@ export default function ApprovalsPage() {
   // expansion dialogs show the department's actual figures.
   const { budgetContext } = useBudgetContext(selectedExpense?._id);
 
-  // Persisted communication thread for the open request.
-  const { thread, threadSending, addComment } = useRequestThread(
-    selectedExpense?._id,
+  // The department's budget items, so the approver's "Approve Financial
+  // Request" dialog can offer real allocations with their live headroom.
+  const { budgetItems, budgetItemsLoading } = useBudgetItems(selectedExpense?._id);
+
+  // The Completed list opens the release and communication-thread dialogs
+  // without selecting a request, so the tab reports which one it is showing.
+  const [threadTargetId, setThreadTargetId] = useState<string | null>(null);
+
+  // Persisted communication thread for whichever request is in focus.
+  const { thread, threadLoading, threadSending, addComment } = useRequestThread(
+    threadTargetId ?? selectedExpense?._id,
     (message) => setAdminNotice({ tone: "error", message })
   );
 
@@ -53,8 +63,12 @@ export default function ApprovalsPage() {
       selectedExpense={selectedExpense}
       actions={expenseActions}
       budgetContext={budgetContext}
+      budgetItems={budgetItems}
+      budgetItemsLoading={budgetItemsLoading}
       thread={thread}
+      threadLoading={threadLoading}
       threadSending={threadSending}
+      onFocusThreadRequest={setThreadTargetId}
       onAddComment={addComment}
       onViewAttachment={setViewedAttachment}
       onAddAttachments={addAttachments}

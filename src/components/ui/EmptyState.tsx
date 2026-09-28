@@ -32,7 +32,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, description
         width: 46,
         height: 46,
         borderRadius: "50%",
-        background: "rgba(var(--color-text-muted), 0.12)",
+        background: "rgb(var(--color-text-muted) / 0.12)",
         color: "rgb(var(--color-text-dim))",
         display: "flex",
         alignItems: "center",

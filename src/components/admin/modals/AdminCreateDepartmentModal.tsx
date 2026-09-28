@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
-import { useResetOnOpen } from "../../ui/useResetOnOpen";
+import { SubmitButton } from "../../ui/SubmitButton";
+import { CURRENCY_SYMBOL, formatNairaPrecise } from "../../ui/format";
 
 interface LineItem {
   id: string;
@@ -12,8 +13,8 @@ interface LineItem {
 interface AdminCreateDepartmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  /** Resolves false when the create was refused, so the modal can stay open. */
-  onCreateDepartment: (deptData: any) => void | Promise<boolean | void>;
+  onCreateDepartment: (deptData: any) => void;
+  /** True while the department (and its opening budget) is being persisted. */
   busy?: boolean;
 }
 
@@ -27,13 +28,6 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
   // Starts empty: the modal used to pre-fill three invented allocation lines
   // totalling ₦9,000,000, which would have been saved verbatim on submit.
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
-
-  // This modal renders null rather than unmounting, so without an explicit
-  // reset the next open still showed the previous department's entry.
-  useResetOnOpen(isOpen, () => {
-    setDeptName("");
-    setLineItems([]);
-  });
 
   if (!isOpen) return null;
 
@@ -62,23 +56,21 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
     setLineItems(lineItems.filter(item => item.id !== id));
   };
 
-  // Closes only on a confirmed create, so a rejected name (duplicate, too short)
-  // leaves the entry on screen to correct rather than silently discarding it.
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const created = await onCreateDepartment({
+    onCreateDepartment({
       name: deptName,
       totalBudget: totalAllocation,
       lineItems
     });
-    if (created !== false) onClose();
+    onClose();
   };
 
   return (
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgb(var(--color-overlay) / 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -91,7 +83,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
         maxWidth: "600px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
         maxHeight: "90vh",
@@ -134,8 +126,8 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
               style={{
                 width: "100%",
                 padding: "0.65rem 0.85rem",
-                backgroundColor: "rgba(15, 23, 42, 0.6)",
-                border: "1px solid rgba(255, 255, 255, 0.12)",
+                backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                border: "1px solid rgb(var(--color-card-border))",
                 borderRadius: "0.5rem",
                 color: "rgb(var(--color-text))",
                 fontSize: "0.9rem",
@@ -159,7 +151,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             <div style={{ marginBottom: "1rem" }}>
               <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>TOTAL ALLOCATION</div>
               <div style={{ fontSize: "1.35rem", fontWeight: "800", color: "#38bdf8", marginTop: "0.15rem" }}>
-                ₦{totalAllocation.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {formatNairaPrecise(totalAllocation)}
               </div>
             </div>
 
@@ -167,8 +159,8 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               {lineItems.map((item) => (
                 <div key={item.id} style={{
-                  backgroundColor: "rgba(15, 23, 42, 0.5)",
-                  border: "1px solid rgba(255, 255, 255, 0.08)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.5)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.5)",
                   borderRadius: "0.5rem",
                   padding: "0.75rem 1rem",
                   display: "flex",
@@ -206,7 +198,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                     />
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>₦</span>
+                    <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", fontWeight: "600" }}>{CURRENCY_SYMBOL}</span>
                     <input
                       type="number"
                       value={item.amount}
@@ -215,7 +207,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                         width: "110px",
                         padding: "0.35rem 0.6rem",
                         backgroundColor: "rgba(30, 41, 59, 0.8)",
-                        border: "1px solid rgba(255, 255, 255, 0.1)",
+                        border: "1px solid rgb(var(--color-card-border))",
                         borderRadius: "0.375rem",
                         color: "rgb(var(--color-text))",
                         fontSize: "0.85rem",
@@ -246,7 +238,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                 borderRadius: "0.5rem",
                 border: "1px dashed rgba(59, 130, 246, 0.4)",
                 backgroundColor: "transparent",
-                color: "#60a5fa",
+                color: "rgb(var(--color-primary))",
                 fontSize: "0.8rem",
                 fontWeight: "600",
                 display: "flex",
@@ -269,7 +261,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
               style={{
                 padding: "0.65rem 1.25rem",
                 borderRadius: "0.5rem",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgb(var(--color-card-border))",
                 backgroundColor: "transparent",
                 color: "rgb(var(--color-text))",
                 fontWeight: "600",
@@ -279,24 +271,19 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             >
               Cancel
             </button>
-            <button
+            <SubmitButton
               type="submit"
-              disabled={busy}
+              loading={busy}
+              loadingLabel="Creating…"
               style={{
                 padding: "0.65rem 1.25rem",
-                borderRadius: "0.5rem",
-                border: "none",
-                backgroundColor: "#2563eb",
-                color: "#ffffff",
-                fontWeight: "600",
                 fontSize: "0.85rem",
-                cursor: busy ? "not-allowed" : "pointer",
-                opacity: busy ? 0.6 : 1,
+                fontWeight: 600,
                 boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
               }}
             >
-              {busy ? "Creating…" : "Create Department"}
-            </button>
+              Create Department
+            </SubmitButton>
           </div>
         </form>
       </div>

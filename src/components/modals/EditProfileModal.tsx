@@ -2,6 +2,7 @@
 
 import React from "react";
 import * as Icons from "lucide-react";
+import { SubmitButton } from "../ui/SubmitButton";
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -11,6 +12,8 @@ interface EditProfileModalProps {
   setEditProfileForm: React.Dispatch<React.SetStateAction<any>>;
   handleUpdateProfile: (e: React.FormEvent) => Promise<void>;
   onOpenUpdatePhotoModal: () => void;
+  /** True while the profile save is in flight. */
+  busy?: boolean;
 }
 
 export const EditProfileModal: React.FC<EditProfileModalProps> = ({
@@ -21,6 +24,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   setEditProfileForm,
   handleUpdateProfile,
   onOpenUpdatePhotoModal,
+  busy = false,
 }) => {
   if (!isOpen) return null;
 
@@ -37,7 +41,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
           </button>
         </div>
 
-        <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: 0 }} />
+        <hr style={{ border: "none", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", margin: 0 }} />
 
         <form onSubmit={handleUpdateProfile} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
           {/* Profile Photo Row */}
@@ -63,7 +67,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   type="button" 
                   onClick={onOpenUpdatePhotoModal}
                   className="btn btn-secondary" 
-                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.75rem", background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "rgb(var(--color-text))" }}
+                  style={{ padding: "0.35rem 0.75rem", fontSize: "0.75rem", background: "none", border: "1px solid rgb(var(--color-card-border))", color: "rgb(var(--color-text))" }}
                 >
                   Change Photo
                 </button>
@@ -127,13 +131,15 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))", marginTop: "0.25rem", display: "block", fontStyle: "italic" }}>Managed by Administration</span>
             </div>
 
+            {/* Department — only initiators and approvers have one; the previous
+                "Operations" fallback named a department that does not exist. */}
             <div className="form-group" style={{ margin: 0 }}>
               <label className="form-label" style={{ fontSize: "0.8rem", fontWeight: "700" }}>Department</label>
               <div className="icon-input-wrapper">
                 <input
                   type="text"
                   disabled
-                  value={currentUser?.departmentName || "Operations"}
+                  value={currentUser?.departmentName || "Enterprise-wide"}
                   className="form-input icon-input-field"
                   style={{ fontSize: "0.85rem", padding: "0.6rem 2.25rem 0.6rem 0.85rem", background: "rgba(99, 102, 241, 0.05)", cursor: "not-allowed" }}
                 />
@@ -173,15 +179,20 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             <span>Some fields are managed by your organization's directory service and cannot be changed manually. Contact HR for department or role updates.</span>
           </div>
 
-          <hr style={{ border: "none", borderTop: "1px solid rgba(255,255,255,0.08)", margin: 0 }} />
+          <hr style={{ border: "none", borderTop: "1px solid rgb(var(--color-card-border) / 0.5)", margin: 0 }} />
 
           <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
             <button type="button" onClick={onClose} className="btn btn-secondary" style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))" }}>
               Cancel
             </button>
-            <button type="submit" className="btn btn-primary" style={{ padding: "0.55rem 1.25rem", borderRadius: "8px", fontWeight: "600", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <SubmitButton
+              type="submit"
+              loading={busy}
+              loadingLabel="Saving…"
+              style={{ padding: "0.55rem 1.25rem", borderRadius: "8px", fontWeight: 600 }}
+            >
               Save Changes <Icons.CheckCircle size={16} />
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>

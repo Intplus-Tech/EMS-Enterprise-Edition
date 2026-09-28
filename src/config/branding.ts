@@ -6,14 +6,23 @@
 import { ENV } from "./env";
 
 export const BRANDING = {
-  appName: "SpendFlow",
+  /**
+   * Short for "Expense Management System". The only place the product name is
+   * written down — every surface (sidebar, auth pages, email subjects and
+   * footers, dialog titles) reads it from here. Do not re-type it inline.
+   */
+  appName: "EMS",
   logoIcon: "Wallet", // This corresponds to the Lucide icon name we will render dynamically
   logoUrl: ENV.NEXT_PUBLIC_APP_LOGO_URL, // Configurable from ENV source of truth
-  tagline: "Dynamic Expense & Budget Management",
+  tagline: "Enterprise Edition",
   theme: {
-    // Standard Dark Mode palette with Indigo/Purple highlights
-    primary: "99 102 241",      // RGB for #6366f1 (Indigo 500)
-    primaryHover: "79 70 229", // RGB for #4f46e5 (Indigo 600)
+    // Brand accent is the blue every design uses for primary actions, active
+    // navigation and chart highlights. It was previously indigo here while the
+    // components hardcoded #2563EB inline, so the token and the product
+    // disagreed; they are now the same colour.
+    primary: "37 99 235",      // RGB for #2563EB (Blue 600)
+    primaryHover: "29 78 216", // RGB for #1d4ed8 (Blue 700)
+    primarySoft: "147 197 253",// RGB for #93c5fd (Blue 300) — accent on dark surfaces
     secondary: "16 185 129",    // RGB for #10b981 (Emerald 500)
     secondaryHover: "5 150 105",// RGB for #059669 (Emerald 600)
     accent: "245 158 11",       // RGB for #f59e0b (Amber 500)

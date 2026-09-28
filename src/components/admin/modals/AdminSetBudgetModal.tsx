@@ -5,82 +5,193 @@
  * (Set Budget, Edit Department) collect identical fields.
  * Design source: designs/system-admin/Set Budget.png
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
-import { formatNairaPrecise } from "../../ui/format";
-import { useResetOnOpen } from "../../ui/useResetOnOpen";
+import { CURRENCY_SYMBOL, formatNaira, formatNairaPrecise, formatDate } from "../../ui/format";
+import { BudgetPeriodDto } from "../../../types/api";
+import {
+  FiscalPeriod,
+  currentFiscalPeriod,
+  fiscalPeriodFor,
+  periodCovers,
+} from "../../../domains/budget/fiscalPeriod";
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
 
 interface AdminSetBudgetModalProps {
   isOpen: boolean;
   onClose: () => void;
   departments: any[];
-  /** Resolves false when the save was refused, so the modal can stay open. */
-  onSetBudget: (departmentId: string, totalAmount: number, lineItems: any[]) => void | Promise<boolean | void>;
-  busy?: boolean;
+  /** Existing periods, so a funded department opens on its current items. */
+  budgetPeriods?: BudgetPeriodDto[];
+  /** Optional department ID to pre-select when opening the modal. */
+  initialDepartmentId?: string;
+  onSetBudget: (
+    departmentId: string,
+    totalAmount: number,
+    lineItems: any[],
+    /** The fiscal window the allocation belongs to — periods are keyed by it. */
+    period: FiscalPeriod
+  ) => void;
 }
 
 export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   isOpen,
   onClose,
   departments,
-  onSetBudget,
-  busy = false
+  budgetPeriods = [],
+  initialDepartmentId,
+  onSetBudget
 }) => {
-  const [selectedDeptId, setSelectedDeptId] = useState("");
-  const [lineItems, setLineItems] = useState<any[]>([]);
-  const [showAddItem, setShowAddItem] = useState(false);
-  const [error, setError] = useState("");
+  /**
+   * The department's existing items, as editable rows.
+   *
+   * Without this the modal always opened on an empty list, so re-saving a
+   * funded department wiped every item it had along with the spend recorded
+   * against them. Loaded on mount and on each department change rather than in
+   * an effect, so the admin's edits are never overwritten by a re-render.
+   */
+  const itemsFor = (departmentId: string, periodName: string) =>
+    (
+      budgetPeriods.find(
+        (p) => p.departmentId === departmentId && p.periodName === periodName
+      )?.lineItems ?? []
+    ).map(
+      (item, index) => ({
+        // `key` is local to this list; `itemId` is the item's real identity and
+        // is sent back on save. Without it a rename reads as a delete plus an
+        // insert server-side, losing the item's ledger and orphaning every
+        // request booked against it.
+        key: item.id || `new-${index}`,
+        itemId: item.id,
+        name: item.name,
+        description: item.description ?? "",
+        amount: item.amount,
+        // Carried so the reader can see what an item has actually consumed.
+        utilised: item.utilised ?? 0,
+        pending: item.pending ?? 0,
+        expansionsGranted: item.expansionsGranted ?? 0,
+      })
+    );
 
-  // The department list arrives after this modal first mounts, so the initial
-  // useState could never see it — the select stayed on "" and every save was
-  // rejected by the API for a missing departmentId.
-  useResetOnOpen(isOpen, () => {
-    setSelectedDeptId(departments[0]?._id || departments[0]?.id || "");
-    setLineItems([]);
-    setShowAddItem(false);
-    setError("");
-  });
+  const getTargetDeptId = () => {
+    if (initialDepartmentId && departments.some((d: any) => (d._id || d.id) === initialDepartmentId)) {
+      return initialDepartmentId;
+    }
+    return departments[0]?._id || departments[0]?.id || "";
+  };
+
+  /**
+   * Windows the admin may allocate against: last year, this year and next, plus
+   * anything the department already holds. An existing period contributes its
+   * stored dates rather than the generated ones — the server keys a period by
+   * (department, name), so re-sending a different window would silently move the
+   * boundaries every request already booked against it is measured by.
+   */
+  const periodOptionsFor = (departmentId: string): FiscalPeriod[] => {
+    const year = new Date().getFullYear();
+    const byName = new Map<string, FiscalPeriod>(
+      [year - 1, year, year + 1]
+        .map((y) => fiscalPeriodFor(y))
+        .map((p) => [p.periodName, p])
+    );
+
+    budgetPeriods
+      .filter((p) => p.departmentId === departmentId)
+      .forEach((p) =>
+        byName.set(p.periodName, {
+          periodName: p.periodName,
+          startDate: p.startDate,
+          endDate: p.endDate,
+        })
+      );
+
+    return [...byName.values()].sort((a, b) => Date.parse(a.startDate) - Date.parse(b.startDate));
+  };
+
+  /**
+   * Opens on whichever of the department's periods covers today, so a funded
+   * department shows its live allocation; otherwise on the current fiscal year,
+   * which is the one a new allocation almost always belongs to.
+   */
+  const defaultPeriodName = (departmentId: string) =>
+    budgetPeriods.find((p) => p.departmentId === departmentId && periodCovers(p))?.periodName ??
+    currentFiscalPeriod().periodName;
+
+  const [selectedDeptId, setSelectedDeptId] = useState(getTargetDeptId);
+  const [selectedPeriodName, setSelectedPeriodName] = useState(() =>
+    defaultPeriodName(getTargetDeptId())
+  );
+  const [lineItems, setLineItems] = useState<any[]>(() =>
+    itemsFor(getTargetDeptId(), defaultPeriodName(getTargetDeptId()))
+  );
+  const [showAddItem, setShowAddItem] = useState(false);
+
+  // Sync department, period and line items whenever the modal opens or target department changes
+  useEffect(() => {
+    if (isOpen) {
+      const targetId = getTargetDeptId();
+      const periodName = defaultPeriodName(targetId);
+      setSelectedDeptId(targetId);
+      setSelectedPeriodName(periodName);
+      setLineItems(itemsFor(targetId, periodName));
+    }
+  }, [isOpen, initialDepartmentId]);
+
+  // Switching department replaces the rows with that department's own items.
+  const handleDepartmentChange = (departmentId: string) => {
+    const periodName = defaultPeriodName(departmentId);
+    setSelectedDeptId(departmentId);
+    setSelectedPeriodName(periodName);
+    setLineItems(itemsFor(departmentId, periodName));
+  };
+
+  // Each period holds its own allocation, so switching one reloads its items.
+  const handlePeriodChange = (periodName: string) => {
+    setSelectedPeriodName(periodName);
+    setLineItems(itemsFor(selectedDeptId, periodName));
+  };
 
   if (!isOpen) return null;
 
   const totalAllocation = lineItems.reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
   const selectedDept = departments.find((d: any) => (d._id || d.id) === selectedDeptId);
+  const periodOptions = periodOptionsFor(selectedDeptId);
+  const selectedPeriod =
+    periodOptions.find((p) => p.periodName === selectedPeriodName) ?? currentFiscalPeriod();
 
   const handleAddLineItem = (item: BudgetItemPayload) => {
-    setLineItems([...lineItems, { id: Date.now().toString(), name: item.category, description: item.description, amount: item.amount }]);
+    // No `itemId`: the server allocates one. Only the local key is set here.
+    setLineItems([
+      ...lineItems,
+      {
+        key: `new-${Date.now()}`,
+        name: item.category,
+        description: item.description,
+        amount: item.amount,
+        utilised: 0,
+        pending: 0,
+        expansionsGranted: 0,
+      },
+    ]);
   };
 
-  const handleItemChange = (id: string, field: string, value: any) => {
+  const handleItemChange = (key: string, field: string, value: any) => {
     setLineItems(lineItems.map(item => {
-      if (item.id === id) {
+      if (item.key === key) {
         return { ...item, [field]: field === "amount" ? Number(value) || 0 : value };
       }
       return item;
     }));
   };
 
-  const handleRemoveItem = (id: string) => {
-    setLineItems(lineItems.filter(item => item.id !== id));
+  const handleRemoveItem = (key: string) => {
+    setLineItems(lineItems.filter(item => item.key !== key));
   };
 
-  /**
-   * Closes only once the save is known to have succeeded. Dismissing
-   * unconditionally is what made a rejected budget look like a saved one.
-   */
-  const handleSubmit = async () => {
-    if (!selectedDeptId) {
-      setError("Select a department before setting its budget.");
-      return;
-    }
-    if (lineItems.length === 0) {
-      setError("Add at least one budget line item.");
-      return;
-    }
-    setError("");
-    const saved = await onSetBudget(selectedDeptId, totalAllocation, lineItems);
-    if (saved !== false) onClose();
+  const handleSubmit = () => {
+    onSetBudget(selectedDeptId, totalAllocation, lineItems, selectedPeriod);
+    onClose();
   };
 
   return (
@@ -96,38 +207,44 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
             <button type="button" onClick={onClose} className="btn btn-secondary" style={{ background: "none", border: "none" }}>
               Cancel
             </button>
-            <button type="button" onClick={handleSubmit} disabled={busy} className="btn btn-primary" style={{ background: "#2563EB", border: "none", opacity: busy ? 0.6 : 1 }}>
-              {busy ? "Saving…" : "Finish"}
+            <button type="button" onClick={handleSubmit} className="btn btn-primary" style={{ background: "#2563EB", border: "none" }}>
+              Finish
             </button>
           </div>
         }
       >
-        {/* Validation banner — the API's rejection reason used to surface only
-            as a toast after the modal had already closed. */}
-        {error && (
-          <div style={{
-            marginBottom: "1rem",
-            padding: "0.65rem 0.85rem",
-            borderRadius: "0.5rem",
-            border: "1px solid rgba(220, 38, 38, 0.35)",
-            background: "rgba(220, 38, 38, 0.1)",
-            color: "#DC2626",
-            fontSize: "0.82rem",
-            fontWeight: 600
-          }}>
-            {error}
-          </div>
-        )}
-
         {/* Department Selection */}
         <div style={{ marginBottom: "1.5rem" }}>
           <label className="form-label">Department Name</label>
-          <select className="form-select" value={selectedDeptId} onChange={(e) => { setSelectedDeptId(e.target.value); setError(""); }}>
+          <select className="form-select" value={selectedDeptId} onChange={(e) => handleDepartmentChange(e.target.value)}>
             <option value="">Select Department</option>
             {departments.map((d: any) => (
               <option key={d._id || d.id} value={d._id || d.id}>{d.name}</option>
             ))}
           </select>
+        </div>
+
+        {/* Budget period — the allocation is held against a named fiscal window,
+            and a request is only checked against the period covering its payment
+            date, so the admin has to see and choose which year they are funding. */}
+        <div style={{ marginBottom: "1.5rem" }}>
+          <label className="form-label" htmlFor="budget-period">Budget Period</label>
+          <select
+            id="budget-period"
+            className="form-select"
+            value={selectedPeriodName}
+            onChange={(e) => handlePeriodChange(e.target.value)}
+          >
+            {periodOptions.map((p) => (
+              <option key={p.periodName} value={p.periodName}>
+                {p.periodName}
+                {periodCovers(p) ? " (current)" : ""}
+              </option>
+            ))}
+          </select>
+          <div style={{ marginTop: "0.35rem", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
+            {formatDate(selectedPeriod.startDate)} – {formatDate(selectedPeriod.endDate)}
+          </div>
         </div>
 
         {/* Budget box — running total plus the composed line items */}
@@ -157,40 +274,66 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
 
             {lineItems.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginTop: "1rem" }}>
-                {lineItems.map(item => (
-                  <div key={item.id} style={{
-                    background: "rgba(var(--color-surface-secondary), 0.5)",
-                    border: "1px solid rgb(var(--color-card-border))",
-                    borderRadius: "0.5rem",
-                    padding: "0.65rem 0.85rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "0.5rem"
-                  }}>
-                    <input
-                      type="text"
-                      value={item.name}
-                      onChange={(e) => handleItemChange(item.id, "name", e.target.value)}
-                      aria-label="Budget item name"
-                      style={{ background: "none", border: "none", color: "rgb(var(--color-text))", fontWeight: 600, fontSize: "0.85rem", flexGrow: 1, outline: "none" }}
-                    />
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                      <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>₦</span>
-                      <input
-                        type="number"
-                        value={item.amount}
-                        onChange={(e) => handleItemChange(item.id, "amount", e.target.value)}
-                        aria-label="Budget item amount"
-                        className="form-input"
-                        style={{ width: "120px", padding: "0.25rem 0.5rem", fontSize: "0.85rem", textAlign: "right" }}
-                      />
-                      <button type="button" onClick={() => handleRemoveItem(item.id)} aria-label={`Remove ${item.name}`} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer" }}>
-                        <Icons.Trash2 size={14} />
-                      </button>
+                {lineItems.map(item => {
+                  // Spend already booked against this item. An item carrying
+                  // commitments cannot be cut below them, and the admin needs to
+                  // see that before editing rather than on a rejected save.
+                  const committed = (item.utilised || 0) + (item.pending || 0);
+
+                  return (
+                    <div key={item.key} style={{
+                      background: "rgb(var(--color-surface-secondary) / 0.5)",
+                      border: "1px solid rgb(var(--color-card-border))",
+                      borderRadius: "0.5rem",
+                      padding: "0.65rem 0.85rem",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.4rem"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.5rem" }}>
+                        <input
+                          type="text"
+                          value={item.name}
+                          onChange={(e) => handleItemChange(item.key,"name", e.target.value)}
+                          aria-label="Budget item name"
+                          style={{ background: "none", border: "none", color: "rgb(var(--color-text))", fontWeight: 600, fontSize: "0.85rem", flexGrow: 1, outline: "none" }}
+                        />
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                          <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>{CURRENCY_SYMBOL}</span>
+                          <input
+                            type="number"
+                            value={item.amount}
+                            onChange={(e) => handleItemChange(item.key,"amount", e.target.value)}
+                            aria-label="Budget item amount"
+                            className="form-input"
+                            style={{ width: "120px", padding: "0.25rem 0.5rem", fontSize: "0.85rem", textAlign: "right" }}
+                          />
+                          <button type="button" onClick={() => handleRemoveItem(item.key)} aria-label={`Remove ${item.name}`} style={{ background: "none", border: "none", color: "#EF4444", cursor: "pointer" }}>
+                            <Icons.Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Ledger line — only for items that have seen activity */}
+                      {(committed > 0 || item.expansionsGranted > 0) && (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.85rem", fontSize: "0.72rem", color: "rgb(var(--color-text-muted))" }}>
+                          <span>Utilised {formatNaira(item.utilised)}</span>
+                          <span>Locked {formatNaira(item.pending)}</span>
+                          {item.expansionsGranted > 0 && (
+                            <span style={{ color: "rgb(var(--color-warning))", fontWeight: 600 }}>
+                              +{formatNaira(item.expansionsGranted)} granted expansion
+                            </span>
+                          )}
+                          {Number(item.amount) < committed && (
+                            <span style={{ color: "rgb(var(--color-danger))", fontWeight: 600 }}>
+                              Below the {formatNaira(committed)} already committed
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

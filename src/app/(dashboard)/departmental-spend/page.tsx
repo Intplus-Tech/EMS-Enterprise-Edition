@@ -24,8 +24,10 @@ export default function DepartmentalSpendPage() {
     loadDashboardData,
     setSelectedAdminDept,
     setShowAdminCreateDeptModal,
+    setShowAdminSetBudgetModal,
     setShowAdminEditDeptModal,
     setShowAdminDeleteDeptModal,
+    restoreDepartment,
   } = useDashboard();
 
   // The directory (`departments`) and the ledger figures (`budgets`) come from
@@ -68,6 +70,11 @@ export default function DepartmentalSpendPage() {
         departments={departmentRows}
         expenses={expenses}
         onOpenCreateDept={() => setShowAdminCreateDeptModal(true)}
+        onOpenSetBudget={(dept) => {
+          if (dept) setSelectedAdminDept(dept);
+          else setSelectedAdminDept(null);
+          setShowAdminSetBudgetModal(true);
+        }}
         onOpenEditDept={(dept) => {
           setSelectedAdminDept(dept);
           setShowAdminEditDeptModal(true);
@@ -75,6 +82,12 @@ export default function DepartmentalSpendPage() {
         onOpenDeleteDept={(dept) => {
           setSelectedAdminDept(dept);
           setShowAdminDeleteDeptModal(true);
+        }}
+        // Restore undoes the deletion cascade, so the reinstated requests have
+        // to be refetched alongside the department list.
+        onRestoreDept={async (dept) => {
+          await restoreDepartment(dept.id);
+          await loadDashboardData(currentUser);
         }}
       />
     );

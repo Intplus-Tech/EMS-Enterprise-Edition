@@ -12,6 +12,30 @@ if (isConfigured) {
   });
 }
 
+/**
+ * Translates a Cloudinary SDK error into something a human can act on.
+ *
+ * The upload endpoint returns its JSON error body brotli-compressed, which the
+ * Node SDK does not decode — so every failure arrives as the opaque
+ * "Server returned unexpected status code - <code>" with the real reason
+ * (e.g. `x-cld-error: missing permissions (actions=["create"])`) discarded.
+ * Mapping the status codes back to a cause is the only way these surface
+ * usefully in the UI banner and the audit log.
+ */
+function describeCloudinaryError(error: any): string {
+  switch (error?.http_code) {
+    case 401:
+      return "Cloudinary rejected the credentials (401). Verify CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET belong to CLOUDINARY_CLOUD_NAME.";
+    case 403:
+      return 'Cloudinary refused the upload (403): the API key is authenticated but lacks the "create" permission. Grant that key upload access under Console → Settings → API Keys, or issue a full-access key.';
+    case 420:
+    case 429:
+      return `Cloudinary rate limit reached (${error.http_code}). Please retry shortly.`;
+    default:
+      return `Cloudinary storage error: ${error?.message || "unknown failure"}`;
+  }
+}
+
 export class CloudinaryUploadServiceClass implements IFileUploadService {
   /**
    * Uploads a file buffer to Cloudinary.
@@ -42,9 +66,10 @@ export class CloudinaryUploadServiceClass implements IFileUploadService {
         },
         (error, result) => {
           if (error) {
+            const reason = describeCloudinaryError(error);
             if (!ENV.isProduction) {
               console.warn(
-                `[CloudinaryUploadService] Upload failed (${error.message}). Falling back to mock URL in development.`
+                `[CloudinaryUploadService] ${reason} Falling back to mock URL in development.`
               );
               const mockPublicId = `mock_${Date.now()}_${fileName.replace(/\s+/g, "_")}`;
               return resolve({
@@ -52,7 +77,7 @@ export class CloudinaryUploadServiceClass implements IFileUploadService {
                 publicId: mockPublicId,
               });
             }
-            return reject(error);
+            return reject(new Error(reason));
           }
           if (!result) {
             return reject(new Error("Upload returned undefined result"));
@@ -91,7 +116,7 @@ export class CloudinaryUploadServiceClass implements IFileUploadService {
         createdAt: new Date(resource.created_at),
       };
     } catch (error: any) {
-      throw new Error(`Failed to read file from Cloudinary: ${error.message}`);
+      throw new Error(`Failed to read file. ${describeCloudinaryError(error)}`);
     }
   }
 
@@ -121,7 +146,7 @@ export class CloudinaryUploadServiceClass implements IFileUploadService {
         },
         (error, result) => {
           if (error) {
-            return reject(error);
+            return reject(new Error(describeCloudinaryError(error)));
           }
           if (!result) {
             return reject(new Error("Update returned undefined result"));
@@ -149,7 +174,7 @@ export class CloudinaryUploadServiceClass implements IFileUploadService {
       const result = await cloudinary.uploader.destroy(publicId);
       return result.result === "ok";
     } catch (error: any) {
-      throw new Error(`Failed to delete file from Cloudinary: ${error.message}`);
+      throw new Error(`Failed to delete file. ${describeCloudinaryError(error)}`);
     }
   }
 }

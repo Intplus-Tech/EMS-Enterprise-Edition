@@ -42,7 +42,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
       style={{
         position: "fixed",
         inset: 0,
-        backgroundColor: "rgba(15, 23, 42, 0.6)",
+        backgroundColor: "rgb(var(--color-overlay) / 0.6)",
         backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
@@ -102,8 +102,10 @@ export const ModalShell: React.FC<ModalShellProps> = ({
           </button>
         </div>
 
-        {/* Scrollable body */}
-        <div style={{ padding: "1.5rem 1.75rem", overflowY: "auto", flex: 1 }}>{children}</div>
+        {/* Scrollable body. `wrap-anywhere` is inherited by everything a caller
+            renders here, so an unbroken request description or vendor name
+            wraps instead of widening the dialog past its own maxWidth. */}
+        <div className="wrap-anywhere" style={{ padding: "1.5rem 1.75rem", overflowY: "auto", flex: 1 }}>{children}</div>
 
         {/* Sticky footer — omitted when the caller renders its own actions inline */}
         {footer && (
@@ -115,7 +117,7 @@ export const ModalShell: React.FC<ModalShellProps> = ({
               gap: "0.75rem",
               padding: "1.15rem 1.75rem",
               borderTop: "1px solid rgb(var(--color-card-border))",
-              background: "rgba(var(--color-surface-secondary), 0.35)",
+              background: "rgb(var(--color-surface-secondary) / 0.35)",
             }}
           >
             {footer}

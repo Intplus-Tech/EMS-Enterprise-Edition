@@ -6,9 +6,52 @@ import { formatNaira } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import { ExpenseClient } from "../services/expense.client";
 import { BudgetContextDto } from "../types/api";
+import { isDecidableException } from "../enums/statuses";
 
 /** Rows shown per page in the exceptions queue. */
 const ROWS_PER_PAGE = 8;
+
+/**
+ * Sized column widths for the queue table, in px (border-box, padding included).
+ *
+ * `table-fixed` gives each column its declared width and hands what is left to
+ * the single unsized one â€” REQUEST TITLE. That only works while the sized
+ * columns actually leave something behind, and they had stopped doing so: they
+ * summed to 970px inside a ~1020px panel, so the title was left with ~50px, 40
+ * of which is its own padding. `wrap-anywhere` then broke each title one
+ * character per line rather than overflowing.
+ */
+const COLUMN_WIDTHS = {
+  deficit: 160,
+  reqId: 150, // "#EXP-2026-0007" has to sit on one line; 120px wrapped it
+  dept: 140,
+  amount: 145,
+  budget: 130,
+  wait: 95,
+  action: 140
+} as const;
+
+/** Narrowest REQUEST TITLE we consider readable â€” roughly three words per line. */
+const TITLE_MIN_WIDTH = 240;
+
+/**
+ * The floor that keeps the title column from being starved again. Below this
+ * the table stops shrinking and `.table-container` scrolls sideways, which is
+ * the bounded failure mode; the unbounded one is a column collapsing to nothing.
+ * Derived rather than written out so it cannot drift from the widths above.
+ */
+const TABLE_MIN_WIDTH =
+  Object.values(COLUMN_WIDTHS).reduce((sum, width) => sum + width, 0) + TITLE_MIN_WIDTH;
+
+/** Shared header-cell styling; only width and alignment differ per column. */
+const headCellStyle: React.CSSProperties = {
+  padding: "1rem 1.25rem",
+  fontSize: "0.725rem",
+  fontWeight: "700",
+  color: "rgb(var(--color-text-dim))",
+  letterSpacing: "0.05em",
+  textTransform: "uppercase"
+};
 
 interface PendingExceptionsOverviewTabProps {
   currentUser?: any;
@@ -34,14 +77,16 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
    * Real budget position per open exception, keyed by request id.
    *
    * The DEFICIT and BUDGET columns used to be `amount * 0.4` and `amount * 0.6`
-   * — invented ratios with no relationship to any department's allocation — and
+   * â€” invented ratios with no relationship to any department's allocation â€” and
    * the "Total Deficit Exposed" KPI was their sum. They are now the server's
    * own figures, the same ones the review screen shows.
    */
   const [budgetByRequest, setBudgetByRequest] = useState<Record<string, BudgetContextDto>>({});
 
   const openExceptions = useMemo(
-    () => expenses.filter(e => e.status === "PENDING_EXCEPTIONAL" || e.status === "INSUFFICIENT_BUDGET"),
+    // Held requests share the flagged status but have no period to expand, so
+    // they are not the Finance Head's to decide and stay out of this queue.
+    () => expenses.filter(e => isDecidableException(e)),
     [expenses]
   );
 
@@ -78,7 +123,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
     return {
       id: String(e._id),
       // `criticalGap` is the shortfall this request would create. Null until the
-      // figure has loaded, so the cell says "—" instead of guessing.
+      // figure has loaded, so the cell says "â€”" instead of guessing.
       deficit: context?.hasBudget ? context.criticalGap : null,
       reqId: e.requestNumber ? `#${e.requestNumber.replace(/^REQ-/, "")}` : `#${String(e._id).slice(-4)}`,
       title: e.description || e.category,
@@ -165,7 +210,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
           className="glass-card"
           style={{
             background: "rgb(var(--color-card))",
-            border: "1px solid rgba(var(--color-card-border), 0.5)",
+            border: "1px solid rgb(var(--color-card-border) / 0.5)",
             borderRadius: "16px",
             padding: "1.6rem 1.75rem",
             display: "flex",
@@ -204,7 +249,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
           className="glass-card"
           style={{
             background: "rgb(var(--color-card))",
-            border: "1px solid rgba(var(--color-card-border), 0.5)",
+            border: "1px solid rgb(var(--color-card-border) / 0.5)",
             borderRadius: "16px",
             padding: "1.6rem 1.75rem",
             display: "flex",
@@ -220,7 +265,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
             {/* Measured from the queue. This tile showed a fixed "1.4 Days". */}
             <span style={{ fontSize: "2rem", fontWeight: "800", color: "#2563EB", letterSpacing: "-0.02em" }}>
               {records.length === 0
-                ? "—"
+                ? "â€”"
                 : `${Math.max(...records.map(r => r.waitDays))} days`}
             </span>
           </div>
@@ -247,7 +292,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         className="glass-panel"
         style={{
           background: "rgb(var(--color-card))",
-          border: "1px solid rgba(var(--color-card-border), 0.5)",
+          border: "1px solid rgb(var(--color-card-border) / 0.5)",
           borderRadius: "14px",
           padding: "1.15rem 1.5rem",
           display: "flex",
@@ -272,8 +317,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                 minWidth: "170px",
                 padding: "0.55rem 0.85rem",
                 borderRadius: "8px",
-                border: "1px solid rgba(var(--color-card-border), 0.8)",
-                background: "rgba(var(--color-surface), 0.6)",
+                border: "1px solid rgb(var(--color-card-border) / 0.8)",
+                background: "rgb(var(--color-surface) / 0.6)",
                 fontSize: "0.85rem",
                 fontWeight: "600",
                 color: "rgb(var(--color-text))"
@@ -299,8 +344,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                 minWidth: "170px",
                 padding: "0.55rem 0.85rem",
                 borderRadius: "8px",
-                border: "1px solid rgba(var(--color-card-border), 0.8)",
-                background: "rgba(var(--color-surface), 0.6)",
+                border: "1px solid rgb(var(--color-card-border) / 0.8)",
+                background: "rgb(var(--color-surface) / 0.6)",
                 fontSize: "0.85rem",
                 fontWeight: "600",
                 color: "rgb(var(--color-text))"
@@ -335,8 +380,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                   width: "100%",
                   padding: "0.55rem 0.85rem 0.55rem 2.35rem",
                   borderRadius: "8px",
-                  border: "1px solid rgba(var(--color-card-border), 0.8)",
-                  background: "rgba(var(--color-surface), 0.6)",
+                  border: "1px solid rgb(var(--color-card-border) / 0.8)",
+                  background: "rgb(var(--color-surface) / 0.6)",
                   fontSize: "0.85rem",
                   color: "rgb(var(--color-text))",
                   outline: "none"
@@ -359,8 +404,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
               fontSize: "0.85rem",
               fontWeight: "600",
               borderRadius: "8px",
-              border: "1px solid rgba(var(--color-card-border), 0.8)",
-              background: "rgba(var(--color-surface), 0.6)",
+              border: "1px solid rgb(var(--color-card-border) / 0.8)",
+              background: "rgb(var(--color-surface) / 0.6)",
               color: "rgb(var(--color-text))",
               cursor: "pointer"
             }}
@@ -376,23 +421,29 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         style={{
           borderRadius: "14px",
           overflow: "hidden",
-          border: "1px solid rgba(var(--color-card-border), 0.5)",
+          border: "1px solid rgb(var(--color-card-border) / 0.5)",
           background: "rgb(var(--color-card))",
           boxShadow: "var(--shadow-sm)"
         }}
       >
         <div className="table-container" style={{ overflowX: "auto" }}>
-          <table className="data-table" style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+          <table
+            className="data-table table-fixed"
+            style={{ width: "100%", minWidth: `${TABLE_MIN_WIDTH}px`, borderCollapse: "collapse", textAlign: "left" }}
+          >
             <thead>
-              <tr style={{ background: "rgba(var(--color-surface-secondary), 0.5)", borderBottom: "1px solid rgba(var(--color-card-border), 0.6)" }}>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEFICIT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQ ID</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>REQUEST TITLE</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>DEPT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>AMOUNT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>BUDGET</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase" }}>WAIT</th>
-                <th style={{ padding: "1rem 1.25rem", fontSize: "0.725rem", fontWeight: "700", color: "rgb(var(--color-text-dim))", letterSpacing: "0.05em", textTransform: "uppercase", textAlign: "right" }}>ACTION</th>
+              {/* Every column but REQUEST TITLE is sized to its longest realistic
+                  value, so the title absorbs the slack and wraps rather than
+                  stretching the table past the panel. */}
+              <tr style={{ background: "rgb(var(--color-surface-secondary) / 0.5)", borderBottom: "1px solid rgb(var(--color-card-border) / 0.6)" }}>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.deficit }}>DEFICIT</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.reqId }}>REQ ID</th>
+                <th style={headCellStyle}>REQUEST TITLE</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.dept }}>DEPT</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.amount }}>AMOUNT</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.budget }}>BUDGET</th>
+                <th style={{ ...headCellStyle, width: COLUMN_WIDTHS.wait }}>WAIT</th>
+                <th style={{ ...headCellStyle, textAlign: "right", width: COLUMN_WIDTHS.action }}>ACTION</th>
               </tr>
             </thead>
             <tbody>
@@ -403,7 +454,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                     <tr
                       key={r.id}
                       style={{
-                        borderBottom: "1px solid rgba(var(--color-card-border), 0.3)",
+                        borderBottom: "1px solid rgb(var(--color-card-border) / 0.3)",
                         transition: "background 0.15s ease"
                       }}
                     >
@@ -419,7 +470,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                             fontSize: "0.8rem"
                           }}
                         >
-                          {r.deficit === null ? "—" : `-${formatNaira(Math.abs(r.deficit))}`}
+                          {r.deficit === null ? "â€”" : `-${formatNaira(Math.abs(r.deficit))}`}
                         </span>
                       </td>
 
@@ -428,8 +479,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                         {r.reqId}
                       </td>
 
-                      {/* REQUEST TITLE + Subtitle */}
-                      <td style={{ padding: "1.1rem 1.25rem" }}>
+                      {/* REQUEST TITLE + Subtitle â€” free text, so it wraps */}
+                      <td className="wrap-anywhere" style={{ padding: "1.1rem 1.25rem" }}>
                         <div style={{ display: "flex", flexDirection: "column" }}>
                           <span style={{ fontSize: "0.9rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>
                             {r.title}
@@ -441,9 +492,10 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                       </td>
 
                       {/* DEPT Pill Badge */}
-                      <td style={{ padding: "1.1rem 1.25rem" }}>
+                      <td className="wrap-anywhere" style={{ padding: "1.1rem 1.25rem" }}>
                         <span
                           style={{
+                            display: "inline-block",
                             padding: "0.25rem 0.75rem",
                             borderRadius: "8px",
                             background: "rgba(37, 99, 235, 0.12)",
@@ -473,8 +525,13 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
 
                       {/* ACTION Button */}
                       <td style={{ padding: "1.1rem 1.25rem", textAlign: "right" }}>
+                        {/* Hands back the raw expense, not the display record:
+                            the page resolves the selection by `_id`, which only
+                            exists on the former. Passing `r` sent `_id:
+                            undefined`, so the lookup missed and Review did
+                            nothing. */}
                         <button
-                          onClick={() => onReviewRequest && onReviewRequest(r)}
+                          onClick={() => onReviewRequest && onReviewRequest(r.rawExpense)}
                           className="btn btn-secondary"
                           style={{
                             display: "inline-flex",
@@ -517,8 +574,8 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
         <div
           style={{
             padding: "0.5rem 1.5rem 1rem",
-            background: "rgba(var(--color-surface-secondary), 0.4)",
-            borderTop: "1px solid rgba(var(--color-card-border), 0.4)",
+            background: "rgb(var(--color-surface-secondary) / 0.4)",
+            borderTop: "1px solid rgb(var(--color-card-border) / 0.4)",
             display: "flex",
             flexDirection: "column",
             gap: "0.5rem"
@@ -549,7 +606,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
             }}
           >
             <Icons.RefreshCw size={15} className={isReloading ? "spin" : ""} />
-            {isReloading ? "Reloading…" : "Reload Data"}
+            {isReloading ? "Reloadingâ€¦" : "Reload Data"}
           </button>
         </div>
       </div>

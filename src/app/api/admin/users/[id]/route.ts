@@ -66,6 +66,8 @@ export const DELETE = withErrorHandling(async (req: NextRequest, { params }: Rou
     throw new Error("Forbidden: you cannot delete your own account.");
   }
 
+  // In-flight requests are cancelled by the removal rather than blocking it;
+  // the count comes back so the admin is told what the deletion took with it.
   const removed = await UserService.remove(id, {
     id: actor.id,
     name: actor.name,

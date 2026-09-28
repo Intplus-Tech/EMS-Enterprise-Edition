@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
+import { SubmitButton } from "../../components/ui/SubmitButton";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -54,27 +55,27 @@ export default function ForgotPasswordPage() {
         justifyContent: "space-between", 
         alignItems: "center", 
         background: "rgb(var(--color-surface))",
-        borderBottom: "1px solid rgba(var(--color-card-border), 0.5)"
+        borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)"
       }}>
         {/* Brand logo & text */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ 
             padding: "0.4rem", 
             borderRadius: "50%", 
-            background: "rgba(var(--color-primary), 0.15)",
+            background: "rgb(var(--color-primary) / 0.15)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center"
           }}>
-            <img src={BRANDING.logoUrl || "/logo.svg"} alt="EMS Logo" style={{ width: 26, height: 26, objectFit: "contain", borderRadius: "50%" }} />
+            <img src={BRANDING.logoUrl || "/logo.svg"} alt={`${BRANDING.appName} Logo`} style={{ width: 26, height: 26, objectFit: "contain", borderRadius: "50%" }} />
           </div>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>EMS</span>
+              <span style={{ fontWeight: "700", fontSize: "1rem", color: "rgb(var(--color-text))" }}>{BRANDING.appName}</span>
               <span style={{ 
                 fontSize: "0.65rem", 
                 fontWeight: "600", 
-                background: "rgba(var(--color-card-border), 0.4)", 
+                background: "rgb(var(--color-card-border) / 0.4)", 
                 color: "rgb(var(--color-text-muted))", 
                 padding: "0.15rem 0.35rem", 
                 borderRadius: "4px" 
@@ -96,7 +97,7 @@ export default function ForgotPasswordPage() {
             gap: "0.5rem", 
             padding: "0.5rem 1rem", 
             borderRadius: "8px", 
-            border: "1px solid rgba(var(--color-card-border), 0.5)", 
+            border: "1px solid rgb(var(--color-card-border) / 0.5)", 
             background: "rgb(var(--color-surface))",
             color: "rgb(var(--color-text-muted))",
             fontSize: "0.85rem",
@@ -105,11 +106,11 @@ export default function ForgotPasswordPage() {
             transition: "all 0.15s ease"
           }}
           onMouseOver={(e) => {
-            e.currentTarget.style.borderColor = "rgba(var(--color-primary), 0.5)";
-            e.currentTarget.style.background = "rgba(var(--color-primary), 0.05)";
+            e.currentTarget.style.borderColor = "rgb(var(--color-primary) / 0.5)";
+            e.currentTarget.style.background = "rgb(var(--color-primary) / 0.05)";
           }}
           onMouseOut={(e) => {
-            e.currentTarget.style.borderColor = "rgba(var(--color-card-border), 0.6)";
+            e.currentTarget.style.borderColor = "rgb(var(--color-card-border) / 0.6)";
             e.currentTarget.style.background = "rgb(var(--color-card))";
           }}
         >
@@ -123,7 +124,7 @@ export default function ForgotPasswordPage() {
           maxWidth: "480px", 
           width: "100%", 
           background: "rgb(var(--color-surface))", 
-          border: "1px solid rgba(var(--color-card-border), 0.5)", 
+          border: "1px solid rgb(var(--color-card-border) / 0.5)", 
           borderRadius: "16px", 
           padding: "2.5rem", 
           boxShadow: "var(--shadow-lg)" 
@@ -182,7 +183,7 @@ export default function ForgotPasswordPage() {
                   width: "100%", 
                   padding: "0.75rem 1rem", 
                   background: "rgb(var(--color-surface))", 
-                  border: "1px solid rgba(var(--color-card-border), 0.6)", 
+                  border: "1px solid rgb(var(--color-card-border) / 0.6)", 
                   borderRadius: "8px", 
                   color: "rgb(var(--color-text))", 
                   fontSize: "0.95rem",
@@ -191,36 +192,16 @@ export default function ForgotPasswordPage() {
               />
             </div>
 
-            {/* Submit Button */}
-            <button 
-              type="submit" 
-              disabled={loading || sent}
-              style={{ 
-                width: "100%", 
-                background: "rgb(var(--color-primary))", 
-                color: "#FFFFFF", 
-                border: "none", 
-                borderRadius: "8px", 
-                padding: "0.875rem", 
-                fontWeight: "600", 
-                fontSize: "1rem",
-                cursor: (loading || sent) ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: "0.5rem",
-                opacity: (loading || sent) ? 0.7 : 1,
-                transition: "background-color 0.2s"
-              }}
-              onMouseOver={(e) => !(loading || sent) && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary-hover))")}
-              onMouseOut={(e) => !(loading || sent) && (e.currentTarget.style.backgroundColor = "rgb(var(--color-primary))")}
+            {/* Submit Button — stays disabled after `sent` so the code is not re-requested */}
+            <SubmitButton
+              type="submit"
+              loading={loading}
+              loadingLabel="Sending…"
+              disabled={sent}
+              style={{ width: "100%", padding: "0.875rem", fontSize: "1rem", fontWeight: 600 }}
             >
-              {loading ? "Sending..." : (
-                <>
-                  Send Verification Code <Icons.ArrowRight size={18} />
-                </>
-              )}
-            </button>
+              Send Verification Code <Icons.ArrowRight size={18} />
+            </SubmitButton>
           </form>
 
           {/* Back to Login Link */}

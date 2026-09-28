@@ -135,7 +135,7 @@ export function getEmailFooter(): string {
               
               <!-- Copyright -->
               <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #94A3B8; margin: 0; text-align: center;">
-                &copy; 2026 EMS. All rights reserved.
+                &copy; 2026 ${BRANDING.appName}. All rights reserved.
               </p>
             </td>
           </tr>
@@ -171,7 +171,7 @@ export function getInviteEmailHtml(inviteUrl: string, roleName: string, recipien
     </p>
     
     <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 16px 0; text-align: left;">
-      EMS provides your team with high-density, low-friction tools to manage complex financial data, streamline approvals, and ensure institutional trust across all departments.
+      ${BRANDING.appName} provides your team with high-density, low-friction tools to manage complex financial data, streamline approvals, and ensure institutional trust across all departments.
     </p>
     
     <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 15px; color: #475569; line-height: 1.6; margin: 0 0 28px 0; text-align: left;">
@@ -190,11 +190,17 @@ export function getInviteEmailHtml(inviteUrl: string, roleName: string, recipien
     </table>
     
     <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 13px; color: #64748B; text-align: center; margin: 16px 0 0 0;">
-      This link will expire in 48 hours.
+      This link will expire in 7 days.
+    </p>
+
+    <!-- Fallback Plain Text URL for Security Scanners & Corporate Mail Gateways -->
+    <p style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 12px; color: #64748B; word-break: break-all; margin: 20px 0 0 0; text-align: center;">
+      If the button above does not work, copy and paste this URL into your browser:<br>
+      <a href="${inviteUrl}" style="color: #0A52D6; text-decoration: underline;">${inviteUrl}</a>
     </p>
   `;
 
-  return compileTemplate(content, { title: "Invitation to join EMS", origin });
+  return compileTemplate(content, { title: `Invitation to join ${BRANDING.appName}`, origin });
 }
 
 /**
@@ -228,5 +234,49 @@ export function getResetCodeEmailHtml(code: string, recipientName: string = "Use
     </p>
   `;
 
-  return compileTemplate(content, { title: "Reset your EMS password", origin });
+  return compileTemplate(content, { title: `Reset your ${BRANDING.appName} password`, origin });
+}
+
+/**
+ * Plain text representation for invitation email (MIME compliance).
+ */
+export function getInviteEmailText(inviteUrl: string, roleName: string, recipientName: string = "User"): string {
+  return `Hello ${recipientName},
+
+You have been invited to join ${BRANDING.appName} as a ${roleName}.
+
+To accept your invitation and set up your account, copy and paste the following link into your web browser:
+${inviteUrl}
+
+Note: This link will expire in 7 days.
+
+If you did not expect this invitation, please contact your administrator.
+
+© 2026 ${BRANDING.appName}. All rights reserved.`;
+}
+
+/**
+ * Plain text representation for password reset email (MIME compliance).
+ */
+export function getResetCodeEmailText(code: string, recipientName: string = "User"): string {
+  return `Hello ${recipientName},
+
+We received a request to reset your password for ${BRANDING.appName}.
+
+Your 6-digit verification code is: ${code}
+
+This code is valid for 15 minutes and can only be used once. If you did not request this code, you can safely ignore this email.
+
+© 2026 ${BRANDING.appName}. All rights reserved.`;
+}
+
+/**
+ * Plain text representation for expense status updates (MIME compliance).
+ */
+export function getExpenseNotificationText(requestNumber: string, status: string, recipientName: string = "User", actionUrl?: string): string {
+  return `Hello ${recipientName},
+
+Your expense request #${requestNumber} status has been updated to: ${status}.
+
+${actionUrl ? `View details: ${actionUrl}\n\n` : ""}© 2026 ${BRANDING.appName}. All rights reserved.`;
 }

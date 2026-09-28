@@ -1,6 +1,11 @@
 /**
- * Selectable expense categories for the New Request form
- * (designs/initiator/New Request.png).
+ * The expense-category vocabulary.
+ *
+ * No longer offered as a picker: the New Request form does not ask the
+ * initiator to classify their spend (designs/initiator/New Request.png shows no
+ * such field), so `DEFAULT_EXPENSE_CATEGORY` is what new requests carry. The
+ * list stays because seeded and pre-existing records use these labels, and the
+ * reporting filters derive their options from stored values.
  *
  * Kept as a const array rather than a TS enum because the category is also a
  * free-text-ish label rendered directly in tables and grouped on the reporting

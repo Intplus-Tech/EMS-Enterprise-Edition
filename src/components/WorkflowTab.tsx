@@ -1,5 +1,6 @@
 import React from "react";
 import * as Icons from "lucide-react";
+import { CURRENCY_SYMBOL } from "./ui/format";
 
 interface WorkflowTabProps {
   currentUser: any;
@@ -36,9 +37,9 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({
       <div className="glass-panel" style={{ padding: "1.5rem" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "2rem" }}>
           {workflowSteps.map((step, idx) => (
-            <div key={step.stepIndex} className="glass-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(15,23,42,0.4)" }}>
+            <div key={step.stepIndex} className="glass-card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgb(var(--color-background))" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                <div style={{ background: "rgba(var(--color-primary), 0.2)", borderRadius: "50%", width: "2.5rem", height: "2.5rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ background: "rgb(var(--color-primary) / 0.2)", borderRadius: "50%", width: "2.5rem", height: "2.5rem", display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <span style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", margin: "auto" }}>{idx + 1}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
@@ -47,7 +48,7 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({
                     value={step.stepName}
                     onChange={(e) => handleStepDetailChange(idx, "stepName", e.target.value)}
                     className="form-input"
-                    style={{ padding: "0.3rem 0.5rem", fontSize: "0.9rem", background: "transparent", border: "none", borderBottom: "1px solid rgba(255,255,255,0.1)", width: "240px", fontWeight: "600" }}
+                    style={{ padding: "0.3rem 0.5rem", fontSize: "0.9rem", background: "transparent", border: "none", borderBottom: "1px solid rgb(var(--color-card-border))", width: "240px", fontWeight: "600" }}
                   />
                   <div style={{ display: "flex", gap: "1rem", fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>
                     <span>Actor Role: <strong>{step.role}</strong></span>
@@ -57,7 +58,8 @@ export const WorkflowTab: React.FC<WorkflowTabProps> = ({
 
               <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
                 <div className="form-group" style={{ margin: 0, display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Min Amount Rule: $</span>
+                  {/* The threshold is compared against request amounts, which are Naira. */}
+                  <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>Min Amount Rule: {CURRENCY_SYMBOL}</span>
                   <input
                     type="number"
                     value={step.minAmount}

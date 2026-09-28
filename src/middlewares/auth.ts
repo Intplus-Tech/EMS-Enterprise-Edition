@@ -6,6 +6,7 @@ import { SystemRole } from "../enums/roles";
 import { PermissionAction, PermissionResource } from "../enums/permissions";
 import { connectToDatabase } from "../config/db";
 import { User } from "../models/User";
+import { SESSION_REVOKED_ERROR, SINGLE_SESSION_ERROR } from "../domains/auth/session";
 
 export interface AuthenticatedRequestState {
   id: string;
@@ -50,8 +51,9 @@ export async function authenticate(
   // JWTs are self-contained, so a suspended or force-signed-out user would keep
   // working until their 8-hour token expired. Rejecting tokens issued before the
   // account's `sessionsValidFrom` watermark makes "Force Log Out" and account
-  // suspension take effect on the very next request.
-  await assertSessionNotRevoked(decoded.id, decoded.iat);
+  // suspension take effect on the very next request, and rejecting a token that
+  // is not the account's current session enforces one active session.
+  await assertSessionNotRevoked(decoded.id, decoded.iat, decoded.sid);
 
   // 4. Role authorization check
   if (allowedRoles && allowedRoles.length > 0) {
@@ -71,13 +73,20 @@ export async function authenticate(
 }
 
 /**
- * Rejects a token that predates the account's revocation watermark, or that
- * belongs to an account which has since been deactivated or deleted.
+ * Rejects a token that predates the account's revocation watermark, is not the
+ * account's one active session, or belongs to an account which has since been
+ * deactivated or deleted.
  */
-async function assertSessionNotRevoked(userId: string, issuedAtSeconds?: number): Promise<void> {
+async function assertSessionNotRevoked(
+  userId: string,
+  issuedAtSeconds?: number,
+  sessionId?: string
+): Promise<void> {
   await connectToDatabase();
 
-  const user = await User.findById(userId).select("isActive sessionsValidFrom").lean();
+  const user = await User.findById(userId)
+    .select("isActive sessionsValidFrom activeSessionId")
+    .lean();
   if (!user) {
     throw new Error("Unauthorized: The account for this session no longer exists.");
   }
@@ -90,8 +99,17 @@ async function assertSessionNotRevoked(userId: string, issuedAtSeconds?: number)
     // a token issued in the same second the watermark was set.
     const issuedAtMs = issuedAtSeconds * 1000;
     if (issuedAtMs < Math.floor(user.sessionsValidFrom.getTime() / 1000) * 1000) {
-      throw new Error("Unauthorized: This session has been ended. Please sign in again.");
+      throw new Error(SESSION_REVOKED_ERROR);
     }
+  }
+
+  // Single active session. Every sign-in mints a new id and stores it on the
+  // account, so a token whose `sid` no longer matches belongs to a device that
+  // has since been displaced. Tokens minted before this field existed carry no
+  // `sid` at all and are rejected the same way, which costs those users one
+  // re-login rather than leaving a hole in the rule.
+  if (user.activeSessionId && user.activeSessionId !== sessionId) {
+    throw new Error(SINGLE_SESSION_ERROR);
   }
 }
 

@@ -3,6 +3,7 @@ import { Pagination } from "../ui/Pagination";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
 import { datedFilename, downloadCsv } from "../ui/exportCsv";
 import { DepartmentDto, DepartmentSpendDto, PopulatedExpenseDto } from "../../types/api";
+import { RequestStatus } from "../../enums/statuses";
 
 // Matches the row density shown in designs/system-admin/Admin_ Department Management.png
 const ROWS_PER_PAGE = 5;
@@ -15,21 +16,42 @@ export type AdminDepartmentRow = DepartmentDto &
     budgetItems?: { category: string; amount: number; description?: string; utilization: number }[];
   };
 
+/** Statuses that count as still open for the Pending Requests tile. */
+const OPEN_STATUSES: string[] = [
+  RequestStatus.SUBMITTED,
+  RequestStatus.BUDGET_CHECK,
+  RequestStatus.INSUFFICIENT_BUDGET,
+  RequestStatus.PENDING_EXCEPTIONAL,
+  RequestStatus.PENDING_APPROVAL,
+  RequestStatus.APPROVED,
+  RequestStatus.SENT_TO_FINANCE,
+  RequestStatus.UPLOADED_TO_BANK,
+  RequestStatus.AWAITING_RELEASE,
+];
+
+/** A deleted department stays in the table awaiting purge — see DepartmentService.beginDeletion. */
+const pendingDeletion = (d: AdminDepartmentRow) => d.isPendingDeletion === true;
+
 interface AdminDepartmentalSpendTabProps {
   departments: AdminDepartmentRow[];
   /** Every request, used by the per-department analytics drill-down. */
   expenses?: PopulatedExpenseDto[];
   onOpenCreateDept: () => void;
+  onOpenSetBudget?: (dept?: AdminDepartmentRow) => void;
   onOpenEditDept: (dept: AdminDepartmentRow) => void;
   onOpenDeleteDept: (dept: AdminDepartmentRow) => void;
+  /** Reactivates an archived department — no confirmation, it is reversible. */
+  onRestoreDept: (dept: AdminDepartmentRow) => void;
 }
 
 export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps> = ({
   departments,
   expenses = [],
   onOpenCreateDept,
+  onOpenSetBudget,
   onOpenEditDept,
-  onOpenDeleteDept
+  onOpenDeleteDept,
+  onRestoreDept
 }) => {
   const [selectedAnalyticsDept, setSelectedAnalyticsDept] = useState<AdminDepartmentRow | null>(null);
 
@@ -48,8 +70,24 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
     ]);
   };
   const [page, setPage] = useState(1);
+  // Controls behind the two icon buttons above the table. Both rendered as bare
+  // icons with no handler, so the "filter" and "sort" affordances the design
+  // shows did nothing at all.
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "AT_RISK">("ALL");
+  const [sortBy, setSortBy] = useState<"NAME" | "UTILISATION">("NAME");
 
-  const deptList = departments;
+  /** A department is at risk once it has committed most of its allocation. */
+  const AT_RISK_PCT = 85;
+
+  const deptList = departments
+    .filter((d) => {
+      if (statusFilter === "ACTIVE") return d.isActive !== false;
+      if (statusFilter === "AT_RISK") return d.hasBudget && d.pctUsed >= AT_RISK_PCT;
+      return true;
+    })
+    .sort((a, b) =>
+      sortBy === "UTILISATION" ? b.pctUsed - a.pctUsed : a.name.localeCompare(b.name)
+    );
 
   /**
    * Enterprise roll-up for the two tiles at the top. These were the design's
@@ -63,6 +101,11 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
     }),
     { allocated: 0, utilised: 0, pending: 0 }
   );
+
+  // The other two tiles kept the design's sample figures (14 / 6) hardcoded, so
+  // deleting a department left "Active Depts." unchanged.
+  const activeDeptCount = departments.filter((d) => d.isActive !== false).length;
+  const pendingRequestCount = expenses.filter((e) => OPEN_STATUSES.includes(e.status)).length;
 
   /**
    * Utilisation against allocation, department by department, as the substitute
@@ -234,7 +277,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                 width: "120px",
                 height: "120px",
                 borderRadius: "50%",
-                background: `conic-gradient(${selectedAnalyticsDept.pctUsed > 90 ? "#DC2626" : "#2563EB"} ${Math.min(100, selectedAnalyticsDept.pctUsed) * 3.6}deg, rgba(var(--color-card-border), 0.5) 0deg)`,
+                background: `conic-gradient(${selectedAnalyticsDept.pctUsed > 90 ? "#DC2626" : "#2563EB"} ${Math.min(100, selectedAnalyticsDept.pctUsed) * 3.6}deg, rgb(var(--color-card-border) / 0.5) 0deg)`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -268,7 +311,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                   / {selectedAnalyticsDept.hasBudget ? formatNaira(selectedAnalyticsDept.totalBudget) : "no budget set"}
                 </span>
               </div>
-              <div style={{ width: "100%", height: "8px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "4px", margin: "0.85rem 0" }}>
+              <div style={{ width: "100%", height: "8px", backgroundColor: "rgb(var(--color-card-border) / 0.5)", borderRadius: "4px", margin: "0.85rem 0" }}>
                 <div style={{ width: `${Math.min(100, selectedAnalyticsDept.pctUsed)}%`, height: "100%", backgroundColor: "#2563EB", borderRadius: "4px" }} />
               </div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
@@ -337,7 +380,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                       <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>{item.name}</span>
                       <span style={{ fontWeight: "700", color: "rgb(var(--color-text))" }}>{formatNaira(item.amount)}</span>
                     </div>
-                    <div style={{ width: "100%", height: "6px", backgroundColor: "rgba(var(--color-card-border), 0.5)", borderRadius: "3px", marginBottom: "0.35rem" }}>
+                    <div style={{ width: "100%", height: "6px", backgroundColor: "rgb(var(--color-card-border) / 0.5)", borderRadius: "3px", marginBottom: "0.35rem" }}>
                       <div style={{ width: `${item.barPct}%`, height: "100%", backgroundColor: "#2563EB", borderRadius: "3px" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem" }}>
@@ -365,7 +408,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             ) : (
               <table className="data-table" style={{ width: "100%" }}>
                 <thead>
-                  <tr style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)" }}>
+                  <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)" }}>
                     <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>REQUEST DETAILS</th>
                     <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>STATUS</th>
                     <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", textAlign: "right" }}>AMOUNT</th>
@@ -373,7 +416,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                 </thead>
                 <tbody>
                   {analytics!.highValue.map((request) => (
-                    <tr key={request._id} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.3)" }}>
+                    <tr key={request._id} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.3)" }}>
                       <td style={{ padding: "0.85rem 0" }}>
                         <div style={{ fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}>{request.description}</div>
                         <div style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
@@ -409,25 +452,48 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             View and manage Departmental budget spend
           </p>
         </div>
-        <button
-          onClick={onOpenCreateDept}
-          style={{
-            padding: "0.65rem 1.25rem",
-            borderRadius: "0.5rem",
-            border: "none",
-            backgroundColor: "#2563eb",
-            color: "#ffffff",
-            fontWeight: "600",
-            fontSize: "0.9rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            cursor: "pointer",
-            boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
-          }}
-        >
-          <Icons.Plus size={18} /> New Department
-        </button>
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          {onOpenSetBudget && (
+            <button
+              onClick={() => onOpenSetBudget()}
+              className="btn btn-secondary"
+              style={{
+                padding: "0.65rem 1.25rem",
+                borderRadius: "0.5rem",
+                border: "1px solid rgb(var(--color-card-border))",
+                backgroundColor: "rgb(var(--color-surface))",
+                color: "rgb(var(--color-text))",
+                fontWeight: "600",
+                fontSize: "0.9rem",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                cursor: "pointer",
+              }}
+            >
+              <Icons.Landmark size={18} /> Set Budget
+            </button>
+          )}
+          <button
+            onClick={onOpenCreateDept}
+            style={{
+              padding: "0.65rem 1.25rem",
+              borderRadius: "0.5rem",
+              border: "none",
+              backgroundColor: "#2563eb",
+              color: "#ffffff",
+              fontWeight: "600",
+              fontSize: "0.9rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
+            }}
+          >
+            <Icons.Plus size={18} /> New Department
+          </button>
+        </div>
       </div>
 
       {/* Summary KPI Cards */}
@@ -489,20 +555,43 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
       <div className="glass-panel" style={{ padding: "1.5rem", backgroundColor: "rgb(var(--color-card))", borderRadius: "0.75rem", marginBottom: "2rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
           <h3 style={{ fontSize: "1.1rem", fontWeight: "700", color: "rgb(var(--color-text))" }}>Department Overview</h3>
-          <div style={{ display: "flex", gap: "0.5rem" }}>
-            <button style={{ padding: "0.4rem 0.6rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.375rem", color: "rgb(var(--color-text-muted))" }}>
+          {/* The design's two icon affordances, now backed by the filter and
+              sort the table actually applies. */}
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.78rem", color: "rgb(var(--color-text-muted))" }}>
               <Icons.SlidersHorizontal size={14} />
-            </button>
-            <button style={{ padding: "0.4rem 0.6rem", background: "none", border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.375rem", color: "rgb(var(--color-text-muted))" }}>
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value as typeof statusFilter); setPage(1); }}
+                aria-label="Filter departments"
+                className="form-select"
+                style={{ width: "auto", padding: "0.3rem 0.5rem", fontSize: "0.78rem" }}
+              >
+                <option value="ALL">All departments</option>
+                <option value="ACTIVE">Active only</option>
+                <option value="AT_RISK">At risk ({AT_RISK_PCT}%+ used)</option>
+              </select>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.78rem", color: "rgb(var(--color-text-muted))" }}>
               <Icons.ListFilter size={14} />
-            </button>
+              <select
+                value={sortBy}
+                onChange={(e) => { setSortBy(e.target.value as typeof sortBy); setPage(1); }}
+                aria-label="Sort departments"
+                className="form-select"
+                style={{ width: "auto", padding: "0.3rem 0.5rem", fontSize: "0.78rem" }}
+              >
+                <option value="NAME">Sort: Name</option>
+                <option value="UTILISATION">Sort: Utilisation</option>
+              </select>
+            </label>
           </div>
         </div>
 
         <div className="table-container">
           <table className="data-table" style={{ width: "100%" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}>
+              <tr style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)" }}>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>DEPARTMENT</th>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>BUDGET (FY2026)</th>
                 <th style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-muted))" }}>UTILIZED</th>
@@ -518,7 +607,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                 const pct = d.pctUsed;
                 const isHighPct = pct > 80;
                 return (
-                  <tr key={d.id || idx} style={{ borderBottom: "1px solid rgba(var(--color-card-border), 0.5)" }}>
+                  <tr key={d.id || idx} style={{ borderBottom: "1px solid rgb(var(--color-card-border) / 0.5)" }}>
                     <td style={{ padding: "1.1rem 0", fontWeight: "700", color: "rgb(var(--color-text))", fontSize: "0.9rem" }}>
                       {d.name}
                     </td>
@@ -538,7 +627,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                         <span style={{ fontSize: "0.75rem", fontWeight: "700", color: isHighPct ? "#EF4444" : "#2563EB" }}>
                           {pct}%
                         </span>
-                        <div style={{ width: "100%", height: "5px", backgroundColor: "rgba(var(--color-card-border), 0.6)", borderRadius: "2px" }}>
+                        <div style={{ width: "100%", height: "5px", backgroundColor: "rgb(var(--color-card-border) / 0.6)", borderRadius: "2px" }}>
                           <div style={{ width: `${Math.min(100, pct)}%`, height: "100%", backgroundColor: isHighPct ? "#EF4444" : "#2563EB", borderRadius: "2px" }} />
                         </div>
                       </div>
@@ -546,18 +635,35 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                     <td style={{ color: "rgb(var(--color-text-muted))", fontSize: "0.85rem" }}>
                       {d.usersCount}
                     </td>
+                    {/* Three states, not two: a department deliberately made
+                        inactive is not the same as one awaiting deletion, and
+                        only the latter offers Restore. */}
                     <td>
-                      <span className={`badge ${d.isActive !== false ? "badge-paid" : "badge-draft"}`} style={{ fontSize: "0.7rem" }}>
-                        {d.isActive !== false ? "ACTIVE" : "INACTIVE"}
+                      <span
+                        className={`badge ${pendingDeletion(d) ? "badge-rejected" : d.isActive === false ? "badge-draft" : "badge-paid"}`}
+                        style={{ fontSize: "0.7rem" }}
+                      >
+                        {pendingDeletion(d) ? "PENDING DELETION" : d.isActive === false ? "INACTIVE" : "ACTIVE"}
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+                        {/* Set Budget Button */}
+                        {onOpenSetBudget && (
+                          <button
+                            onClick={() => onOpenSetBudget(d)}
+                            title="Set Department Budget"
+                            aria-label={`Set Budget for ${d.name}`}
+                            style={{ background: "none", border: "none", color: "#f59e0b", cursor: "pointer", padding: "0.25rem" }}
+                          >
+                            <Icons.Landmark size={16} />
+                          </button>
+                        )}
                         {/* Edit Button */}
                         <button
                           onClick={() => onOpenEditDept(d)}
                           title="Edit Department"
-                          style={{ background: "none", border: "none", color: "#60a5fa", cursor: "pointer", padding: "0.25rem" }}
+                          style={{ background: "none", border: "none", color: "rgb(var(--color-primary))", cursor: "pointer", padding: "0.25rem" }}
                         >
                           <Icons.Edit2 size={16} />
                         </button>
@@ -569,14 +675,35 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
                         >
                           <Icons.TrendingUp size={16} />
                         </button>
-                        {/* Delete Button */}
-                        <button
-                          onClick={() => onOpenDeleteDept(d)}
-                          title="Delete Department"
-                          style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "0.25rem" }}
-                        >
-                          <Icons.Trash2 size={16} />
-                        </button>
+                        {/* Delete / Restore. The design pairs a Pending Deletion
+                            row with a red "Restore" link rather than an icon, so
+                            the way back is unmissable. */}
+                        {pendingDeletion(d) ? (
+                          <button
+                            onClick={() => onRestoreDept(d)}
+                            aria-label={`Restore ${d.name}`}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "#ef4444",
+                              cursor: "pointer",
+                              padding: "0.25rem",
+                              fontWeight: "700",
+                              fontSize: "0.82rem"
+                            }}
+                          >
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => onOpenDeleteDept(d)}
+                            title="Delete Department"
+                            aria-label={`Delete ${d.name}`}
+                            style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", padding: "0.25rem" }}
+                          >
+                            <Icons.Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -653,7 +780,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
         }}>
           <div>
             <h3 style={{ fontSize: "1.25rem", fontWeight: "700", marginBottom: "0.5rem" }}>Budget Committed</h3>
-            <p style={{ fontSize: "0.82rem", color: "rgba(255, 255, 255, 0.8)", lineHeight: "1.4" }}>
+            <p style={{ fontSize: "0.82rem", color: "rgb(var(--color-card-border) / 1.00)", lineHeight: "1.4" }}>
               Utilised plus pending, across every departmental allocation.
             </p>
           </div>
@@ -662,7 +789,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             width: "130px",
             height: "130px",
             borderRadius: "50%",
-            background: `conic-gradient(#FFFFFF ${Math.min(100, utilisationPct) * 3.6}deg, rgba(255, 255, 255, 0.25) 0deg)`,
+            background: `conic-gradient(#FFFFFF ${Math.min(100, utilisationPct) * 3.6}deg, rgb(var(--color-card-border) / 1.00) 0deg)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -683,7 +810,7 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
             </div>
           </div>
 
-          <span style={{ fontSize: "0.8rem", color: "rgba(255, 255, 255, 0.85)", textAlign: "center" }}>
+          <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-card-border) / 1.00)", textAlign: "center" }}>
             {formatNaira(enterpriseTotals.utilised + enterpriseTotals.pending)} of {formatNaira(enterpriseTotals.allocated)}
           </span>
         </div>

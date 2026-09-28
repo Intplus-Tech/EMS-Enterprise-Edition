@@ -19,6 +19,9 @@ export default function UsersRolesPage() {
     adminBusy,
     saveRolePermissions,
     updateUser,
+    inviteAndReport,
+    setInviteForm,
+    setInviteResult,
     setSelectedAdminUser,
     setShowAdminAddUserModal,
     setShowAdminEditUserProfileModal,
@@ -30,6 +33,27 @@ export default function UsersRolesPage() {
 
   if (currentUser?.role !== SystemRole.ADMIN) return null;
 
+  /**
+   * Re-issuing an invite mints a fresh token, so the result dialog is reopened
+   * with the new link rather than the stale one from the original invitation.
+   * Moved here from the retired "Users & Invites" screen.
+   */
+  const handleResendInvite = async (user: AdminUserDto) => {
+    const input = {
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      departmentId: user.department?.id ?? "",
+    };
+    setInviteForm(input);
+    // `inviteAndReport` refetches, reports delivery through the notice banner
+    // and records the payload the dialog's retry replays.
+    const result = await inviteAndReport(input);
+    // A resend is an explicit request for the link, so the dialog opens even on
+    // a clean send — unlike the create path, where the banner is enough.
+    if (result) setInviteResult(result);
+  };
+
   return (
     <AdminUsersAndRolesTab
       systemUsers={systemUsers}
@@ -40,6 +64,7 @@ export default function UsersRolesPage() {
       // The inline role select persists through the same mutation the Edit
       // Profile dialog uses, so both paths refetch and report failures.
       onChangeUserRole={(user: AdminUserDto, role: SystemRole) => updateUser(user.id, { role })}
+      onResendInvite={handleResendInvite}
       onOpenAddUser={() => setShowAdminAddUserModal(true)}
       onOpenEditUserProfile={(user: AdminUserDto) => {
         setSelectedAdminUser(user);

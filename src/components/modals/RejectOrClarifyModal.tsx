@@ -9,7 +9,7 @@
  * action (REJECT vs RETURN).
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../ui/ModalShell";
 import { RequestReferenceCard } from "../ui/RequestReferenceCard";
@@ -47,6 +47,13 @@ export const RejectOrClarifyModal: React.FC<RejectOrClarifyModalProps> = ({
   const [decision, setDecision] = useState<RejectDecision>(initialDecision);
   const [reason, setReason] = useState("");
   const [signature, setSignature] = useState("");
+
+  // The dialog stays mounted between openings, so `useState(initialDecision)`
+  // only ever honoured the first value it saw: opening from "Reject" and then
+  // from "Insufficient Budget" left the chip on whichever came first.
+  useEffect(() => {
+    if (isOpen) setDecision(initialDecision);
+  }, [isOpen, initialDecision]);
 
   if (!isOpen || !expense) return null;
 

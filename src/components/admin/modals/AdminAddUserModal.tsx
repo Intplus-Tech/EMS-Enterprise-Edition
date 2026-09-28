@@ -1,20 +1,23 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
-import { useResetOnOpen } from "../../ui/useResetOnOpen";
+import { isDepartmentScopedRole } from "../../../enums/roles";
+import { SubmitButton } from "../../ui/SubmitButton";
 
 interface AdminAddUserModalProps {
   isOpen: boolean;
   onClose: () => void;
   departments: any[];
-  /** Resolves false when the invite was refused, so the modal can stay open. */
-  onSaveUser: (userData: any) => void | Promise<boolean | void>;
+  onSaveUser: (userData: any) => void;
+  /** True while the invite is in flight; blocks the duplicate submit. */
+  busy?: boolean;
 }
 
 export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
   isOpen,
   onClose,
   departments,
-  onSaveUser
+  onSaveUser,
+  busy = false
 }) => {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -22,35 +25,29 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
   const [departmentId, setDepartmentId] = useState("");
   const [role, setRole] = useState("INITIATOR");
 
-  // Departments load after first mount, so the initial useState never saw them;
-  // seeding the default here also clears the previous entry on reopen.
-  useResetOnOpen(isOpen, () => {
-    setFullName("");
-    setEmail("");
-    setContactNumber("");
-    setDepartmentId(departments[0]?._id || departments[0]?.id || "");
-    setRole("INITIATOR");
-  });
-
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Only initiators and approvers belong to a department; every other role is
+  // enterprise-wide, so the picker is hidden and no department is submitted.
+  const needsDepartment = isDepartmentScopedRole(role);
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const saved = await onSaveUser({
+    onSaveUser({
       fullName,
       email,
       contactNumber,
-      departmentId,
+      departmentId: needsDepartment ? departmentId : "",
       role
     });
-    if (saved !== false) onClose();
+    onClose();
   };
 
   return (
     <div style={{
       position: "fixed",
       inset: 0,
-      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backgroundColor: "rgb(var(--color-overlay) / 0.75)",
       backdropFilter: "blur(4px)",
       display: "flex",
       alignItems: "center",
@@ -63,7 +60,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
         maxWidth: "560px",
         padding: "1.75rem",
         backgroundColor: "rgb(var(--color-card))",
-        border: "1px solid rgba(255, 255, 255, 0.1)",
+        border: "1px solid rgb(var(--color-card-border))",
         borderRadius: "1rem",
         boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
       }}>
@@ -122,8 +119,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -148,8 +145,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -169,8 +166,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -180,32 +177,40 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
             </div>
           </div>
 
-          {/* Department & Role */}
+          {/* Department & Role — department only applies to scoped roles */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
-                Department
+                {needsDepartment ? "Department" : "Scope"}
               </label>
-              <select
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
-                  borderRadius: "0.5rem",
-                  color: "rgb(var(--color-text))",
-                  fontSize: "0.9rem",
-                  outline: "none"
-                }}
-              >
-                {departments.map((d: any) => (
-                  <option key={d._id || d.id} value={d._id || d.id} style={{ background: "rgb(var(--color-card))" }}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+              {needsDepartment ? (
+                <select
+                  required
+                  value={departmentId}
+                  onChange={(e) => setDepartmentId(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "0.65rem 0.85rem",
+                    backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                    border: "1px solid rgb(var(--color-card-border))",
+                    borderRadius: "0.5rem",
+                    color: "rgb(var(--color-text))",
+                    fontSize: "0.9rem",
+                    outline: "none"
+                  }}
+                >
+                  <option value="" style={{ background: "rgb(var(--color-card))" }}>Select a department</option>
+                  {departments.map((d: any) => (
+                    <option key={d._id || d.id} value={d._id || d.id} style={{ background: "rgb(var(--color-card))" }}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", paddingTop: "0.65rem" }}>
+                  Enterprise-wide
+                </p>
+              )}
             </div>
             <div>
               <label style={{ display: "block", fontSize: "0.8rem", fontWeight: "600", color: "rgb(var(--color-text-muted))", marginBottom: "0.35rem" }}>
@@ -217,8 +222,8 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                 style={{
                   width: "100%",
                   padding: "0.65rem 0.85rem",
-                  backgroundColor: "rgba(15, 23, 42, 0.6)",
-                  border: "1px solid rgba(255, 255, 255, 0.12)",
+                  backgroundColor: "rgb(var(--color-surface-secondary) / 0.6)",
+                  border: "1px solid rgb(var(--color-card-border))",
                   borderRadius: "0.5rem",
                   color: "rgb(var(--color-text))",
                   fontSize: "0.9rem",
@@ -247,7 +252,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
             marginBottom: "1.5rem"
           }}>
             <Icons.Info size={18} style={{ color: "#3b82f6", flexShrink: 0, marginTop: "2px" }} />
-            <p style={{ fontSize: "0.8rem", color: "#93c5fd", lineHeight: "1.4" }}>
+            <p style={{ fontSize: "0.8rem", color: "rgb(var(--color-primary))", lineHeight: "1.4" }}>
               The user will receive an automated invitation email to set their password once the profile is saved. Invitation expires in 72 hours.
             </p>
           </div>
@@ -260,7 +265,7 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
               style={{
                 padding: "0.65rem 1.25rem",
                 borderRadius: "0.5rem",
-                border: "1px solid rgba(255, 255, 255, 0.15)",
+                border: "1px solid rgb(var(--color-card-border))",
                 backgroundColor: "transparent",
                 color: "rgb(var(--color-text))",
                 fontWeight: "600",
@@ -270,22 +275,19 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
             >
               Cancel
             </button>
-            <button
+            <SubmitButton
               type="submit"
+              loading={busy}
+              loadingLabel="Sending invite…"
               style={{
                 padding: "0.65rem 1.25rem",
-                borderRadius: "0.5rem",
-                border: "none",
-                backgroundColor: "#2563eb",
-                color: "#ffffff",
-                fontWeight: "600",
                 fontSize: "0.85rem",
-                cursor: "pointer",
+                fontWeight: 600,
                 boxShadow: "0 4px 12px rgba(37, 99, 235, 0.35)"
               }}
             >
               Save User
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </div>
