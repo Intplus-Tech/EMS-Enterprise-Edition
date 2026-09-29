@@ -119,26 +119,6 @@ export const AdminDepartmentalSpendTab: React.FC<AdminDepartmentalSpendTabProps>
     .slice(0, 6);
 
   /**
-   * In-flight requests and live department count for the two right-hand tiles.
-   * Both read "14" and "6" as literals before, so adding a department or raising
-   * a request left them unchanged and made the screen look like it had not saved.
-   */
-  const pendingRequestCount = expenses.filter((e) =>
-    [
-      "SUBMITTED",
-      "BUDGET_CHECK",
-      "INSUFFICIENT_BUDGET",
-      "PENDING_EXCEPTIONAL",
-      "PENDING_APPROVAL",
-      "APPROVED",
-      "SENT_TO_FINANCE",
-      "UPLOADED_TO_BANK",
-      "AWAITING_RELEASE",
-    ].includes(e.status)
-  ).length;
-  const activeDeptCount = departments.filter((d) => d.isActive !== false).length;
-
-  /**
    * Share of the enterprise allocation actually committed. Replaces the fixed
    * "8.4" score, which was not computed from anything.
    */
