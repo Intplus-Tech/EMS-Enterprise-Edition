@@ -1,8 +1,8 @@
 /**
  * AdminSetBudgetModal
  * Assigns a fiscal allocation to a department by composing budget line items.
- * Line-item capture is delegated to AdminAddBudgetItemModal so both entry points
- * (Set Budget, Edit Department) collect identical fields.
+ * Line items are typed inline (free-text name, amount, description), matching the
+ * Create Department flow, so admins can add several custom categories at once.
  * Design source: designs/system-admin/Set Budget.png
  */
 import React, { useState, useEffect } from "react";
@@ -16,7 +16,6 @@ import {
   fiscalPeriodFor,
   periodCovers,
 } from "../../../domains/budget/fiscalPeriod";
-import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
 
 interface AdminSetBudgetModalProps {
   isOpen: boolean;
@@ -125,7 +124,6 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   const [lineItems, setLineItems] = useState<any[]>(() =>
     itemsFor(getTargetDeptId(), defaultPeriodName(getTargetDeptId()))
   );
-  const [showAddItem, setShowAddItem] = useState(false);
 
   // Sync department, period and line items whenever the modal opens or target department changes
   useEffect(() => {
@@ -155,26 +153,30 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   if (!isOpen) return null;
 
   const totalAllocation = lineItems.reduce((acc, item) => acc + (Number(item.amount) || 0), 0);
-  const selectedDept = departments.find((d: any) => (d._id || d.id) === selectedDeptId);
   const periodOptions = periodOptionsFor(selectedDeptId);
   const selectedPeriod =
     periodOptions.find((p) => p.periodName === selectedPeriodName) ?? currentFiscalPeriod();
 
-  const handleAddLineItem = (item: BudgetItemPayload) => {
+  // Appends a blank, editable row — same inline flow as Create Department, so the
+  // admin can type any category name and add several items before saving.
+  const handleAddLineItem = () => {
     // No `itemId`: the server allocates one. Only the local key is set here.
     setLineItems([
       ...lineItems,
       {
         key: `new-${Date.now()}`,
-        name: item.category,
-        description: item.description,
-        amount: item.amount,
+        name: "",
+        description: "",
+        amount: 0,
         utilised: 0,
         pending: 0,
         expansionsGranted: 0,
       },
     ]);
   };
+
+  // Mirrors BudgetLineItemSchema.name (min 2) so Finish never sends a row the server rejects.
+  const hasUnnamedItem = lineItems.some((item) => (item.name ?? "").trim().length < 2);
 
   const handleItemChange = (key: string, field: string, value: any) => {
     setLineItems(lineItems.map(item => {
@@ -190,7 +192,13 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
   };
 
   const handleSubmit = () => {
-    onSetBudget(selectedDeptId, totalAllocation, lineItems, selectedPeriod);
+    if (hasUnnamedItem) return;
+    onSetBudget(
+      selectedDeptId,
+      totalAllocation,
+      lineItems.map((item) => ({ ...item, name: item.name.trim() })),
+      selectedPeriod
+    );
     onClose();
   };
 
@@ -207,7 +215,19 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
             <button type="button" onClick={onClose} className="btn btn-secondary" style={{ background: "none", border: "none" }}>
               Cancel
             </button>
-            <button type="button" onClick={handleSubmit} className="btn btn-primary" style={{ background: "#2563EB", border: "none" }}>
+            {/* Unnamed rows would fail server validation, so say why Finish is blocked. */}
+            {hasUnnamedItem && (
+              <span style={{ fontSize: "0.78rem", color: "rgb(var(--color-danger))" }}>
+                Name every budget item (at least 2 characters)
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={hasUnnamedItem}
+              className="btn btn-primary"
+              style={{ background: "#2563EB", border: "none", opacity: hasUnnamedItem ? 0.5 : 1, cursor: hasUnnamedItem ? "not-allowed" : "pointer" }}
+            >
               Finish
             </button>
           </div>
@@ -296,7 +316,11 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
                           value={item.name}
                           onChange={(e) => handleItemChange(item.key,"name", e.target.value)}
                           aria-label="Budget item name"
-                          style={{ background: "none", border: "none", color: "rgb(var(--color-text))", fontWeight: 600, fontSize: "0.85rem", flexGrow: 1, outline: "none" }}
+                          placeholder="Type a category, e.g. Cloud Hosting"
+                          maxLength={80}
+                          autoFocus={!item.itemId && !item.name}
+                          className="form-input"
+                          style={{ fontWeight: 600, fontSize: "0.85rem", padding: "0.3rem 0.5rem", flexGrow: 1 }}
                         />
                         <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
                           <span style={{ fontSize: "0.8rem", color: "rgb(var(--color-text-muted))" }}>{CURRENCY_SYMBOL}</span>
@@ -313,6 +337,17 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
                           </button>
                         </div>
                       </div>
+
+                      {/* Optional justification, kept inline like Create Department */}
+                      <input
+                        type="text"
+                        value={item.description ?? ""}
+                        onChange={(e) => handleItemChange(item.key, "description", e.target.value)}
+                        aria-label="Budget item description"
+                        placeholder="Description (optional)"
+                        maxLength={300}
+                        style={{ background: "none", border: "none", color: "rgb(var(--color-text-muted))", fontSize: "0.75rem", outline: "none", width: "100%" }}
+                      />
 
                       {/* Ledger line — only for items that have seen activity */}
                       {(committed > 0 || item.expansionsGranted > 0) && (
@@ -338,10 +373,10 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
             )}
           </div>
 
-          {/* Add line item — opens the shared budget-item modal */}
+          {/* Add line item — appends an inline row the admin types into */}
           <button
             type="button"
-            onClick={() => setShowAddItem(true)}
+            onClick={handleAddLineItem}
             style={{
               width: "100%",
               padding: "1rem",
@@ -362,13 +397,6 @@ export const AdminSetBudgetModal: React.FC<AdminSetBudgetModalProps> = ({
           </button>
         </div>
       </ModalShell>
-
-      <AdminAddBudgetItemModal
-        isOpen={showAddItem}
-        onClose={() => setShowAddItem(false)}
-        departmentName={selectedDept?.name}
-        onAddItem={handleAddLineItem}
-      />
     </>
   );
 };
