@@ -1,6 +1,7 @@
 import React from "react";
 import * as Icons from "lucide-react";
 import { isOwnRequest } from "../domains/identity/reference";
+import { SystemRole, roleLabel } from "../enums/roles";
 import { StatCard } from "./ui/StatCard";
 import { CURRENCY_SYMBOL, formatNaira, formatNairaPrecise, formatDate, humanizeStatus, stageLabel, statusBadgeClass } from "./ui/format";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
@@ -632,7 +633,7 @@ export const RequestsTab: React.FC<RequestsTabProps> = ({
                       <table className="data-table">
                         <thead>
                           <tr>
-                            <th>Initiator</th>
+                            <th>{roleLabel(SystemRole.INITIATOR)}</th>
                             <th>Request ID</th>
                             <th>Category</th>
                             <th>Amount ({CURRENCY_SYMBOL})</th>

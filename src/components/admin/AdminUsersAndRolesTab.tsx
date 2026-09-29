@@ -4,10 +4,10 @@ import { Pagination } from "../ui/Pagination";
 import { StatCard } from "../ui/StatCard";
 import { datedFilename, downloadCsv } from "../ui/exportCsv";
 import { RolePermissionsMatrix } from "./RolePermissionsMatrix";
-import { SystemRole } from "../../enums/roles";
+import { ROLE_OPTIONS, SystemRole, roleLabel } from "../../enums/roles";
 import { PermissionAction, PermissionResource } from "../../enums/permissions";
 import { EmptyState } from "../ui/EmptyState";
-import { formatNaira, humanizeStatus } from "../ui/format";
+import { formatNaira } from "../ui/format";
 import { AdminUserDto, DepartmentDto, DepartmentSpendDto, RolePermissionDto } from "../../types/api";
 
 // Matches the row density shown in designs/system-admin/Admin_ User & Role.png
@@ -228,12 +228,9 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
               style={{ padding: "0.5rem 0.85rem", backgroundColor: "rgb(var(--color-surface-secondary))", border: "1px solid rgb(var(--color-card-border))", borderRadius: "0.375rem", color: "rgb(var(--color-text))", fontSize: "0.85rem" }}
             >
               <option value="ALL">All Roles</option>
-              <option value="ADMIN">Admin</option>
-              <option value="FINANCE_HEAD">Finance Head</option>
-              <option value="FINANCE_MANAGER">Finance Manager</option>
-              <option value="FINANCE_OFFICER">Finance Officer</option>
-              <option value="APPROVER">Approver</option>
-              <option value="INITIATOR">Initiator</option>
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r} value={r}>{roleLabel(r)}</option>
+              ))}
             </select>
           </div>
 
@@ -381,7 +378,7 @@ export const AdminUsersAndRolesTab: React.FC<AdminUsersAndRolesTabProps> = ({
                         style={{ padding: "0.4rem 0.75rem", fontSize: "0.82rem", width: "auto", minWidth: "150px" }}
                       >
                         {Object.values(SystemRole).map((role) => (
-                          <option key={role} value={role}>{humanizeStatus(role)}</option>
+                          <option key={role} value={role}>{roleLabel(role)}</option>
                         ))}
                       </select>
                     </td>

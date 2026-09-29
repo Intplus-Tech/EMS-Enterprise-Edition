@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
 import { formatNairaPrecise } from "./ui/format";
+import { SystemRole, roleLabel } from "../enums/roles";
 
 interface ApproveExpansionModalProps {
   isOpen: boolean;
@@ -287,7 +288,7 @@ export const ApproveExpansionModal: React.FC<ApproveExpansionModalProps> = ({
         <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem", color: "rgb(var(--color-text-muted))" }}>
           <Icons.GitFork size={18} style={{ color: "rgb(var(--color-text-dim))", flexShrink: 0, marginTop: "2px" }} />
           <span style={{ fontSize: "0.8rem", lineHeight: "1.45" }}>
-            Upon approval, this request will move directly to the <strong>Finance Manager (Releaser)</strong> for payment, bypassing the Finance Officer queue.
+            Upon approval, this request will move directly to the <strong>{roleLabel(SystemRole.FINANCE_MANAGER)}</strong> for payment, bypassing the {roleLabel(SystemRole.FINANCE_OFFICER)} queue.
           </span>
         </div>
 

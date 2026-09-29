@@ -232,7 +232,7 @@ function buildReviewQueueNotifications(
     )
     .map((expense) => {
       const requestNumber = expense.requestNumber || "Request";
-      const initiatorName = expense.initiatorId?.name || "an initiator";
+      const initiatorName = expense.initiatorId?.name || "a requester";
 
       return {
         id: `${idOf(expense._id)}:pending:${expense.status}`,

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
-import { isDepartmentScopedRole } from "../../../enums/roles";
+import { ROLE_OPTIONS, isDepartmentScopedRole, roleLabel } from "../../../enums/roles";
 import { SubmitButton } from "../../ui/SubmitButton";
 
 interface AdminAddUserModalProps {
@@ -230,12 +230,9 @@ export const AdminAddUserModal: React.FC<AdminAddUserModalProps> = ({
                   outline: "none"
                 }}
               >
-                <option value="INITIATOR" style={{ background: "rgb(var(--color-card))" }}>Initiator</option>
-                <option value="APPROVER" style={{ background: "rgb(var(--color-card))" }}>Approver / Dept Manager</option>
-                <option value="FINANCE_OFFICER" style={{ background: "rgb(var(--color-card))" }}>Finance Officer</option>
-                <option value="FINANCE_MANAGER" style={{ background: "rgb(var(--color-card))" }}>Finance Manager</option>
-                <option value="FINANCE_HEAD" style={{ background: "rgb(var(--color-card))" }}>Finance Head</option>
-                <option value="ADMIN" style={{ background: "rgb(var(--color-card))" }}>System Admin</option>
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r} value={r} style={{ background: "rgb(var(--color-card))" }}>{roleLabel(r)}</option>
+                ))}
               </select>
             </div>
           </div>

@@ -10,10 +10,11 @@
  */
 
 import React, { RefObject } from "react";
+import { SystemRole, roleLabel } from "../../enums/roles";
 import * as Icons from "lucide-react";
 import { AttachmentList } from "../ui/AttachmentList";
 import { AttachmentDto, AttachmentInput } from "../../types/api";
-import { formatNaira, formatDateTime, humanizeStatus } from "../ui/format";
+import { formatNaira, formatDateTime } from "../ui/format";
 import { SubmitButton } from "../ui/SubmitButton";
 
 interface ResubmitExpenseModalProps {
@@ -100,7 +101,7 @@ export const ResubmitExpenseModal: React.FC<ResubmitExpenseModalProps> = ({
               <strong style={{ fontSize: "0.95rem" }}>
                 {question?.actorName || "Approver"}{" "}
                 <span style={{ fontWeight: 500, color: "rgb(var(--color-text-muted))" }}>
-                  ({humanizeStatus(question?.actorRole) || "Approver"})
+                  ({roleLabel(question?.actorRole) || roleLabel(SystemRole.APPROVER)})
                 </span>
               </strong>
               {question?.timestamp && (

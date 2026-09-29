@@ -13,13 +13,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useRef, useState } from "react";
+import { roleLabel } from "../../enums/roles";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../ui/ModalShell";
 import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
 import { AttachmentTarget } from "./AttachmentViewModal";
 import { AttachmentDto, AttachmentInput } from "../../types/api";
 import { formatFileSize } from "../../domains/attachments/attachment.rules";
-import { formatDateTime, humanizeStatus, justificationLabel } from "../ui/format";
+import { formatDateTime, justificationLabel } from "../ui/format";
 
 export interface PaymentReleasePayload {
   /** Bank transaction reference the release is reconciled against. */
@@ -261,7 +262,7 @@ export const AuthorizeReleaseModal: React.FC<AuthorizeReleaseModalProps> = ({
                         {/* Named roles read as the design's captions; anything
                             else still names its author rather than vanishing. */}
                         {justificationLabel(entry.actorRole) ||
-                          `${entry.actorName} (${humanizeStatus(entry.actorRole)})`}
+                          `${entry.actorName} (${roleLabel(entry.actorRole)})`}
                       </span>
                       <span
                         style={{

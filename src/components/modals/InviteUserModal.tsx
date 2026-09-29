@@ -2,7 +2,7 @@
 
 import React from "react";
 import * as Icons from "lucide-react";
-import { isDepartmentScopedRole } from "../../enums/roles";
+import { ROLE_OPTIONS, isDepartmentScopedRole, roleLabel } from "../../enums/roles";
 import { SubmitButton } from "../ui/SubmitButton";
 
 interface InviteUserModalProps {
@@ -89,12 +89,9 @@ export const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 }
                 className="form-select"
               >
-                <option value="INITIATOR">Initiator</option>
-                <option value="APPROVER">Approver</option>
-                <option value="FINANCE_OFFICER">Finance Officer</option>
-                <option value="FINANCE_MANAGER">Finance Manager</option>
-                <option value="FINANCE_HEAD">Finance Head</option>
-                <option value="ADMIN">System Admin</option>
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r} value={r}>{roleLabel(r)}</option>
+                ))}
               </select>
             </div>
 

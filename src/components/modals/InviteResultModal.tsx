@@ -14,6 +14,7 @@
  */
 
 import React from "react";
+import { roleLabel } from "../../enums/roles";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../ui/ModalShell";
 import { SubmitButton } from "../ui/SubmitButton";
@@ -74,7 +75,7 @@ export const InviteResultModal: React.FC<InviteResultModalProps> = ({
       isOpen
       onClose={onClose}
       title="Invitation result"
-      subtitle={inviteResult.user?.name ? `${inviteResult.user.name} · ${inviteResult.user.role}` : undefined}
+      subtitle={inviteResult.user?.name ? `${inviteResult.user.name} · ${roleLabel(inviteResult.user.role)}` : undefined}
       maxWidth="580px"
       footer={
         <>

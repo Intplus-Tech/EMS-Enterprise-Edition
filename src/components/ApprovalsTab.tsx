@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { SystemRole, roleLabel } from "../enums/roles";
 import * as Icons from "lucide-react";
 import { ApproveExpansionModal } from "./ApproveExpansionModal";
 import { RejectExpansionModal } from "./RejectExpansionModal";
@@ -240,7 +241,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         onNotify?.({ tone: "error", message: "Please enter your question or clarification text." });
         return;
       }
-      const comment = `[Clarification Required - Directed to ${directedTo}${markAsUrgent ? " - URGENT" : ""}]: ${clarificationQuestion}`;
+      // `directedTo` holds the option value; the comment shows its display label.
+      const directedToLabel = directedTo === "Initiator" ? roleLabel(SystemRole.INITIATOR) : directedTo;
+      const comment = `[Clarification Required - Directed to ${directedToLabel}${markAsUrgent ? " - URGENT" : ""}]: ${clarificationQuestion}`;
       const ok = await actions.returnForClarification(id, comment, signature);
       if (ok) {
         setShowClarificationForm(false);
@@ -404,7 +407,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     if (!downloadCsv(datedFilename("processing-pipeline"), filteredList, [
       { header: "Request", value: (e: any) => e.requestNumber },
       { header: "Department", value: (e: any) => e.departmentId?.name ?? "" },
-      { header: "Initiator", value: (e: any) => e.initiatorId?.name ?? "" },
+      { header: roleLabel(SystemRole.INITIATOR), value: (e: any) => e.initiatorId?.name ?? "" },
       { header: "Category", value: (e: any) => e.category },
       { header: "Amount", value: (e: any) => e.amount },
       { header: "Status", value: (e: any) => e.status },
@@ -597,7 +600,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           current: false,
         },
         {
-          label: "Department Approval",
+          label: `${roleLabel(SystemRole.APPROVER)} Review`,
           desc: stageDesc(
             departmentStep,
             "Awaiting actionâ€¦",
@@ -610,7 +613,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           current: selectedExpense.status === "PENDING_APPROVAL",
         },
         {
-          label: "Finance Verification",
+          label: `${roleLabel(SystemRole.FINANCE_OFFICER)} Review`,
           desc: stageDesc(financeStep, "Awaiting actionâ€¦", reached([...BANK_STAGE_STATUSES, "PAID", "CLOSED"])),
           date: financeStep ? formatDate(financeStep.timestamp) : "",
           active: hasHistory
@@ -782,7 +785,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                   `badge-uploaded-to-bank`, none of which exist in globals.css,
                   so the header badge rendered with no colour on most statuses. */}
               <span className={`badge ${statusBadgeClass(selectedExpense.status)}`} style={{ fontWeight: "700" }}>
-                {selectedExpense.status === "SENT_TO_FINANCE" ? "APPROVED BY DEPT HEAD" : humanizeStatus(selectedExpense.status)}
+                {selectedExpense.status === "SENT_TO_FINANCE" ? `APPROVED BY ${roleLabel(SystemRole.APPROVER).toUpperCase()}` : humanizeStatus(selectedExpense.status)}
               </span>
               <span style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))" }}>
                 Submitted on {new Date(selectedExpense.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -893,7 +896,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.departmentId?.name || "â€”"}</strong>
                   </div>
                   <div>
-                    <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>Initiator</span>
+                    <span style={{ color: "rgb(var(--color-text-muted))", display: "block", fontSize: "0.8rem", marginBottom: "0.2rem" }}>{roleLabel(SystemRole.INITIATOR)}</span>
                     <strong style={{ fontSize: "0.95rem" }}>{selectedExpense.initiatorId?.name || "â€”"}</strong>
                   </div>
                   <div>
@@ -973,7 +976,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                           <div style={{ flexGrow: 1, background: "rgb(var(--color-card-border) / 0.12)", padding: "0.85rem 1rem", borderRadius: "8px", border: "1px solid rgb(var(--color-card-border) / 0.5)" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem", gap: "0.5rem" }}>
                               <span style={{ fontSize: "0.85rem", fontWeight: "700" }}>
-                                {entry.authorName} ({humanizeStatus(entry.authorRole)})
+                                {entry.authorName} ({roleLabel(entry.authorRole)})
                                 {/* Internal notes are never shown to the initiator */}
                                 {entry.isInternal && (
                                   <span className="badge badge-draft" style={{ marginLeft: "0.4rem", fontSize: "0.65rem" }}>INTERNAL</span>
@@ -1033,7 +1036,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
                     className="form-input"
                     style={{ padding: "0.45rem", fontSize: "0.85rem" }}
                   >
-                    <option value="Initiator">Initiator</option>
+                    <option value="Initiator">{roleLabel(SystemRole.INITIATOR)}</option>
                     <option value="Dept Head">Department Head</option>
                   </select>
                 </div>

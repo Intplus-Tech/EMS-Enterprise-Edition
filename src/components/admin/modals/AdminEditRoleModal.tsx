@@ -10,10 +10,10 @@
  * hardcoded chips that showed the same values for every role.
  */
 import React, { useEffect, useState } from "react";
+import { roleLabel } from "../../../enums/roles";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../../ui/ModalShell";
 import { SubmitButton } from "../../ui/SubmitButton";
-import { humanizeStatus } from "../../ui/format";
 import {
   PermissionAction,
   PermissionResource,
@@ -59,7 +59,7 @@ export const AdminEditRoleModal: React.FC<AdminEditRoleModalProps> = ({
 
   if (!isOpen || !roleData) return null;
 
-  const roleLabel = humanizeStatus(roleData.role);
+  const roleName = roleLabel(roleData.role);
   // Admin must stay signed-in-able or no one can reach this screen again.
   const isProtectedRole = roleData.role === "ADMIN";
 
@@ -73,7 +73,7 @@ export const AdminEditRoleModal: React.FC<AdminEditRoleModalProps> = ({
     <ModalShell
       isOpen={isOpen}
       onClose={onClose}
-      title={`Edit Role — ${roleLabel}`}
+      title={`Edit Role — ${roleName}`}
       subtitle={`${roleData.userCount} user${roleData.userCount === 1 ? "" : "s"} currently assigned`}
       maxWidth="480px"
       footer={
