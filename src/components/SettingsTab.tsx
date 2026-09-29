@@ -1,4 +1,5 @@
 import React from "react";
+import { roleLabel } from "../enums/roles";
 import * as Icons from "lucide-react";
 import { formatDate } from "./ui/format";
 
@@ -130,7 +131,7 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
               <div className="settings-info-item">
                 <span className="settings-info-label">Role</span>
                 <span className="settings-info-value">
-                  {currentUser?.role === "INITIATOR" ? "Expense Initiator" : currentUser?.role === "APPROVER" ? "Department Approver" : currentUser?.role?.replace(/_/g, " ") || "Member"}
+                  {roleLabel(currentUser?.role) || "Member"}
                 </span>
               </div>
 

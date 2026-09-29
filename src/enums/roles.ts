@@ -11,6 +11,36 @@ export enum SystemRole {
 }
 
 /**
+ * What each role is called on screen. The enum values are stored on users,
+ * permissions and audit entries, so only these display names change when the
+ * business renames a role — every label in the UI must come from here.
+ */
+export const ROLE_LABELS: Record<SystemRole, string> = {
+  [SystemRole.ADMIN]: "System Admin",
+  [SystemRole.INITIATOR]: "Requester",
+  [SystemRole.APPROVER]: "Approver 1",
+  [SystemRole.FINANCE_OFFICER]: "Final Approver",
+  [SystemRole.FINANCE_MANAGER]: "Uploader",
+  [SystemRole.FINANCE_HEAD]: "Finance Head",
+};
+
+/** Display name for a role; unknown values fall back to a readable form of the raw string. */
+export function roleLabel(role: SystemRole | string | null | undefined): string {
+  if (!role) return "";
+  return ROLE_LABELS[role as SystemRole] ?? String(role).replace(/_/g, " ");
+}
+
+/** Roles in the order the user-management selects list them. */
+export const ROLE_OPTIONS: readonly SystemRole[] = [
+  SystemRole.INITIATOR,
+  SystemRole.APPROVER,
+  SystemRole.FINANCE_OFFICER,
+  SystemRole.FINANCE_MANAGER,
+  SystemRole.FINANCE_HEAD,
+  SystemRole.ADMIN,
+];
+
+/**
  * The only two roles that belong to a department. An initiator raises requests
  * against their own department's budget and an approver only ever sees that
  * department's queue, so both are meaningless without one.

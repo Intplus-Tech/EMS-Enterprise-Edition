@@ -7,7 +7,7 @@ import { WorkflowService } from "../workflow/workflow.service";
 import { ILogActor, LoggerService } from "../logs/logger.service";
 import { RequestNotifier } from "../notifications/request-notifier";
 import { BANK_STAGE_STATUSES, OVER_BUDGET_STATUSES, RequestStatus } from "../../enums/statuses";
-import { SystemRole } from "../../enums/roles";
+import { SystemRole, roleLabel } from "../../enums/roles";
 import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
 import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
@@ -730,7 +730,7 @@ export class ExpenseService {
       actorId,
       actorName: SYSTEM_ACTOR_NAME,
       actorRole: SystemRole.ADMIN,
-      action: "Awaiting Finance Manager release on the bank platform",
+      action: `Awaiting ${roleLabel(SystemRole.FINANCE_MANAGER)} release on the bank platform`,
       timestamp: new Date(),
     });
     await request.save();
@@ -909,7 +909,7 @@ export class ExpenseService {
         actorId: actorId,
         actorName: actor.name,
         actorRole: actor.role,
-        action: "Return to Initiator",
+        action: `Return to ${roleLabel(SystemRole.INITIATOR)}`,
         comment,
         timestamp: new Date()
       });
@@ -981,7 +981,7 @@ export class ExpenseService {
       actorId: actorId,
       actorName: SYSTEM_ACTOR_NAME,
       actorRole: SystemRole.ADMIN,
-      action: "Awaiting Finance Manager release on the bank platform",
+      action: `Awaiting ${roleLabel(SystemRole.FINANCE_MANAGER)} release on the bank platform`,
       timestamp: new Date()
     });
     await request.save();

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { roleLabel } from "../../enums/roles";
 import * as Icons from "lucide-react";
 import { SubmitButton } from "../ui/SubmitButton";
 
@@ -120,7 +121,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 <input
                   type="text"
                   disabled
-                  value={currentUser?.role === "INITIATOR" ? "Expense Initiator" : currentUser?.role === "APPROVER" ? "Department Approver" : currentUser?.role?.replace(/_/g, " ") || "Member"}
+                  value={roleLabel(currentUser?.role) || "Member"}
                   className="form-input icon-input-field"
                   style={{ fontSize: "0.85rem", padding: "0.6rem 2.25rem 0.6rem 0.85rem", background: "rgba(99, 102, 241, 0.05)", cursor: "not-allowed" }}
                 />

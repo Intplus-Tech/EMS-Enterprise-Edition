@@ -3,6 +3,7 @@ import * as Icons from "lucide-react";
 import { Pagination } from "./ui/Pagination";
 import { EmptyState } from "./ui/EmptyState";
 import { formatNaira } from "./ui/format";
+import { SystemRole, roleLabel } from "../enums/roles";
 import { datedFilename, downloadCsv } from "./ui/exportCsv";
 import { ExpenseClient } from "../services/expense.client";
 import { BudgetContextDto } from "../types/api";
@@ -559,7 +560,7 @@ export const PendingExceptionsOverviewTab: React.FC<PendingExceptionsOverviewTab
                     <EmptyState
                       icon={<Icons.ShieldCheck size={20} />}
                       title="No pending exceptional approvals"
-                      description="Over-budget requests forwarded by a Finance Officer appear here for authorisation."
+                      description={`Over-budget requests forwarded by a ${roleLabel(SystemRole.FINANCE_OFFICER)} appear here for authorisation.`}
                     />
                   </td>
                 </tr>

@@ -2,6 +2,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { SystemRole, roleLabel } from "../../enums/roles";
 import * as Icons from "lucide-react";
 import { BRANDING } from "../../config/branding";
 
@@ -282,7 +283,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   {currentUser?.name || "Jane Doe"}
                 </span>
                 <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))" }}>
-                  {currentUser?.role === "FINANCE_HEAD" ? "Finance Head" : currentUser?.role === "INITIATOR" ? "Initiator" : currentUser?.role?.replace(/_/g, " ") || "Initiator"}
+                  {roleLabel(currentUser?.role || SystemRole.INITIATOR)}
                 </span>
               </div>
             </div>

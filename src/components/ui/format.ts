@@ -4,6 +4,7 @@
  * Single source of truth for how money, dates and statuses are rendered so that
  * every tab/modal shows identical strings. Pure functions only — no React, no I/O.
  */
+import { SystemRole, roleLabel } from "../../enums/roles";
 
 /**
  * The application's only currency. Every amount stored, entered, logged or
@@ -98,16 +99,16 @@ export function stageLabel(
  * job in the flow rather than the raw enum. Shared by the release review and
  * completed release dialogs, which show the same trail either side of payment.
  */
-const JUSTIFICATION_LABELS: Record<string, string> = {
-  APPROVER: "Approver's Justification (Dept. Head)",
-  FINANCE_HEAD: "Finance Head's Justification",
-  FINANCE_OFFICER: "Finance Officer's Justification",
-  FINANCE_MANAGER: "Finance Manager's Justification",
-};
+const JUSTIFYING_ROLES: string[] = [
+  SystemRole.APPROVER,
+  SystemRole.FINANCE_HEAD,
+  SystemRole.FINANCE_OFFICER,
+  SystemRole.FINANCE_MANAGER,
+];
 
 /** `null` for roles that contribute no justification (the initiator's own notes). */
 export function justificationLabel(actorRole?: string | null): string | null {
-  return JUSTIFICATION_LABELS[actorRole ?? ""] ?? null;
+  return actorRole && JUSTIFYING_ROLES.includes(actorRole) ? `${roleLabel(actorRole)}'s Justification` : null;
 }
 
 /**

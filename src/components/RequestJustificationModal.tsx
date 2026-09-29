@@ -14,9 +14,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState } from "react";
+import { SystemRole, roleLabel } from "../enums/roles";
 import * as Icons from "lucide-react";
 import { EmptyState } from "./ui/EmptyState";
-import { formatDateTime, humanizeStatus } from "./ui/format";
+import { formatDateTime } from "./ui/format";
 import { ThreadEntryDto } from "../types/api";
 
 interface RequestJustificationModalProps {
@@ -52,7 +53,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
   const [questionText, setQuestionText] = useState("");
   const [sentSuccess, setSentSuccess] = useState(false);
 
-  const approverLabel = departmentApprover || "Departmental Approver";
+  const approverLabel = departmentApprover || roleLabel(SystemRole.APPROVER);
 
   const handleSend = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -259,7 +260,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
                             <span style={{ fontSize: "0.825rem", fontWeight: "700", color: isApproval ? "rgb(var(--color-secondary))" : "rgb(var(--color-text))" }}>
                               {entry.authorName}
                               <span style={{ fontWeight: 600, color: "rgb(var(--color-text-muted))", marginLeft: "0.4rem" }}>
-                                {humanizeStatus(String(entry.authorRole))}
+                                {roleLabel(String(entry.authorRole))}
                               </span>
                             </span>
                             <span style={{ fontSize: "0.725rem", color: "rgb(var(--color-text-dim))", whiteSpace: "nowrap" }}>
@@ -337,7 +338,7 @@ export const RequestJustificationModal: React.FC<RequestJustificationModalProps>
         >
           <Icons.Info size={18} style={{ color: "#2563EB", flexShrink: 0, marginTop: "2px" }} />
           <span style={{ fontSize: "0.8rem", lineHeight: "1.5" }}>
-            The request remains in 'Pending' status while clarification is sought. Note: The Finance Officer maintains read-only visibility of this specific exchange until a final decision is posted.
+            The request remains in 'Pending' status while clarification is sought. Note: The {roleLabel(SystemRole.FINANCE_OFFICER)} maintains read-only visibility of this specific exchange until a final decision is posted.
           </span>
         </div>
 

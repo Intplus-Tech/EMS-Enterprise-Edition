@@ -12,8 +12,7 @@
 import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { EmptyState } from "../ui/EmptyState";
-import { humanizeStatus } from "../ui/format";
-import { SystemRole } from "../../enums/roles";
+import { SystemRole, roleLabel } from "../../enums/roles";
 import {
   PermissionAction,
   PermissionResource,
@@ -178,7 +177,7 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({
           >
             {roles.map((role) => (
               <option key={role.role} value={role.role}>
-                {humanizeStatus(role.role)}
+                {roleLabel(role.role)}
               </option>
             ))}
           </select>
@@ -189,11 +188,11 @@ export const RolePermissionsMatrix: React.FC<RolePermissionsMatrixProps> = ({
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
         <div>
           <h1 style={{ fontSize: "1.65rem", fontWeight: 700, color: "rgb(var(--color-text))" }}>
-            Permissions: <span style={{ color: "#2563EB" }}>{humanizeStatus(activeRole?.role)}</span>
+            Permissions: <span style={{ color: "#2563EB" }}>{roleLabel(activeRole?.role)}</span>
           </h1>
           <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginTop: "0.25rem" }}>
             Configure granular access levels for system modules for the{" "}
-            {humanizeStatus(activeRole?.role).toLowerCase()} organizational role.
+            {roleLabel(activeRole?.role)} organizational role.
           </p>
         </div>
         <span

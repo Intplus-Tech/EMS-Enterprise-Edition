@@ -7,6 +7,7 @@ import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions"
 import { AttachmentDto, BudgetContextDto, ThreadEntryDto, WorkflowHistoryDto } from "../types/api";
 import { AttachmentTarget } from "./modals/AttachmentViewModal";
 import { formatNaira, formatNairaPrecise } from "./ui/format";
+import { SystemRole, roleLabel } from "../enums/roles";
 
 interface PendingExceptionsTabProps {
   currentUser?: any;
@@ -122,7 +123,7 @@ export const PendingExceptionsTab: React.FC<PendingExceptionsTabProps> = ({
   })) : [
     {
       id: "hist-1",
-      actor: `${requestDetails.employee} (Initiator)`,
+      actor: `${requestDetails.employee} (${roleLabel(SystemRole.INITIATOR)})`,
       timestamp: requestDetails.createdDate,
       comment: `"${requestDetails.description}"`,
       isOverbudget: false

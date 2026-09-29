@@ -18,6 +18,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React from "react";
+import { roleLabel } from "../../enums/roles";
 import * as Icons from "lucide-react";
 import { ModalShell } from "../ui/ModalShell";
 import { EmptyState } from "../ui/EmptyState";
@@ -135,7 +136,7 @@ export const CommunicationThreadModal: React.FC<CommunicationThreadModalProps> =
                         textTransform: "uppercase",
                       }}
                     >
-                      {humanizeStatus(String(entry.authorRole))}
+                      {roleLabel(String(entry.authorRole))}
                     </span>
                   </div>
                   <span style={{ fontSize: "0.7rem", color: "rgb(var(--color-text-dim))", whiteSpace: "nowrap" }}>

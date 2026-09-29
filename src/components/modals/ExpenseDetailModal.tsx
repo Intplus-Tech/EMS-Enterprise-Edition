@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { SystemRole, roleLabel } from "../../enums/roles";
 import * as Icons from "lucide-react";
 import { WorkflowActionType } from "../../enums/workflowActions";
 import { BANK_STAGE_STATUSES } from "../../enums/statuses";
@@ -361,7 +362,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
                 <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
                   <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.RETURN)} className="btn btn-secondary" disabled={!signed}>
-                    Return to Initiator
+                    Return to {roleLabel(SystemRole.INITIATOR)}
                   </button>
                   <button onClick={() => handleExceptionalBudgetAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger" disabled={!signed}>
                     Reject Request
@@ -483,7 +484,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
                 <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
                   <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.RETURN)} className="btn btn-secondary" disabled={!signed}>
-                    Return to Initiator
+                    Return to {roleLabel(SystemRole.INITIATOR)}
                   </button>
                   <button onClick={() => handleWorkflowAction(selectedExpense._id, WorkflowActionType.REJECT)} className="btn btn-danger" disabled={!signed}>
                     Reject
@@ -497,7 +498,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
 
             {currentUser?.role === "FINANCE_OFFICER" && selectedExpense.status === "SENT_TO_FINANCE" && (
               <div className="glass-card" style={{ border: "1px solid rgb(var(--color-primary) / 0.3)" }}>
-                <p style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }}>Finance Officer Action: Payee Audit & Instruction Upload</p>
+                <p style={{ fontWeight: "bold", color: "rgb(var(--color-primary))", marginBottom: "0.5rem" }}>{roleLabel(SystemRole.FINANCE_OFFICER)} Action: Payee Audit & Instruction Upload</p>
                 <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", marginBottom: "1rem" }}>
                   Please confirm that the payee invoice attachment matches the requested amount. Then click the button below to upload the payment file to the banking system.
                 </p>
@@ -516,7 +517,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                 the signature together, which is what the audit trail needs. */}
             {currentUser?.role === "FINANCE_MANAGER" && BANK_STAGE_STATUSES.includes(selectedExpense.status) && (
               <div className="glass-card" style={{ border: "1px solid rgb(var(--color-secondary) / 0.3)" }}>
-                <p style={{ fontWeight: "bold", color: "rgb(var(--color-secondary))", marginBottom: "0.5rem" }}>Finance Manager Action: Authorize Cash Release</p>
+                <p style={{ fontWeight: "bold", color: "rgb(var(--color-secondary))", marginBottom: "0.5rem" }}>{roleLabel(SystemRole.FINANCE_MANAGER)} Action: Authorize Cash Release</p>
                 <p style={{ fontSize: "0.85rem", color: "rgb(var(--color-text-muted))", margin: 0 }}>
                   Open this request from the <strong style={{ color: "rgb(var(--color-text))" }}>Approvals</strong> screen to release
                   it. The release dialog there records the bank reference and the transfer receipt against the payment.
@@ -541,7 +542,7 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
                   .map((hist: any, index: number) => (
                   <div key={index} style={{ padding: "0.75rem", background: "rgb(var(--color-card-border) / 0.12)", borderRadius: "4px", fontSize: "0.85rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                      <span><strong>{hist.actorName}</strong> ({hist.actorRole})</span>
+                      <span><strong>{hist.actorName}</strong> ({roleLabel(hist.actorRole)})</span>
                       <span style={{ fontSize: "0.75rem", color: "rgb(var(--color-text-dim))" }}>{new Date(hist.timestamp).toLocaleString()}</span>
                     </div>
                     <div>Action: <span style={{ color: "rgb(var(--color-accent))", fontWeight: "600" }}>{hist.action}</span></div>

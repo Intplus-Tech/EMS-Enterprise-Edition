@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { ElectronicSignatureField } from "./ui/ElectronicSignatureField";
 import { formatNairaPrecise } from "./ui/format";
+import { SystemRole, roleLabel } from "../enums/roles";
 
 interface RejectExpansionModalProps {
   isOpen: boolean;
@@ -232,8 +233,8 @@ export const RejectExpansionModal: React.FC<RejectExpansionModalProps> = ({
 
           <ul style={{ margin: 0, paddingLeft: "1.4rem", fontSize: "0.825rem", color: "#1E3A8A", lineHeight: "1.6", fontWeight: "500" }}>
             <li>The request status changes to <strong>REJECTED</strong>.</li>
-            <li>The Finance Officer's history log is updated.</li>
-            <li>The Finance Officer can communicate the rejection to the Initiator.</li>
+            <li>The {roleLabel(SystemRole.FINANCE_OFFICER)}&apos;s history log is updated.</li>
+            <li>The {roleLabel(SystemRole.FINANCE_OFFICER)} can communicate the rejection to the {roleLabel(SystemRole.INITIATOR)}.</li>
           </ul>
         </div>
 
