@@ -13,7 +13,7 @@ import * as Icons from "lucide-react";
 export type AdminDepartmentRow = DepartmentDto &
   Omit<DepartmentSpendDto, "id" | "name" | "description" | "isActive"> & {
     /** Allocation lines for the period, consumed by the Edit Department modal. */
-    budgetItems?: { category: string; amount: number; description?: string; utilization: number }[];
+    budgetItems?: { id?: string; category: string; amount: number; description?: string; utilization: number }[];
   };
 
 /** Statuses that count as still open for the Pending Requests tile. */

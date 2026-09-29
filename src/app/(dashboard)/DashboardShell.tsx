@@ -608,6 +608,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             description: updatedDept.description,
             totalBudget: updatedDept.totalBudget,
             lineItems: (updatedDept.budgetItems || []).map((line: any) => ({
+              // Round-tripped so a renamed item keeps its spend ledger server-side.
+              id: line.id,
               name: line.category ?? line.name,
               description: line.description,
               amount: Number(line.amount) || 0,

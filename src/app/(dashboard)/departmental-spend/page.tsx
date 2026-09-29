@@ -12,6 +12,7 @@ import {
 import { DepartmentalSpendTab } from "../../../components/DepartmentalSpendTab";
 import { useDashboard } from "../DashboardProvider";
 import { SystemRole } from "../../../enums/roles";
+import { currentFiscalPeriod } from "../../../domains/budget/fiscalPeriod";
 
 export default function DepartmentalSpendPage() {
   const {
@@ -38,14 +39,30 @@ export default function DepartmentalSpendPage() {
     // Allocation lines, carried on the row so the Edit Department modal can
     // show them. Without this it opened with an empty list and its save wrote
     // that empty list back, erasing the department's budget breakdown.
-    const linesByDept = new Map<string, { category: string; amount: number; description?: string; utilization: number }[]>();
-    budgetPeriods.forEach((period) => {
-      const existing = linesByDept.get(period.departmentId) ?? [];
-      period.lineItems.forEach((item) =>
-        existing.push({ category: item.name, amount: item.amount, description: item.description, utilization: 0 })
-      );
-      linesByDept.set(period.departmentId, existing);
-    });
+    //
+    // Only the current fiscal period is read, because that is the period the
+    // modal saves to. Merging every period copied last year's items into this
+    // year on save. Ids are carried so a save matches each item to its ledger.
+    const currentPeriodName = currentFiscalPeriod().periodName;
+    const linesByDept = new Map<string, NonNullable<AdminDepartmentRow["budgetItems"]>>();
+    budgetPeriods
+      .filter((period) => period.periodName === currentPeriodName)
+      .forEach((period) => {
+        linesByDept.set(
+          period.departmentId,
+          period.lineItems.map((item) => {
+            const committed = (item.utilised || 0) + (item.pending || 0);
+            return {
+              id: item.id,
+              category: item.name,
+              amount: item.amount,
+              description: item.description,
+              // Share of the item's allocation already spent or locked.
+              utilization: item.amount > 0 ? Math.min(100, Math.round((committed / item.amount) * 100)) : 0,
+            };
+          })
+        );
+      });
 
     return departments.map((dept) => {
       const spend = spendById.get(dept.id);

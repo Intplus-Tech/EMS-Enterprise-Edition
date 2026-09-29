@@ -12,6 +12,8 @@ import { CURRENCY_SYMBOL, formatNairaPrecise, formatNairaCompact } from "../../u
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
 
 interface BudgetLine {
+  /** Stored item id; absent for a line added in this session. Sent back so a save keeps its ledger. */
+  id?: string;
   category: string;
   amount: number;
   utilization: number;
