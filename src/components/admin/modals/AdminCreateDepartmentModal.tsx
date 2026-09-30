@@ -169,7 +169,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
             </select>
             <p style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", marginTop: "0.6rem", marginBottom: 0 }}>
               <Icons.Info size={14} style={{ flexShrink: 0, marginTop: "0.1rem", color: "#2563EB" }} />
-              Determines the approval sequence and segregation of duties for all requests originating from this department. It cannot be changed after the department is created.
+              Determines the approval sequence and segregation of duties for all requests originating from this department. It can be changed later from Edit Department; requests already in approval keep their current flow.
             </p>
           </div>
 

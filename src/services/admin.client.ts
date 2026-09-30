@@ -43,7 +43,7 @@ export interface DepartmentInput {
   name: string;
   description?: string;
   headUserId?: string | null;
-  /** Accepted only on create; the flow cannot be changed afterwards. */
+  /** Changing it later applies to new submissions; in-flight requests keep theirs. */
   approvalFlow?: ApprovalFlow;
   /**
    * Opening allocation, created with the department in a single call.

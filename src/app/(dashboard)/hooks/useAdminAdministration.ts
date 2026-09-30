@@ -160,6 +160,7 @@ export function useAdminAdministration({ onSuccess, onError }: AdminFeedback) {
           name: input.name,
           description: input.description,
           headUserId: input.headUserId,
+          approvalFlow: input.approvalFlow,
           isActive: input.isActive,
         });
 

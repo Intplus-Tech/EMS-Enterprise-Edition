@@ -10,7 +10,11 @@ import { ModalShell } from "../../ui/ModalShell";
 import { DEPARTMENT_SCOPED_ROLES } from "../../../enums/roles";
 import { CURRENCY_SYMBOL, formatNairaPrecise, formatNairaCompact } from "../../ui/format";
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
-import { approvalFlowPolicy } from "../../../domains/workflow/approval-flow.policy";
+import {
+  APPROVAL_FLOW_OPTIONS,
+  approvalFlowOptionLabel,
+} from "../../../domains/workflow/approval-flow.policy";
+import { ApprovalFlow, normalizeApprovalFlow } from "../../../enums/approvalFlows";
 
 interface BudgetLine {
   /** Stored item id; absent for a line added in this session. Sent back so a save keeps its ledger. */
@@ -52,6 +56,7 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
 }) => {
   const [deptName, setDeptName] = useState("");
   const [head, setHead] = useState("");
+  const [approvalFlow, setApprovalFlow] = useState<ApprovalFlow>(normalizeApprovalFlow(undefined));
   const [totalBudget, setTotalBudget] = useState<number>(0);
   const [lines, setLines] = useState<BudgetLine[]>([]);
   const [userSearch, setUserSearch] = useState("");
@@ -63,6 +68,7 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
     if (department) {
       setDeptName(department.name || "");
       setHead(department.head || department.headName || "");
+      setApprovalFlow(normalizeApprovalFlow(department.approvalFlow));
       // Show what is actually allocated. Placeholder figures (a ₦250,000 budget
       // and three invented allocation lines) previously made an unconfigured
       // department look funded, and saving would have persisted the fiction.
@@ -132,6 +138,7 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
       ...department,
       name: deptName,
       head,
+      approvalFlow,
       totalBudget: Number(totalBudget),
       budgetItems: lines
     });
@@ -198,7 +205,7 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
           </div>
         </div>
 
-        {/* Ownership + fiscal envelope + the approval flow fixed at creation */}
+        {/* Ownership + fiscal envelope + approval flow */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "1.75rem" }}>
           <div>
             <label className="form-label">Department Head</label>
@@ -222,20 +229,24 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
           </div>
           <div>
             <label className="form-label" htmlFor="edit-dept-approval-flow">
-              Department Approval Flow{" "}
-              <span style={{ fontSize: "0.7rem", fontWeight: 500, color: "rgb(var(--color-text-dim))" }}>(Not editable)</span>
+              Department Approval Flow
             </label>
-            {/* Read-only by design: in-flight requests are routed on the chain
-                they were submitted into, so the flow is fixed at creation. */}
-            <input
+            {/* Editable so admins never delete and recreate a department just to
+                switch flows. Safe because each request snapshots its flow at
+                submission — in-flight approvals are not re-routed. */}
+            <select
               id="edit-dept-approval-flow"
-              type="text"
-              className="form-input"
-              value={approvalFlowPolicy(department.approvalFlow).label}
-              title={approvalFlowPolicy(department.approvalFlow).description}
-              disabled
-              readOnly
-            />
+              className="form-select"
+              value={approvalFlow}
+              onChange={(e) => setApprovalFlow(e.target.value as ApprovalFlow)}
+            >
+              {APPROVAL_FLOW_OPTIONS.map((flow) => (
+                <option key={flow} value={flow}>{approvalFlowOptionLabel(flow)}</option>
+              ))}
+            </select>
+            <p style={{ fontSize: "0.72rem", color: "rgb(var(--color-text-muted))", marginTop: "0.4rem", marginBottom: 0 }}>
+              Applies to new submissions. Requests already in approval finish on their current flow.
+            </p>
           </div>
         </div>
 

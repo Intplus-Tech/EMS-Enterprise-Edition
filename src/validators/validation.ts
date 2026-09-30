@@ -200,6 +200,9 @@ export const DepartmentUpdateSchema = z.object({
   name: z.string().trim().min(2).max(80).optional(),
   description: z.string().trim().max(500).optional(),
   headUserId: OptionalObjectId,
+  // Editable after creation: requests already in approval keep the flow they
+  // were submitted under, so a switch only affects new submissions.
+  approvalFlow: z.nativeEnum(ApprovalFlow).optional(),
   isActive: z.boolean().optional(),
 });
 
