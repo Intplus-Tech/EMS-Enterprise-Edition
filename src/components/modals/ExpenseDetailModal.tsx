@@ -11,6 +11,7 @@ import { ElectronicSignatureField } from "../ui/ElectronicSignatureField";
 import { formatNaira, humanizeStatus, statusBadgeClass } from "../ui/format";
 import { BudgetItemOptionDto, WorkflowHistoryDto } from "../../types/api";
 import { hasRuledOnRequest, isRestingOnRole } from "../../domains/expense/review-stage";
+import { booksBudgetItem } from "../../domains/workflow/approval-flow.policy";
 import { PaymentRecordCard } from "../ui/PaymentRecordCard";
 
 interface ExpenseDetailModalProps {
@@ -100,7 +101,8 @@ export const ExpenseDetailModal: React.FC<ExpenseDetailModalProps> = ({
   // of them are gated on the signature the server will verify.
   const signed = decisionSignature.trim().length > 0;
 
-  const requiresBudgetItem = currentUser?.role === "APPROVER";
+  // Approver 1 books the spend, or the Finance Head on the Accelerated flow.
+  const requiresBudgetItem = booksBudgetItem(selectedExpense, currentUser?.role);
   const selectedItem = (budgetItems || []).find((item) => item.id === budgetItem);
   const willOverrun = Boolean(selectedItem && !selectedItem.coversRequest);
   const shortfall = selectedItem ? Math.max(0, (selectedExpense?.amount || 0) - selectedItem.available) : 0;

@@ -1,6 +1,7 @@
 import mongoose, { Schema } from "mongoose";
 import { RequestStatus } from "../enums/statuses";
 import { SystemRole } from "../enums/roles";
+import { ApprovalFlow } from "../enums/approvalFlows";
 import { fileNameFromUrl, isStoredUrl } from "../domains/attachments/attachment.rules";
 
 const WorkflowHistorySchema = new Schema({
@@ -130,6 +131,13 @@ const ExpenseRequestSchema = new Schema(
 
     // Workflow state variables
     currentStepIndex: { type: Number, default: 0 },
+    /**
+     * The department's approval flow, copied at each submission. `currentStepIndex`
+     * only means something against the chain it was advanced through, so an admin
+     * switching the department's flow must not re-interpret requests in flight.
+     * Absent on older records, which read as STANDARD.
+     */
+    approvalFlow: { type: String, enum: Object.values(ApprovalFlow), required: false },
     history: { type: [WorkflowHistorySchema], default: [] },
   },
   {

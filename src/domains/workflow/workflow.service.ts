@@ -1,7 +1,10 @@
 import { connectToDatabase } from "../../config/db";
 import { WorkflowConfig } from "../../models/WorkflowConfig";
 import { RequestStatus } from "../../enums/statuses";
-import { SystemRole } from "../../enums/roles";
+import { SystemRole, roleLabel } from "../../enums/roles";
+import { approvalFlowPolicy, WorkflowStep } from "./approval-flow.policy";
+
+export type { WorkflowStep } from "./approval-flow.policy";
 
 /**
  * Roles whose stage in the request flow is served by a dedicated route, not by
@@ -19,15 +22,6 @@ import { SystemRole } from "../../enums/roles";
  */
 const DEDICATED_STAGE_ROLES: SystemRole[] = [SystemRole.FINANCE_MANAGER];
 
-/** One configured approval step, as the routing logic reads it. */
-export interface WorkflowStep {
-  stepIndex: number;
-  stepName: string;
-  role: SystemRole;
-  minAmount?: number;
-  requiresAllApprovals?: boolean;
-}
-
 /** The step a request is waiting on, paired with its position in the chain. */
 export interface ActiveStep {
   step: WorkflowStep;
@@ -39,6 +33,8 @@ interface RoutableRequest {
   amount: number;
   currentStepIndex: number;
   status?: RequestStatus | string;
+  /** Snapshotted from the department at submission; absent means STANDARD. */
+  approvalFlow?: string | null;
 }
 
 /** Steps in execution order; callers hold them straight off a config document. */
@@ -126,14 +122,14 @@ export class WorkflowService {
         steps: [
           {
             stepIndex: 0,
-            stepName: "Departmental Approval",
+            stepName: `${roleLabel(SystemRole.APPROVER)} Review`,
             role: SystemRole.APPROVER,
             minAmount: 0,
             requiresAllApprovals: false
           },
           {
             stepIndex: 1,
-            stepName: "Finance Officer Review",
+            stepName: `${roleLabel(SystemRole.FINANCE_OFFICER)} Review`,
             role: SystemRole.FINANCE_OFFICER,
             minAmount: 0,
             requiresAllApprovals: false
@@ -152,13 +148,23 @@ export class WorkflowService {
    * Returns the next step schema, or null if all steps are completed.
    */
   public static async getNextStepForRequest(request: any): Promise<ActiveStep | null> {
-    const config = await this.getActiveWorkflow();
-    return resolveActiveStep(config.steps as WorkflowStep[], request);
+    return resolveActiveStep(await this.getStepsForFlow(request?.approvalFlow), request);
   }
 
-  /** See `resumeStepIndexForResubmission`; resolves the active config first. */
+  /** See `resumeStepIndexForResubmission`; resolves the request's chain first. */
   public static async getResumeStepIndex(request: any): Promise<number> {
+    return resumeStepIndexForResubmission(await this.getStepsForFlow(request?.approvalFlow), request);
+  }
+
+  /**
+   * The approval chain a flow runs. A flow with a fixed chain (the Finance Head
+   * direct flow) ignores Workflow Rules entirely — its whole point is that the
+   * configured Approver 1 / Final Approver stages are bypassed.
+   */
+  public static async getStepsForFlow(flow: string | null | undefined): Promise<WorkflowStep[]> {
+    const fixed = approvalFlowPolicy(flow).fixedSteps;
+    if (fixed) return fixed;
     const config = await this.getActiveWorkflow();
-    return resumeStepIndexForResubmission(config.steps as WorkflowStep[], request);
+    return config.steps as WorkflowStep[];
   }
 }

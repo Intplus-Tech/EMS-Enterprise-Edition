@@ -19,6 +19,8 @@ export interface NavBadgeContext {
   expenses: {
     status: RequestStatus | string;
     currentStepIndex?: number;
+    /** Role of the step a PENDING_APPROVAL request rests on, resolved server-side. */
+    currentStageRole?: string;
     /** Held for a missing budget period — see `isDecidableException`. */
     awaitingBudgetPeriod?: boolean;
   }[];
@@ -53,11 +55,26 @@ const awaitingMyDecisionCount = ({ expenses, role }: NavBadgeContext) =>
   expenses.filter((e) => {
     const status = String(e.status);
     if (role === "FINANCE_HEAD") return isDecidableException(e);
-    if (role === "APPROVER") return status === "PENDING_APPROVAL" && e.currentStepIndex === 0;
+    // The resolved stage role wins: on the Accelerated flow step 0 is the
+    // Finance Head's, not the approver's. The index is only a legacy fallback.
+    if (role === "APPROVER") {
+      return status === "PENDING_APPROVAL" &&
+        (e.currentStageRole ? e.currentStageRole === "APPROVER" : e.currentStepIndex === 0);
+    }
     if (role === "FINANCE_OFFICER") return status === "SENT_TO_FINANCE";
     if (role === "FINANCE_MANAGER") return isStatusIn(BANK_STAGE_STATUSES, status);
     return false;
   }).length;
+
+/**
+ * Accelerated Fast-Track requests waiting on the Finance Head's own approval
+ * step. Separate from `openExceptionCount`: that queue is budget expansions on
+ * the Pending Exceptions screen, this one is ordinary approvals.
+ */
+const financeHeadApprovalCount = ({ expenses }: NavBadgeContext) =>
+  expenses.filter(
+    (e) => String(e.status) === "PENDING_APPROVAL" && e.currentStageRole === "FINANCE_HEAD"
+  ).length;
 
 const SETTINGS: NavItem = { route: "/settings", label: "Settings", icon: "Settings" };
 
@@ -68,6 +85,14 @@ const INITIATOR_NAV: NavItem[] = [
 ];
 
 const FINANCE_HEAD_NAV: NavItem[] = [
+  // Departments on the Accelerated Fast-Track flow route straight to the
+  // Finance Head, bypassing Approver 1 and the Final Approver.
+  {
+    route: "/approvals",
+    label: "Pending Approvals",
+    icon: "CheckSquare",
+    badge: financeHeadApprovalCount,
+  },
   {
     route: "/pending-exceptions",
     label: "Pending Exceptions",

@@ -39,6 +39,8 @@ import {
   POST_APPROVAL_STATUSES,
 } from "../enums/statuses";
 import type { ExpenseActions } from "../app/(dashboard)/hooks/useExpenseActions";
+import { ApprovalFlow, normalizeApprovalFlow } from "../enums/approvalFlows";
+import { booksBudgetItem } from "../domains/workflow/approval-flow.policy";
 
 interface ApprovalsTabProps {
   currentUser: any;
@@ -438,6 +440,16 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
 
   const isApprover = currentUser?.role === "APPROVER";
   const isFinanceOfficer = currentUser?.role === "FINANCE_OFFICER";
+  const isFinanceHead = currentUser?.role === "FINANCE_HEAD";
+  // Both own a single approval desk and split their queue on the same rule.
+  const isDeskReviewer = isApprover || isFinanceHead;
+
+  // The Finance Head sees the whole organisation, but this screen is their
+  // Accelerated Fast-Track approval desk only — over-budget work stays on the
+  // Pending Exceptions screen.
+  const queueExpenses = isFinanceHead
+    ? expenses.filter((e) => normalizeApprovalFlow(e.approvalFlow) === ApprovalFlow.FINANCE_HEAD_DIRECT)
+    : expenses;
 
   /** Is this request resting on the viewer's own approval step? */
   const isOwnPendingStep = (e: any) => isRestingOnRole(e, currentUser?.role);
@@ -446,27 +458,28 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
   // The Finance Officer's inbound work now arrives at PENDING_APPROVAL on their
   // own step — their review *is* an approval step — so without it this tab read
   // as permanently empty for them while requests piled up waiting on them.
-  const newRequests = expenses.filter(
-    e =>
-      e.status === "SENT_TO_FINANCE" ||
-      e.status === "APPROVED" ||
-      (isFinanceOfficer && isOwnPendingStep(e))
+  const newRequests = queueExpenses.filter(e =>
+    isFinanceHead
+      ? isOwnPendingStep(e)
+      : e.status === "SENT_TO_FINANCE" ||
+        e.status === "APPROVED" ||
+        (isFinanceOfficer && isOwnPendingStep(e))
   );
 
-  const processingRequests = expenses.filter(e => {
+  const processingRequests = queueExpenses.filter(e => {
     if (![...BANK_STAGE_STATUSES, ...OVER_BUDGET_STATUSES, "RETURNED", "BUDGET_CHECK", "PENDING_APPROVAL"].includes(e.status)) {
       return false;
     }
     // The departmental approver's in-flight list is everything that has not yet
     // left their desk — the one rule, applied here and inverted below, so a
     // request can never fall out of both tabs.
-    if (isApprover && hasLeftApproverDesk(e, currentUser)) return false;
+    if (isDeskReviewer && hasLeftApproverDesk(e, currentUser)) return false;
     return true;
   });
 
-  const completedRequests = expenses.filter(e => {
+  const completedRequests = queueExpenses.filter(e => {
     if (["PAID", "CLOSED", "REJECTED", "CANCELLED"].includes(e.status)) return true;
-    if (isApprover && hasLeftApproverDesk(e, currentUser)) return true;
+    if (isDeskReviewer && hasLeftApproverDesk(e, currentUser)) return true;
     return false;
   });
 
@@ -590,6 +603,12 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
     return done ? "Completed" : fallback;
   };
 
+  // The Accelerated flow bypasses Approver 1 and the Final Approver: the
+  // Finance Head's approval is the single review stage, and it is also what
+  // performs the bank upload, so the separate officer stage is dropped.
+  const isFastTrack =
+    normalizeApprovalFlow(selectedExpense?.approvalFlow) === ApprovalFlow.FINANCE_HEAD_DIRECT;
+
   const workflowStages = selectedExpense
     ? [
         {
@@ -600,7 +619,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           current: false,
         },
         {
-          label: `${roleLabel(SystemRole.APPROVER)} Review`,
+          label: `${roleLabel(isFastTrack ? SystemRole.FINANCE_HEAD : SystemRole.APPROVER)} Review`,
           desc: stageDesc(
             departmentStep,
             "Awaiting actionâ€¦",
@@ -612,7 +631,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             : reached([...POST_APPROVAL_STATUSES, "PENDING_EXCEPTIONAL"]),
           current: selectedExpense.status === "PENDING_APPROVAL",
         },
-        {
+        ...(isFastTrack ? [] : [{
           label: `${roleLabel(SystemRole.FINANCE_OFFICER)} Review`,
           desc: stageDesc(financeStep, "Awaiting actionâ€¦", reached([...BANK_STAGE_STATUSES, "PAID", "CLOSED"])),
           date: financeStep ? formatDate(financeStep.timestamp) : "",
@@ -620,7 +639,7 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
             ? Boolean(financeStep)
             : reached([...BANK_STAGE_STATUSES, "PAID", "CLOSED"]),
           current: selectedExpense.status === "SENT_TO_FINANCE",
-        },
+        }]),
         {
           label: "Final Disbursement",
           desc: stageDesc(disbursementStep, "Pending approvalâ€¦", reached(["PAID", "CLOSED"])),
@@ -687,9 +706,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
         expense={selectedExpense}
         budgetItems={budgetItems}
         budgetItemsLoading={budgetItemsLoading}
-        // Only the departmental approver books the spend against an item; the
-        // Finance Officer reviews the choice they already made.
-        requiresBudgetItem={currentUser?.role === "APPROVER"}
+        // Only the flow's booking role (Approver 1, or the Finance Head on the
+        // Accelerated flow) books the spend; later steps review that choice.
+        requiresBudgetItem={booksBudgetItem(selectedExpense, currentUser?.role)}
         submitting={actions.submitting}
         onConfirm={handleApproveConfirm}
       />
@@ -796,7 +815,9 @@ export const ApprovalsTab: React.FC<ApprovalsTabProps> = ({
           {/* Action Buttons */}
           {!isSelectedCompleted && (
             <div style={{ display: "flex", gap: "0.75rem" }}>
-              {currentUser?.role === "FINANCE_HEAD" || selectedExpense.status === "PENDING_EXCEPTIONAL" ? (
+              {/* Expansion decisions only for over-budget requests; on the
+                  Accelerated flow the Finance Head also approves ordinary ones. */}
+              {(isFinanceHead && OVER_BUDGET_STATUSES.includes(selectedExpense.status)) || selectedExpense.status === "PENDING_EXCEPTIONAL" ? (
                 <>
                   <button 
                     onClick={() => {

@@ -5,6 +5,7 @@ import { withErrorHandling } from "../../../../middlewares/errors";
 import { DepartmentService } from "../../../../domains/department/department.service";
 import { DepartmentCreateSchema } from "../../../../validators/validation";
 import { PermissionAction, PermissionResource } from "../../../../enums/permissions";
+import { normalizeApprovalFlow } from "../../../../enums/approvalFlows";
 
 /** Department directory for the Admin Department Management screen. */
 export const GET = withErrorHandling(async (req: NextRequest) => {
@@ -37,6 +38,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
       name: department.name,
       description: department.description || "",
       headUserId: department.headUserId?.toString() ?? null,
+      approvalFlow: normalizeApprovalFlow(department.approvalFlow),
       isActive: department.isActive !== false,
       isPendingDeletion: false,
       usersCount: 0,

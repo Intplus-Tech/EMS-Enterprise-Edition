@@ -11,6 +11,7 @@ import { SystemRole } from "../enums/roles";
 import { RequestStatus } from "../enums/statuses";
 import { LogType } from "../enums/logTypes";
 import { PermissionAction, PermissionResource } from "../enums/permissions";
+import { ApprovalFlow } from "../enums/approvalFlows";
 import { IVendorBankDetails, PermissionGrants } from "./domain";
 
 /** Every route returns this envelope; `withErrorHandling` guarantees the shape. */
@@ -100,6 +101,8 @@ export interface ExpenseRequestDto {
   currentStageName?: string;
   /** Role the active step belongs to; separates the two PENDING_APPROVAL queues. */
   currentStageRole?: string;
+  /** Flow snapshotted at submission; absent on older records (= STANDARD). */
+  approvalFlow?: ApprovalFlow;
   exceptionalBudgetApproved?: boolean;
   exceptionalApprovedBy?: PopulatedRef | string | null;
   originalAmount?: number;
@@ -190,6 +193,8 @@ export interface DepartmentDto {
   isPendingDeletion: boolean;
   headUserId: string | null;
   headName: string | null;
+  /** The approval chain this department's requests run; fixed at creation. */
+  approvalFlow: ApprovalFlow;
   usersCount: number;
 }
 

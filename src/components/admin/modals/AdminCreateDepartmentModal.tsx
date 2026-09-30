@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import * as Icons from "lucide-react";
 import { SubmitButton } from "../../ui/SubmitButton";
 import { CURRENCY_SYMBOL, formatNairaPrecise } from "../../ui/format";
+import { ApprovalFlow, DEFAULT_APPROVAL_FLOW } from "../../../enums/approvalFlows";
+import { APPROVAL_FLOW_OPTIONS, approvalFlowOptionLabel } from "../../../domains/workflow/approval-flow.policy";
 
 interface LineItem {
   id: string;
@@ -25,6 +27,8 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
   busy = false
 }) => {
   const [deptName, setDeptName] = useState("");
+  // Fixed at creation — the Edit Department modal shows it read-only.
+  const [approvalFlow, setApprovalFlow] = useState<ApprovalFlow>(DEFAULT_APPROVAL_FLOW);
   // Starts empty: the modal used to pre-fill three invented allocation lines
   // totalling ₦9,000,000, which would have been saved verbatim on submit.
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -60,6 +64,7 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
     e.preventDefault();
     onCreateDepartment({
       name: deptName,
+      approvalFlow,
       totalBudget: totalAllocation,
       lineItems
     });
@@ -134,6 +139,38 @@ export const AdminCreateDepartmentModal: React.FC<AdminCreateDepartmentModalProp
                 outline: "none"
               }}
             />
+          </div>
+
+          {/* Approval flow — designs/system-admin Create Department (flow selector) */}
+          <div style={{
+            backgroundColor: "rgb(var(--color-surface-secondary) / 0.5)",
+            border: "1px solid rgb(var(--color-card-border))",
+            borderRadius: "0.75rem",
+            padding: "1rem 1.25rem",
+            marginBottom: "1.5rem"
+          }}>
+            <label
+              htmlFor="create-dept-approval-flow"
+              style={{ display: "block", fontSize: "0.75rem", fontWeight: "700", color: "rgb(var(--color-text-muted))", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}
+            >
+              Department Approval Flow <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <select
+              id="create-dept-approval-flow"
+              className="form-select"
+              required
+              value={approvalFlow}
+              onChange={(e) => setApprovalFlow(e.target.value as ApprovalFlow)}
+              style={{ width: "100%" }}
+            >
+              {APPROVAL_FLOW_OPTIONS.map((flow) => (
+                <option key={flow} value={flow}>{approvalFlowOptionLabel(flow)}</option>
+              ))}
+            </select>
+            <p style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start", fontSize: "0.75rem", color: "rgb(var(--color-text-muted))", marginTop: "0.6rem", marginBottom: 0 }}>
+              <Icons.Info size={14} style={{ flexShrink: 0, marginTop: "0.1rem", color: "#2563EB" }} />
+              Determines the approval sequence and segregation of duties for all requests originating from this department. It cannot be changed after the department is created.
+            </p>
           </div>
 
           {/* Budget Box Section */}

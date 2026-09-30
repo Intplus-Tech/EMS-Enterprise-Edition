@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import { RequestStatus } from "../enums/statuses";
+import { ApprovalFlow, DEFAULT_APPROVAL_FLOW } from "../enums/approvalFlows";
 
 /**
  * What a deletion changed elsewhere in the system, so Restore can put it back.
@@ -42,6 +43,12 @@ const DepartmentSchema = new Schema(
     description: { type: String, required: false },
     // Departmental approver surfaced in the Admin Edit Department modal.
     headUserId: { type: Schema.Types.ObjectId, ref: "User", required: false },
+    // Which approval chain this department's requests run — see `approval-flow.policy.ts`.
+    approvalFlow: {
+      type: String,
+      enum: Object.values(ApprovalFlow),
+      default: DEFAULT_APPROVAL_FLOW,
+    },
     isActive: { type: Boolean, default: true },
     // Present only while the department sits in the "Pending Deletion" state.
     pendingDeletion: { type: PendingDeletionSchema, required: false, default: undefined },

@@ -16,8 +16,10 @@ import {
   WorkflowStep,
   resolveActiveStep,
 } from "../../../domains/workflow/workflow.service";
+import { APPROVAL_FLOW_OPTIONS } from "../../../domains/workflow/approval-flow.policy";
 import { SystemRole } from "../../../enums/roles";
 import { RequestStatus } from "../../../enums/statuses";
+import { ApprovalFlow, normalizeApprovalFlow } from "../../../enums/approvalFlows";
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
   await connectToDatabase();
@@ -74,14 +76,19 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   // travels with the name: the bell used to treat every PENDING_APPROVAL row as
   // the approver's, so they were told a request sitting with the Finance
   // Officer was "awaiting your review".
-  const workflow = await WorkflowService.getActiveWorkflow();
-  const steps = workflow.steps as WorkflowStep[];
+  // Each request runs its own flow's chain, so the chains are resolved once per
+  // flow rather than once per row.
+  const stepsByFlow = new Map<ApprovalFlow, WorkflowStep[]>();
+  for (const flow of APPROVAL_FLOW_OPTIONS) {
+    stepsByFlow.set(flow, await WorkflowService.getStepsForFlow(flow));
+  }
 
   let expenses = found.map((expense) => {
     const json = expense.toJSON();
     if (json.status === RequestStatus.PENDING_APPROVAL) {
       // `resolveActiveStep`, not `steps[currentStepIndex]`: the index is the
       // next candidate, and a step below its `minAmount` threshold is skipped.
+      const steps = stepsByFlow.get(normalizeApprovalFlow(expense.approvalFlow)) ?? [];
       const active = resolveActiveStep(steps, expense);
       json.currentStageName = active?.step.stepName;
       json.currentStageRole = active?.step.role;

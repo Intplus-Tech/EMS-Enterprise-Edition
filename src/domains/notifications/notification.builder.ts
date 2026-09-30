@@ -128,7 +128,9 @@ function messageFor(type: NotificationType, expense: any, entry: any): string {
 function pendingStatusesForRole(role: string | undefined): string[] {
   switch (role) {
     case SystemRole.FINANCE_HEAD:
-      return OVER_BUDGET_STATUSES;
+      // PENDING_APPROVAL for their own step on the Accelerated Fast-Track flow;
+      // `isOwnStage` keeps other roles' steps out.
+      return [...OVER_BUDGET_STATUSES, RequestStatus.PENDING_APPROVAL];
     case SystemRole.APPROVER:
       return [RequestStatus.PENDING_APPROVAL];
     case SystemRole.FINANCE_OFFICER:

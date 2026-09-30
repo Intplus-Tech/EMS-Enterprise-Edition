@@ -582,6 +582,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           createDepartment({
             name: deptData.name,
             description: deptData.description,
+            approvalFlow: deptData.approvalFlow,
             totalBudget: deptData.totalBudget,
             lineItems: (deptData.lineItems || []).map((item: any) => ({
               name: item.name,

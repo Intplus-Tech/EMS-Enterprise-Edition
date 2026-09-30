@@ -12,6 +12,8 @@ import { AuditAction } from "../../enums/auditActions";
 import { WorkflowActionType } from "../../enums/workflowActions";
 import { DEFAULT_EXPENSE_CATEGORY } from "../../enums/expenseCategories";
 import { SYSTEM_ACTOR_NAME } from "../identity/reference";
+import { approvalFlowPolicy } from "../workflow/approval-flow.policy";
+import { normalizeApprovalFlow } from "../../enums/approvalFlows";
 import { fileNameFromUrl } from "../attachments/attachment.rules";
 import { IAttachment, IUser } from "../../types";
 import { formatNaira } from "../../components/ui/format";
@@ -39,6 +41,7 @@ const money = formatNaira;
 type WorkflowRequestDoc = {
   requestNumber: string;
   status: RequestStatus;
+  approvalFlow?: string | null;
   history: {
     push(entry: {
       statusBefore: RequestStatus;
@@ -234,14 +237,24 @@ export class ExpenseService {
 
     const previousStatus = request.status;
 
+    // The department's flow decides which chain this submission runs. Taken
+    // fresh on every submission so a department switched while the request sat
+    // with the initiator applies to the reply too.
+    const department = await Department.findById(request.departmentId).select("approvalFlow").lean();
+    const flow = normalizeApprovalFlow((department as { approvalFlow?: string } | null)?.approvalFlow);
+    const flowChanged = normalizeApprovalFlow(request.approvalFlow) !== flow;
+    request.approvalFlow = flow;
+
     // A returned request re-enters the chain where it stopped, so the reply
     // goes back to whoever asked the question. When that stage is not part of
     // the chain — the Finance Head's exceptional return fires only after every
     // step is spent — the stored index points past the end and the routing
     // below would find nothing to route to. See
     // `resumeStepIndexForResubmission` for why that stranded the request.
+    // If the flow changed meanwhile, the old index points into a different
+    // chain altogether, so the request starts the new one from the top.
     if (previousStatus === RequestStatus.RETURNED) {
-      request.currentStepIndex = await WorkflowService.getResumeStepIndex(request);
+      request.currentStepIndex = flowChanged ? 0 : await WorkflowService.getResumeStepIndex(request);
     }
 
     request.status = RequestStatus.SUBMITTED;
@@ -694,11 +707,12 @@ export class ExpenseService {
     logActor: ILogActor
   ) {
     const actorId = getActorId(actor);
-    // The officer is the one who confirms payee and documents. When the Finance
-    // Head's expansion is what unblocked the request, the upload is the system
-    // resuming a leg the officer already approved — attributing it to the Head
-    // would put them on the record as having done the officer's check.
-    const isOfficer = actor.role === SystemRole.FINANCE_OFFICER;
+    // The upload role (the Final Approver, or the Finance Head on the direct
+    // flow) is the one who confirms payee and documents. When the Finance Head's
+    // expansion is what unblocked a standard-flow request, the upload is the
+    // system resuming a leg the officer already approved — attributing it to the
+    // Head would put them on the record as having done the officer's check.
+    const isOfficer = actor.role === approvalFlowPolicy(request.approvalFlow).bankUploadRole;
 
     request.status = RequestStatus.UPLOADED_TO_BANK;
     request.history.push({
@@ -762,7 +776,7 @@ export class ExpenseService {
 
     // Validate that the actor has the required role for the active step
     if (actor.role !== nextRouting.step.role) {
-      throw new Error(`Unauthorized. This step requires the role: ${nextRouting.step.role}`);
+      throw new Error(`Unauthorized. This step requires the role: ${roleLabel(nextRouting.step.role)}`);
     }
 
     const previousStatus = request.status;
@@ -770,12 +784,14 @@ export class ExpenseService {
     // `ipAddress` rides along on the authenticated actor so audit rows carry
     // the real client address; the viewer no longer substitutes a fake one.
     const logActor = { id: actorId, name: actor.name, role: actor.role, ipAddress: actor.ipAddress };
+    const flowPolicy = approvalFlowPolicy(request.approvalFlow);
 
-    // The approver books the request against a budget item as part of approving
+    // The flow's booking role (Approver 1, or the Finance Head when Approver 1 is
+    // bypassed) books the request against a budget item as part of approving
     // it. Done before the transition so a rejected attachment (wrong department,
     // unknown item) fails the whole decision rather than advancing a request
     // that nothing draws down.
-    if (action === WorkflowActionType.APPROVE && actor.role === SystemRole.APPROVER) {
+    if (action === WorkflowActionType.APPROVE && actor.role === flowPolicy.budgetBookingRole) {
       if (budgetItemId) {
         await BudgetService.attachRequestToItem(requestId, budgetItemId, logActor);
         request = await ExpenseRequest.findById(requestId);
@@ -866,10 +882,11 @@ export class ExpenseService {
           logActor
         );
 
-        // The Finance Officer's approval carries the request across the bank
-        // leg and into the Manager's queue. Any other role finishing the chain
-        // leaves it at SENT_TO_FINANCE for an officer to pick up.
-        if (actor.role === SystemRole.FINANCE_OFFICER) {
+        // The flow's upload role (Final Approver, or the Finance Head on the
+        // direct flow) carries the request across the bank leg and into the
+        // Uploader's queue. Any other role finishing the chain leaves it at
+        // SENT_TO_FINANCE for an officer to pick up.
+        if (actor.role === flowPolicy.bankUploadRole) {
           await this.advanceToBankStage(request, actor, logActor);
         }
       }
@@ -935,7 +952,7 @@ export class ExpenseService {
   public static async processFinanceUpload(requestId: string, actor: WorkflowActor) {
     await connectToDatabase();
     if (actor.role !== SystemRole.FINANCE_OFFICER) {
-      throw new Error("Unauthorized. Only Finance Officers can verify and upload bank files.");
+      throw new Error(`Unauthorized. Only the ${roleLabel(SystemRole.FINANCE_OFFICER)} can verify and upload bank files.`);
     }
 
     const request = await ExpenseRequest.findById(requestId);
@@ -1011,7 +1028,7 @@ export class ExpenseService {
   ) {
     await connectToDatabase();
     if (actor.role !== SystemRole.FINANCE_MANAGER) {
-      throw new Error("Unauthorized. Only Finance Managers/Payment Releasers can authorize cash release.");
+      throw new Error(`Unauthorized. Only the ${roleLabel(SystemRole.FINANCE_MANAGER)} can authorize cash release.`);
     }
 
     const request = await ExpenseRequest.findById(requestId);

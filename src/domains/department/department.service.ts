@@ -9,6 +9,7 @@ import { RequestNotifier } from "../notifications/request-notifier";
 import { AuditAction } from "../../enums/auditActions";
 import { IN_FLIGHT_STATUSES, RequestStatus } from "../../enums/statuses";
 import { DepartmentDto } from "../../types/api";
+import { ApprovalFlow, normalizeApprovalFlow } from "../../enums/approvalFlows";
 import { IBudgetLineItem } from "../../types/domain";
 
 /**
@@ -67,6 +68,8 @@ export class DepartmentService {
       isPendingDeletion: Boolean(dept.pendingDeletion),
       headUserId: dept.headUserId ? String(dept.headUserId) : null,
       headName: dept.headUserId ? headById.get(String(dept.headUserId)) ?? null : null,
+      // Departments created before flows existed have no value stored.
+      approvalFlow: normalizeApprovalFlow(dept.approvalFlow),
       // Deletion clears the assignment, so a pending-deletion row correctly
       // reports the users it no longer holds; Restore puts them back.
       usersCount: countByDept.get(String(dept._id)) ?? 0,
@@ -78,6 +81,7 @@ export class DepartmentService {
       name: string;
       description?: string;
       headUserId?: string | null;
+      approvalFlow?: ApprovalFlow;
       /** Opening allocation, created alongside the department. */
       budget?: {
         periodName: string;
@@ -104,13 +108,14 @@ export class DepartmentService {
       name: data.name.trim(),
       description: data.description?.trim(),
       headUserId: data.headUserId || undefined,
+      approvalFlow: normalizeApprovalFlow(data.approvalFlow),
       isActive: true,
     });
 
     await LoggerService.logAudit(
       AuditAction.DEPARTMENT_CREATED,
       `Department '${department.name}' created`,
-      { departmentId: department._id },
+      { departmentId: department._id, approvalFlow: department.approvalFlow },
       actor
     );
 

@@ -10,6 +10,7 @@ import { ModalShell } from "../../ui/ModalShell";
 import { DEPARTMENT_SCOPED_ROLES } from "../../../enums/roles";
 import { CURRENCY_SYMBOL, formatNairaPrecise, formatNairaCompact } from "../../ui/format";
 import { AdminAddBudgetItemModal, BudgetItemPayload } from "./AdminAddBudgetItemModal";
+import { approvalFlowPolicy } from "../../../domains/workflow/approval-flow.policy";
 
 interface BudgetLine {
   /** Stored item id; absent for a line added in this session. Sent back so a save keeps its ledger. */
@@ -197,8 +198,8 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
           </div>
         </div>
 
-        {/* Ownership + fiscal envelope */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.75rem" }}>
+        {/* Ownership + fiscal envelope + the approval flow fixed at creation */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "1.75rem" }}>
           <div>
             <label className="form-label">Department Head</label>
             <select className="form-select" value={head} onChange={(e) => setHead(e.target.value)}>
@@ -217,6 +218,23 @@ export const AdminEditDepartmentModal: React.FC<AdminEditDepartmentModalProps> =
               value={totalBudget}
               onChange={(e) => setTotalBudget(Number(e.target.value))}
               style={{ textAlign: "right" }}
+            />
+          </div>
+          <div>
+            <label className="form-label" htmlFor="edit-dept-approval-flow">
+              Department Approval Flow{" "}
+              <span style={{ fontSize: "0.7rem", fontWeight: 500, color: "rgb(var(--color-text-dim))" }}>(Not editable)</span>
+            </label>
+            {/* Read-only by design: in-flight requests are routed on the chain
+                they were submitted into, so the flow is fixed at creation. */}
+            <input
+              id="edit-dept-approval-flow"
+              type="text"
+              className="form-input"
+              value={approvalFlowPolicy(department.approvalFlow).label}
+              title={approvalFlowPolicy(department.approvalFlow).description}
+              disabled
+              readOnly
             />
           </div>
         </div>

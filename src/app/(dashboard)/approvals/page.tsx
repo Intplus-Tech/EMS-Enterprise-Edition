@@ -7,7 +7,6 @@
 import { useState } from "react";
 import { ApprovalsTab } from "../../../components/ApprovalsTab";
 import { useDashboard } from "../DashboardProvider";
-import { SystemRole } from "../../../enums/roles";
 import { useBudgetContext } from "../hooks/useBudgetContext";
 import { useBudgetItems } from "../hooks/useBudgetItems";
 import { useRequestThread } from "../hooks/useRequestThread";
@@ -45,9 +44,6 @@ export default function ApprovalsPage() {
     threadTargetId ?? selectedExpense?._id,
     (message) => setAdminNotice({ tone: "error", message })
   );
-
-  // Finance Head reviews exceptions on its own route, not the approvals queue.
-  if (currentUser?.role === SystemRole.FINANCE_HEAD) return null;
 
   return (
     <ApprovalsTab

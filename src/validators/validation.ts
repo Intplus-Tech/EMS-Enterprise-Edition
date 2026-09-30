@@ -3,6 +3,7 @@ import { SystemRole } from "../enums/roles";
 import { PermissionAction, PermissionResource } from "../enums/permissions";
 import { WorkflowActionType } from "../enums/workflowActions";
 import { LogType } from "../enums/logTypes";
+import { ApprovalFlow, DEFAULT_APPROVAL_FLOW } from "../enums/approvalFlows";
 import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_REQUEST } from "../domains/attachments/attachment.rules";
 
 export const LoginSchema = z.object({
@@ -166,6 +167,12 @@ export const DepartmentCreateSchema = z.object({
   name: z.string().trim().min(2, "Department name is required").max(80),
   description: z.string().trim().max(500).optional(),
   headUserId: OptionalObjectId,
+  /**
+   * Which approval chain the department's requests run. Set at creation only —
+   * the Edit Department design shows it as not editable, and the update schema
+   * below deliberately omits it so a direct PUT cannot change it either.
+   */
+  approvalFlow: z.nativeEnum(ApprovalFlow).optional().default(DEFAULT_APPROVAL_FLOW),
   /**
    * The department's opening budget, created in the same step.
    *

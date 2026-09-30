@@ -5,6 +5,7 @@ import { withErrorHandling } from "../../../../../middlewares/errors";
 import { DepartmentService } from "../../../../../domains/department/department.service";
 import { DepartmentStatusSchema, DepartmentUpdateSchema } from "../../../../../validators/validation";
 import { PermissionAction, PermissionResource } from "../../../../../enums/permissions";
+import { normalizeApprovalFlow } from "../../../../../enums/approvalFlows";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -27,6 +28,7 @@ export const PUT = withErrorHandling(async (req: NextRequest, { params }: RouteC
       name: department.name,
       description: department.description || "",
       headUserId: department.headUserId?.toString() ?? null,
+      approvalFlow: normalizeApprovalFlow(department.approvalFlow),
       isActive: department.isActive !== false,
     },
   });

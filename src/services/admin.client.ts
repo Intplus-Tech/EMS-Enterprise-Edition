@@ -8,6 +8,7 @@
 import { http } from "./http";
 import { SystemRole } from "../enums/roles";
 import { PermissionAction, PermissionResource } from "../enums/permissions";
+import { ApprovalFlow } from "../enums/approvalFlows";
 import {
   AdminUserDto,
   BudgetPeriodDto,
@@ -42,6 +43,8 @@ export interface DepartmentInput {
   name: string;
   description?: string;
   headUserId?: string | null;
+  /** Accepted only on create; the flow cannot be changed afterwards. */
+  approvalFlow?: ApprovalFlow;
   /**
    * Opening allocation, created with the department in a single call.
    *
