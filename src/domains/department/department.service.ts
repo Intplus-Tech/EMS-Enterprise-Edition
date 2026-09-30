@@ -100,6 +100,14 @@ export class DepartmentService {
     const existing = await Department.findOne({
       name: { $regex: `^${escapeRegex(data.name)}$`, $options: "i" },
     });
+    if (existing?.pendingDeletion) {
+      // Deletion is soft and keeps the name reserved for Restore. Admins were
+      // recreating a department only to change its approval flow; point them
+      // at the actions that keep its users, budget and history.
+      throw new Error(
+        `Invalid request: '${existing.name}' was deleted and can be restored. Restore it, then edit its approval flow if that is what needs to change.`
+      );
+    }
     if (existing) {
       throw new Error(`Invalid request: a department named '${data.name}' already exists.`);
     }
@@ -141,7 +149,13 @@ export class DepartmentService {
 
   public static async update(
     id: string,
-    data: { name?: string; description?: string; headUserId?: string | null; isActive?: boolean },
+    data: {
+      name?: string;
+      description?: string;
+      headUserId?: string | null;
+      approvalFlow?: ApprovalFlow;
+      isActive?: boolean;
+    },
     actor: ILogActor
   ) {
     await connectToDatabase();
@@ -164,12 +178,25 @@ export class DepartmentService {
     if (data.headUserId !== undefined) department.headUserId = data.headUserId || undefined;
     if (data.isActive !== undefined) department.isActive = data.isActive;
 
+    // Only new submissions pick up the switch: each request snapshots its flow
+    // at submission (see `ExpenseService.submitRequest`), so anything already
+    // in approval finishes on the chain it entered.
+    const previousFlow = normalizeApprovalFlow(department.approvalFlow);
+    const flowChanged = data.approvalFlow !== undefined && data.approvalFlow !== previousFlow;
+    if (flowChanged) department.approvalFlow = data.approvalFlow;
+
     await department.save();
 
     await LoggerService.logAudit(
       AuditAction.DEPARTMENT_UPDATED,
-      `Department '${department.name}' updated`,
-      { departmentId: department._id, changes: data },
+      flowChanged
+        ? `Department '${department.name}' updated — approval flow changed from ${previousFlow} to ${data.approvalFlow}`
+        : `Department '${department.name}' updated`,
+      {
+        departmentId: department._id,
+        changes: data,
+        ...(flowChanged ? { previousApprovalFlow: previousFlow } : {}),
+      },
       actor
     );
 
